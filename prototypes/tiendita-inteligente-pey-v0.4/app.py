@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import Any
 from pey_gateway import PeyClient, PeyError, verify_standard_webhook, money_to_cents
 from cart_intelligence import parse_cart
+import unicodedata
+from zoneinfo import ZoneInfo
 
 import qrcode
 from fastapi import FastAPI, HTTPException, Request
@@ -80,7 +82,7 @@ async def require_operator(request:Request, call_next):
             return JSONResponse(status_code=401,content={'detail':'Inicia sesión como empleado o dueño'})
         if employee and not operator:
             path=request.url.path
-            allowed=(path in ('/api/employee/bootstrap','/api/cart/parse','/api/employee/logout') or
+            allowed=(path in ('/api/employee/bootstrap','/api/cart/parse','/api/employee/logout','/api/barcodes/lookup') or
                      path=='/api/sales' and request.method=='POST' or
                      path.startswith('/api/sales/') and
                      (path.endswith('/qr') or path.endswith('/push') or path.endswith('/status')))
@@ -93,7 +95,13 @@ async def require_operator(request:Request, call_next):
                     with db() as c:row=c.execute('SELECT employee FROM sales WHERE id=?',(sale_id,)).fetchone()
                     if not row or row['employee']!=employee:
                         return JSONResponse(status_code=403,content={'detail':'Venta de otro empleado'})
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers['X-Content-Type-Options']='nosniff'
+    response.headers['Referrer-Policy']='no-referrer'
+    response.headers['X-Frame-Options']='DENY'
+    if request.url.path.startswith('/api/'):
+        response.headers['Cache-Control']='no-store'
+    return response
 
 app.mount('/static', StaticFiles(directory=ROOT / 'static'), name='static')
 # Recursos oficiales Abarpay reutilizados desde la raíz del repositorio.
@@ -154,6 +162,10 @@ def create_database():
             );
             CREATE TABLE IF NOT EXISTS webhook_events (
               webhook_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS product_barcodes (
+              code TEXT PRIMARY KEY, product_id TEXT NOT NULL,
+              FOREIGN KEY(product_id) REFERENCES products(id)
             );
             CREATE TABLE IF NOT EXISTS login_failures (
               ip TEXT NOT NULL, created_at TEXT NOT NULL
@@ -220,6 +232,100 @@ def create_database():
 
 create_database()
 
+# GAP-004/GAP-012 integrados aquí para conservar el Dockerfile del equipo sin cambios.
+try:
+    ZONE = ZoneInfo("America/Mexico_City")
+except Exception:
+    # CDMX permanece en UTC-6 desde 2022; respaldo para contenedores sin tzdata.
+    ZONE = timezone(timedelta(hours=-6))
+PAID = ("PAGADA", "PAGADA_PRUEBA", "DEMO_PAGADA", "FIADA")
+
+
+def daily_close(connection, day=None):
+    local_day = day or datetime.now(ZONE).date().isoformat()
+    try:
+        begin = datetime.fromisoformat(local_day + "T00:00:00").replace(tzinfo=ZONE)
+        end = datetime.fromisoformat(local_day + "T23:59:59.999999").replace(tzinfo=ZONE)
+    except ValueError as exc:
+        raise ValueError("Fecha inválida; usa AAAA-MM-DD") from exc
+    if begin.date().isoformat() != local_day:
+        raise ValueError("Fecha inválida")
+    start_utc = begin.astimezone(timezone.utc).isoformat(timespec="seconds")
+    end_utc = end.astimezone(timezone.utc).isoformat(timespec="seconds")
+    rows = connection.execute(
+        """SELECT id, employee, status, amount_cents, charged_cents,
+                  created_at, paid_at, qr_mode, verified_source, items_json
+           FROM sales
+           WHERE (created_at>=? AND created_at<=?)
+              OR (paid_at>=? AND paid_at<=?)
+           ORDER BY id""",
+        (start_utc, end_utc, start_utc, end_utc),
+    ).fetchall()
+    report = {"date":local_day, "timezone":"America/Mexico_City", "commercial_cents":0,
+              "test_cents":0, "simulated_cents":0, "credit_cents":0,
+              "pending_count":0, "uncertain_count":0, "paid_count":0,
+              "test_count":0, "simulated_count":0, "credit_count":0,
+              "employees":{}, "exceptions":[]}
+    for row in rows:
+        item = dict(row)
+        status = item["status"]
+        created_today = start_utc <= item["created_at"] <= end_utc
+        paid_today = bool(item["paid_at"] and start_utc <= item["paid_at"] <= end_utc)
+        if created_today and status == "PENDIENTE":
+            report["pending_count"] += 1
+            if (item["qr_mode"] or "").startswith("REAL_REVISAR"):
+                report["uncertain_count"] += 1
+                report["exceptions"].append({"id":item["id"],"reason":"Revisar respuesta PEY"})
+        if created_today and status not in (*PAID, "PENDIENTE", "CANCELADA"):
+            report["uncertain_count"] += 1
+            report["exceptions"].append({"id":item["id"],"reason":status})
+        if status == "FIADA" and created_today:
+            report["credit_cents"] += item["amount_cents"]
+            report["credit_count"] += 1
+        if not paid_today:
+            continue
+        group = report["employees"].setdefault(item["employee"], {"commercial_cents":0,"sales":0})
+        if status == "PAGADA":
+            report["commercial_cents"] += item["charged_cents"]
+            report["paid_count"] += 1
+            group["commercial_cents"] += item["charged_cents"]
+            group["sales"] += 1
+        elif status == "PAGADA_PRUEBA":
+            report["test_cents"] += item["charged_cents"]
+            report["test_count"] += 1
+        elif status == "DEMO_PAGADA":
+            report["simulated_cents"] += item["amount_cents"]
+            report["simulated_count"] += 1
+    report["employees"] = [{"name":name, **metrics} for name,metrics in sorted(report["employees"].items())]
+    report["exceptions"] = report["exceptions"][:30]
+    report["note"] = "Pruebas, simulaciones y fiados NO son ingresos comerciales cobrados. No es conciliación bancaria ni cierre fiscal."
+    return report
+
+
+def normalize(text):
+    return "".join(c for c in unicodedata.normalize("NFD", text.lower()) if unicodedata.category(c)!="Mn")
+
+
+def answer_local(connection, question):
+    """Intérprete controlado: jamás produce SQL dinámico ni modifica el registro."""
+    q = normalize(question).strip()
+    day = daily_close(connection)
+    if any(word in q for word in ("vendi hoy", "vendido hoy", "ventas hoy", "cobre hoy", "cobrado hoy", "ingresos hoy")):
+        return {"answer":f"Hoy se cobraron ${day['commercial_cents']/100:,.2f} MXN en {day['paid_count']} ventas comerciales. Los pagos de prueba y las simulaciones están separados.", "source":"corte local"}
+    if "prueba" in q or "simulad" in q:
+        return {"answer":f"Hoy: PEY de prueba ${day['test_cents']/100:,.2f} MXN; simulaciones ${day['simulated_cents']/100:,.2f} MXN. No son ingresos comerciales.", "source":"corte local"}
+    if any(word in q for word in ("reponer", "agot", "stock", "inventario", "faltan productos", "existencias")):
+        products=connection.execute("SELECT name, qty, min_qty, sales_day, lead_days FROM products WHERE qty<=min_qty ORDER BY qty ASC").fetchall()
+        if not products:return {"answer":"No hay productos por debajo del mínimo registrado.", "source":"inventario local"}
+        names=[f"{p['name']}: quedan {p['qty']} (mínimo {p['min_qty']})" for p in products[:8]]
+        return {"answer":"Revisa para reponer: "+"; ".join(names)+".", "source":"inventario local"}
+    if "fiado" in q or "deben" in q or "deuda" in q:
+        balance=connection.execute("SELECT COALESCE(SUM(amount_cents),0) FROM credit_movements").fetchone()[0]
+        return {"answer":f"Saldo pendiente registrado en fiados: ${balance/100:,.2f} MXN. No es ingreso cobrado.", "source":"libro local de fiados"}
+    if "pendiente" in q or "conciliar" in q:
+        return {"answer":f"Hoy hay {day['pending_count']} ventas pendientes y {day['uncertain_count']} casos que requieren revisión. No se consideran pagados.", "source":"corte local"}
+    return {"answer":"Puedo consultar: ¿Cuánto vendí hoy?, ¿Qué productos debo reponer?, ¿Cuánto me deben de fiado?, ¿Qué ventas están pendientes? y ¿Cuánto fue de prueba? No modifico ventas ni inventario.", "source":"ayuda local"}
+
 
 def result_rows(cur):
     return [dict(row) for row in cur.fetchall()]
@@ -263,6 +369,61 @@ def snapshot():
                 'config':{'pey_mode':'REAL' if LIVE else ('BLOQUEADO' if CONFIG_BLOCKED else 'DEMO'),
                           'server_time':now(), 'single_branch':'Sucursal Centro',
                           'needs_internet_for_pey':True,'one_cent_test':TEST_ONE_CENT,'evaluator_demo':EVALUATOR_DEMO,'ai_enabled':bool(os.getenv('OPENAI_API_KEY'))}}
+
+
+# Funciones adicionales de la versión v0.5: lectura local y código de barras.
+@app.get('/api/reports/daily-close')
+def daily_closing(date: str | None = None):
+    if date and (len(date)!=10 or date[4]!='-' or date[7]!='-'):
+        raise HTTPException(422,'Fecha inválida; utiliza AAAA-MM-DD')
+    with db() as c:
+        try:return daily_close(c,date)
+        except ValueError as exc:raise HTTPException(422,str(exc))
+
+
+class BusinessQuestion(BaseModel):
+    question: str = Field(min_length=3,max_length=250)
+
+
+@app.post('/api/assistant/ask')
+def business_question(value:BusinessQuestion):
+    with db() as c:return answer_local(c,value.question)
+
+
+class BarcodeQuery(BaseModel):
+    code: str = Field(min_length=6,max_length=64)
+
+
+class BarcodeLink(BarcodeQuery):
+    product_id: str
+
+
+@app.post('/api/barcodes/lookup')
+def barcode_lookup(value:BarcodeQuery):
+    code=value.code.strip()
+    if not code.isascii() or not code.isalnum():
+        raise HTTPException(422,'Código inválido')
+    with db() as c:
+        row=c.execute("""SELECT p.id,p.name,p.price_cents,p.qty FROM product_barcodes b
+                         JOIN products p ON p.id=b.product_id WHERE b.code=?""",(code,)).fetchone()
+    if not row:raise HTTPException(404,'Código sin asociar. Selecciona el producto para enlazarlo.')
+    return dict(row)
+
+
+@app.post('/api/barcodes/link')
+def barcode_link(value:BarcodeLink):
+    code=value.code.strip()
+    if not code.isascii() or not code.isalnum():
+        raise HTTPException(422,'Código inválido')
+    with conn_guard,db() as c:
+        p=c.execute('SELECT id FROM products WHERE id=?',(value.product_id,)).fetchone()
+        if not p:raise HTTPException(404,'Producto desconocido')
+        old=c.execute('SELECT product_id FROM product_barcodes WHERE code=?',(code,)).fetchone()
+        if old and old['product_id']!=value.product_id:
+            raise HTTPException(409,'Código ya asociado a otro producto; requiere revisión manual')
+        c.execute('INSERT OR IGNORE INTO product_barcodes(code,product_id) VALUES(?,?)',(code,value.product_id))
+    return barcode_lookup(BarcodeQuery(code=code))
+
 
 @app.get('/empleado')
 def employee_home(): return FileResponse(ROOT/'static'/'empleado.html')
