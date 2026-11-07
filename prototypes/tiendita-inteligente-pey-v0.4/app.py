@@ -81,7 +81,7 @@ async def require_operator(request:Request, call_next):
             return JSONResponse(status_code=401,content={'detail':'Inicia sesión como empleado o dueño'})
         if employee and not operator:
             path=request.url.path
-            allowed=(path in ('/api/employee/bootstrap','/api/cart/parse','/api/employee/logout') or
+            allowed=(path in ('/api/employee/bootstrap','/api/cart/parse','/api/employee/logout','/api/barcodes/lookup') or
                      path=='/api/sales' and request.method=='POST' or
                      path.startswith('/api/sales/') and
                      (path.endswith('/qr') or path.endswith('/push') or path.endswith('/status')))
