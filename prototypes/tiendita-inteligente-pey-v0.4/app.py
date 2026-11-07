@@ -233,7 +233,11 @@ def create_database():
 create_database()
 
 # GAP-004/GAP-012 integrados aquí para conservar el Dockerfile del equipo sin cambios.
-ZONE = ZoneInfo("America/Mexico_City")
+try:
+    ZONE = ZoneInfo("America/Mexico_City")
+except Exception:
+    # CDMX permanece en UTC-6 desde 2022; respaldo para contenedores sin tzdata.
+    ZONE = timezone(timedelta(hours=-6))
 PAID = ("PAGADA", "PAGADA_PRUEBA", "DEMO_PAGADA", "FIADA")
 
 
