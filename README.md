@@ -182,6 +182,7 @@ Orden propuesto de trabajo:
 
 - [Banner](assets/branding/banner.jpeg): 1600 × 533 píxeles.
 - [Logo](assets/branding/logo.jpeg) e [identidad visual](assets/branding/identidadVisual.jpeg); guía en [`GuiaIdentidadGrafica.jpeg`](assets/branding/GuiaIdentidadGrafica.jpeg).
+- [Diseño de interfaz de Abarpay](docs/diseno/README.md): maquetas de pantallas, recorridos y sistema de diseño.
 - [Brief compartido del equipo: DevDay Exchange México 2026](https://chatgpt.com/s/t_6aef79ee56148191a6c905d73d32fa2b): problema, enfoque móvil, propuestas del equipo, modelo comercial, plazo y recomendación del MVP. Se presenta como diagnóstico, no como decisión final.
 - **Resumen de projecto.eml**, proporcionado por el equipo: síntesis de la reunión «Open AI PEY», con inventarios móviles, administración, IA, proveedores, fiado, conectividad y etapas de crecimiento. Incluye recomendaciones del autor además de ideas atribuidas a la reunión.
 - [Documentación oficial de PEY](https://docs.pey.mx/): contrato y comportamiento esperado de la integración.
