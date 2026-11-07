@@ -111,3 +111,46 @@ def parse_cart(conn, text: str) -> dict:
             result["warning"] = f"OpenAI no respondió ({type(e).__name__}); se usó el intérprete local"
             return result
     return parse_local(text, catalog)
+
+
+class VisionUnavailable(Exception):
+    """No hay OPENAI_API_KEY: el reconocimiento por foto no está disponible."""
+
+
+def parse_photo(conn, image_b64: str) -> dict:
+    """Foto del mostrador → carrito. Solo con OpenAI; sin key no se inventa nada."""
+    if not os.getenv("OPENAI_API_KEY"):
+        raise VisionUnavailable("Falta OPENAI_API_KEY para reconocer productos por foto")
+    from openai import OpenAI
+
+    catalog = _catalog_rows(conn)
+    listing = [{"productId": p["id"], "name": p["name"]} for p in catalog]
+    schema = {
+        "type": "object", "additionalProperties": False,
+        "properties": {
+            "items": {"type": "array", "items": {
+                "type": "object", "additionalProperties": False,
+                "properties": {"productId": {"type": "integer"}, "qty": {"type": "integer"}},
+                "required": ["productId", "qty"]}},
+            "unmatched": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["items", "unmatched"],
+    }
+    resp = OpenAI().chat.completions.create(
+        model=os.getenv("OPENAI_VISION_MODEL", OPENAI_MODEL),
+        temperature=0,
+        response_format={"type": "json_schema", "json_schema": {"name": "carrito", "schema": schema, "strict": True}},
+        messages=[
+            {"role": "system", "content": (
+                "Eres la caja de una tiendita mexicana. Identifica los productos visibles en la foto del mostrador "
+                "y cuántos hay de cada uno. Usa SOLO productId de este catálogo; lo que no reconozcas con seguridad "
+                "va a unmatched. No inventes productos ni precios.\nCatálogo: " + json.dumps(listing, ensure_ascii=False))},
+            {"role": "user", "content": [
+                {"type": "text", "text": "¿Qué productos hay en el mostrador?"},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + image_b64}},
+            ]},
+        ],
+    )
+    data = json.loads(resp.choices[0].message.content)
+    pairs = [(i["productId"], i["qty"]) for i in data.get("items", [])]
+    return {"items": _to_items(pairs, catalog), "unmatched": data.get("unmatched", []), "engine": "openai-vision"}

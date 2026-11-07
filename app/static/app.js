@@ -171,4 +171,77 @@ document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click"
 document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => ir(b.dataset.tab)));
 $("atras").addEventListener("click", () => ir("home"));
 
+// ---------- Escáner con cámara (códigos de barras y foto de productos) ----------
+const SC = { stream: null, timer: null, modo: "codigo", ultimo: "", bloqueado: false };
+async function abrirScanner(modo) {
+  SC.modo = modo; SC.ultimo = ""; SC.bloqueado = false;
+  $("scanner").hidden = false; $("enlazar").hidden = true;
+  $("scan-titulo").textContent = modo === "foto" ? "Foto de productos" : "Escanear código";
+  $("scan-marco").classList.toggle("foto", modo === "foto");
+  $("tomar-foto").hidden = modo !== "foto"; $("scan-manual").hidden = modo === "foto";
+  $("scan-msg").textContent = modo === "foto" ? "Pon los productos en el mostrador y toma la foto." : "Apunta al código de barras del producto.";
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    $("scan-msg").textContent = "La cámara necesita HTTPS o localhost. Escribe el código abajo."; return;
+  }
+  try {
+    SC.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    $("scan-video").srcObject = SC.stream; await $("scan-video").play();
+  } catch (e) { $("scan-msg").textContent = "No pude abrir la cámara (" + e.name + "). Escribe el código abajo."; return; }
+  if (modo === "codigo") iniciarLectura();
+}
+function cerrarScanner() {
+  clearInterval(SC.timer);
+  if (SC.stream) SC.stream.getTracks().forEach((t) => t.stop());
+  SC.stream = null; $("scanner").hidden = true;
+}
+async function iniciarLectura() {
+  if (!("BarcodeDetector" in window)) { $("scan-msg").textContent = "Este navegador no lee códigos con la cámara (usa Chrome). Escribe el código abajo."; return; }
+  const det = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code"] });
+  SC.timer = setInterval(async () => {
+    if (SC.bloqueado || $("scan-video").readyState < 2) return;
+    try {
+      const codes = await det.detect($("scan-video"));
+      if (codes.length && codes[0].rawValue !== SC.ultimo) { SC.ultimo = codes[0].rawValue; buscarCodigo(SC.ultimo); }
+    } catch {}
+  }, 350);
+}
+async function buscarCodigo(code) {
+  SC.bloqueado = true;
+  try {
+    const p = await api("/api/barcode/lookup", { method: "POST", body: JSON.stringify({ code }) });
+    agregar(p.productId, 1); if (navigator.vibrate) navigator.vibrate(80);
+    $("scan-msg").textContent = `Agregado: ${p.name}. Escanea el siguiente o cierra.`;
+    setTimeout(() => { SC.bloqueado = false; SC.ultimo = ""; }, 1200);
+  } catch (e) {
+    if (e.message !== "Código sin enlazar") { $("scan-msg").textContent = e.message; SC.bloqueado = false; return; }
+    $("enl-codigo").textContent = code; $("enlazar").hidden = false;
+    $("enl-lista").innerHTML = S.products.map((p) => `<button data-enl="${p.id}">${p.name}</button>`).join("");
+    $("scan-msg").textContent = "Este código es nuevo: enlázalo una vez y la próxima se agrega solo.";
+  }
+}
+$("enl-lista").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-enl]"); if (!b) return;
+  const code = $("enl-codigo").textContent;
+  const p = await api("/api/barcode/link", { method: "POST", body: JSON.stringify({ code, productId: +b.dataset.enl }) });
+  agregar(p.productId, 1); $("enlazar").hidden = true;
+  $("scan-msg").textContent = `Enlazado y agregado: ${p.name}.`;
+  setTimeout(() => { SC.bloqueado = false; SC.ultimo = ""; }, 1200);
+});
+$("scan-manual").addEventListener("submit", (ev) => { ev.preventDefault(); const c = $("scan-codigo").value.trim(); if (c) { buscarCodigo(c); $("scan-codigo").value = ""; } });
+$("tomar-foto").addEventListener("click", async () => {
+  const v = $("scan-video"); if (!v.videoWidth) return toast("La cámara aún no está lista.");
+  const cv = document.createElement("canvas"); const k = Math.min(1, 1024 / v.videoWidth);
+  cv.width = v.videoWidth * k; cv.height = v.videoHeight * k; cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
+  $("scan-msg").textContent = "Reconociendo productos…";
+  try {
+    const r = await api("/api/cart/photo", { method: "POST", body: JSON.stringify({ image: cv.toDataURL("image/jpeg", 0.8).split(",")[1] }) });
+    r.items.forEach((i) => agregar(i.productId, i.qty));
+    $("unmatched").innerHTML = r.unmatched.map((u) => `<span>No reconocí: ${u}</span>`).join("");
+    cerrarScanner(); toast(r.items.length ? "Productos agregados desde la foto. Revisa antes de cobrar." : "No reconocí productos del catálogo.");
+  } catch (e) { $("scan-msg").textContent = e.message; }
+});
+$("abrir-scan").addEventListener("click", () => abrirScanner("codigo"));
+$("abrir-foto").addEventListener("click", () => abrirScanner("foto"));
+$("cerrar-scan").addEventListener("click", cerrarScanner);
+
 init().catch((e) => toast("No pude cargar la tienda: " + e.message));

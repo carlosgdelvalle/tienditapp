@@ -20,7 +20,7 @@ Detalle en [`app/README.md`](../app/README.md). Reglas del repo en [`AGENTS.md`]
 
 ## Evidencia
 
-- `pytest app/tests`: 12 passed (pey simulado, etiquetado SIMULADO). CI de GitHub en verde.
+- `pytest app/tests`: 15 passed (incluye escáner) (pey simulado, etiquetado SIMULADO). CI de GitHub en verde.
 - `GET /transaction/api-key` con la key nueva: HTTP 200.
 - Pago real por CoDi de $0.01: tx `01M6VXE5HTXV66NPJCR1XY7T4A`, `PAID` a las 15:08 (QR creado por API y conciliado).
 - La app creó QR reales de pey desde su pantalla (ventas de $58 que cobran $0.01 en modo demo).
@@ -30,6 +30,7 @@ Detalle en [`app/README.md`](../app/README.md). Reglas del repo en [`AGENTS.md`]
 - Un pago real hecho al QR generado por la pantalla de la app.
 - OpenAI en vivo: sin `OPENAI_API_KEY`, el dictado usa el intérprete local y la pantalla lo dice.
 - Webhook en internet: implementado con firma Standard Webhooks; falta URL HTTPS pública.
+- Escáner: probado en Chrome con cámara simulada (abre la cámara, enlaza y vuelve a encontrar el código). Falta leer un código de barras real con cámara física; la foto de productos necesita `OPENAI_API_KEY`.
 
 ## Qué revisar (para los agentes del equipo)
 

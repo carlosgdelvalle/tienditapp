@@ -52,6 +52,10 @@
         <button class="btn sec" type="submit">Agregar</button>
       </form>
     </div>
+    <div class="scan-btns">
+      <button id="abrir-scan" class="btn sec" type="button">▦ Escanear código</button>
+      <button id="abrir-foto" class="btn sec" type="button">◉ Foto de productos</button>
+    </div>
     <p id="escuche" class="escuche" hidden></p>
     <p id="ia" class="fino"></p>
     <div id="unmatched" class="chips"></div>
@@ -111,6 +115,18 @@
   <button data-tab="inventario"><span>⬡</span>Inventario</button>
   <button data-tab="mitienda"><span>▮▮</span>Reportes</button>
 </nav>
+<!-- Escáner con cámara -->
+<div id="scanner" class="scanner" hidden>
+  <div class="scan-top"><b id="scan-titulo">Escanear código</b><button id="cerrar-scan" class="scan-x" aria-label="Cerrar cámara">✕</button></div>
+  <div class="scan-vista"><video id="scan-video" playsinline muted></video><div class="scan-marco" id="scan-marco"></div></div>
+  <p id="scan-msg" class="scan-msg">Apunta al código de barras del producto.</p>
+  <button id="tomar-foto" class="btn prim" hidden>Tomar foto y reconocer</button>
+  <form id="scan-manual" class="scan-manual"><input id="scan-codigo" inputmode="numeric" placeholder="O escribe el código" aria-label="Código de barras"><button class="btn sec">Buscar</button></form>
+  <div id="enlazar" class="enlazar" hidden>
+    <p><b>Código nuevo:</b> <span id="enl-codigo" class="mono"></span>. ¿Qué producto es?</p>
+    <div id="enl-lista" class="enl-lista"></div>
+  </div>
+</div>
 <div id="toast" class="toast" role="status" hidden></div>
 <script src="/static/app.js"></script>
 </body>

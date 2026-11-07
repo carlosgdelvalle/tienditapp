@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS payments (
   source TEXT NOT NULL,
   received_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS barcodes (
+  code TEXT PRIMARY KEY,
+  product_id INTEGER NOT NULL REFERENCES products(id)
+);
 CREATE TABLE IF NOT EXISTS webhook_events (
   webhook_id TEXT PRIMARY KEY,
   received_at REAL NOT NULL,

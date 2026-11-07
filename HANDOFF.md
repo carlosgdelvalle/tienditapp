@@ -13,7 +13,7 @@ Entrega de la propuesta a las 16:00 (`docs/propuesta-4pm.md`) y primer pago real
 
 ## Identidad visual del MVP
 
-- PR #5: logo oficial servido desde `assets/branding/`, integrado con el rediseño vigente de `main`. Validación local: 13 pruebas aprobadas y revisión visual con Playwright en 1440 × 1000 y 390 × 844; navegación, carrito, inventario y reportes sin errores. Véase `docs/bitacora/2026-11-07-1549-diseno-branding-mvp.md`.
+- PR #5: logo oficial servido desde `assets/branding/`, integrado con el rediseño vigente de `main`. Validación local: 16 pruebas aprobadas y revisión visual con Playwright en 1440 × 1000 y 390 × 844; navegación, carrito, inventario y reportes sin errores. Véase `docs/bitacora/2026-11-07-1549-diseno-branding-mvp.md`.
 
 ## NO VERIFICADO
 - Pago real desde la pantalla de la app (falta escanear un QR generado por la app).
