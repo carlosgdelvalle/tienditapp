@@ -39,13 +39,14 @@ PEY_WEBHOOK_SECRET = os.getenv('PEY_WEBHOOK_SECRET', '')
 OPERATOR_TOKEN = os.getenv('TIENDITA_OPERATOR_TOKEN', '')
 PEY_BANK_ACCOUNT_ID = os.getenv('PEY_BANK_ACCOUNT_ID', '')
 TEST_ONE_CENT = os.getenv('TIENDITA_TEST_ONE_CENT','0') == '1'
+EVALUATOR_DEMO = os.getenv('TIENDITA_EVALUATOR_DEMO','0') == '1'
 EMPLOYEE_SESSION_SECRET = os.getenv('TIENDITA_SESSION_SECRET','')
 # Bloqueo adicional: integracion real nunca se activa con solo copiar una llave.
 LIVE = bool(LIVE_REQUESTED and PEY_API_KEY and PEY_WEBHOOK_SECRET and
             len(OPERATOR_TOKEN) >= 20 and
             os.getenv('PEY_CONFIRM_REAL_MONEY') == 'YES_I_AUTHORIZE' and
             os.getenv('TIENDITA_PUBLIC_URL', '').startswith('https://') and
-            (os.getenv('TIENDITA_EVALUATOR_DEMO') != '1' or TEST_ONE_CENT) and
+            (not EVALUATOR_DEMO or TEST_ONE_CENT) and
             len(EMPLOYEE_SESSION_SECRET)>=32 and
             all(os.getenv('TIENDITA_EMPLOYEE_PIN_'+n,'') for n in ('ANA','LUIS','MARIA')))
 CONFIG_BLOCKED = LIVE_REQUESTED and not LIVE
@@ -53,6 +54,7 @@ pey = PeyClient(api_key=PEY_API_KEY) if LIVE else None
 
 PORTAL_TITLE='Tiendita Inteligente'
 conn_guard = threading.RLock()
+_last_pey_reconcile: dict[int, float] = {}
 app = FastAPI(title=PORTAL_TITLE, version='0.4.0')
 
 def _employee_session(request: Request):
@@ -152,6 +154,9 @@ def create_database():
             );
             CREATE TABLE IF NOT EXISTS webhook_events (
               webhook_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS login_failures (
+              ip TEXT NOT NULL, created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS clients (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -282,12 +287,20 @@ class EmployeeLoginIn(BaseModel):
     pin: str = ''
 
 @app.post('/api/employee/login')
-def employee_login(value:EmployeeLoginIn):
+def employee_login(value:EmployeeLoginIn,request:Request):
     names={'Ana':'ANA','Luis':'LUIS','María':'MARIA'}
     if value.name not in names:raise HTTPException(400,'Empleado desconocido')
     if LIVE:
+        ip=request.client.host if request.client else 'unknown'
+        cutoff=(datetime.now(timezone.utc)-timedelta(minutes=15)).isoformat(timespec='seconds')
+        with conn_guard, db() as c:
+            failures=c.execute('SELECT COUNT(*) FROM login_failures WHERE ip=? AND created_at>=?',(ip,cutoff)).fetchone()[0]
+        if failures>=5:raise HTTPException(429,'Demasiados intentos. Espera antes de intentar de nuevo')
         pin=os.getenv('TIENDITA_EMPLOYEE_PIN_'+names[value.name],'')
-        if not pin or not hmac.compare_digest(pin,value.pin):raise HTTPException(401,'PIN incorrecto')
+        if not pin or not hmac.compare_digest(pin,value.pin):
+            with conn_guard, db() as c:
+                c.execute('INSERT INTO login_failures(ip,created_at) VALUES (?,?)',(ip,now()))
+            raise HTTPException(401,'PIN incorrecto')
     expires=int(time.time())+8*3600
     token=f'{value.name}|{expires}'
     signature=hmac.new(EMPLOYEE_SESSION_SECRET.encode(),token.encode(),hashlib.sha256).hexdigest() if EMPLOYEE_SESSION_SECRET else ''
@@ -413,12 +426,19 @@ def payment_params(amount_cents:int, ref:int, concept:str, kind:str, **extras):
 
 def send_sale_pey(sid:int, kind:str, phone:str|None=None):
     if CONFIG_BLOCKED:raise HTTPException(503,'Modo PEY BLOQUEADO: configuracion segura incompleta')
+    if LIVE and EVALUATOR_DEMO and kind!='QR':
+        raise HTTPException(403,'El evaluador solo puede utilizar QR CoDi de un centavo')
     with conn_guard, db() as c:
         c.execute('BEGIN IMMEDIATE')
         s=c.execute('SELECT * FROM sales WHERE id=?',(sid,)).fetchone()
         if not s:raise HTTPException(404,'Venta no existe')
         if s['status']!='PENDIENTE' or s['qr_id']:
             raise HTTPException(409,'La venta ya no admite una nueva solicitud de pago')
+        if LIVE and EVALUATOR_DEMO:
+            since=(datetime.now(timezone.utc)-timedelta(hours=1)).isoformat(timespec='seconds')
+            requested=c.execute("SELECT COUNT(*) FROM sales WHERE created_at>=? AND qr_mode LIKE 'REAL_%'",(since,)).fetchone()[0]
+            if requested>=20:raise HTTPException(429,'Límite horario de QR del evaluador alcanzado')
+            if s['charged_cents']!=1:raise HTTPException(409,'El cobro de evaluación debe ser exactamente MXN $0.01')
         if LIVE:
             # Reserva el intento antes de llamar a PEY: ante timeout NO se reintenta
             # automaticamente una peticion potencialmente aceptada por el banco.
@@ -453,8 +473,64 @@ def send_sale_pey(sid:int, kind:str, phone:str|None=None):
                 'label':'PEY acepto la solicitud bancaria. Pago PENDIENTE hasta confirmacion.',
                 'folio':r['codiId']}
 
+
+def reconcile_sale_from_pey(sid:int):
+    """Recuperación QR vía API autenticada: nunca supone PAID por generar QR.
+
+    Cada lectura es limitada, y falla sin confirmar ante respuestas ambiguas.
+    """
+    with db() as c:
+        sale=c.execute("SELECT * FROM sales WHERE id=?",(sid,)).fetchone()
+    if not sale or sale['status']!='PENDIENTE' or sale['qr_mode']!='REAL_QR':
+        return
+    with conn_guard:
+        previous=_last_pey_reconcile.get(sid,0)
+        if time.monotonic()-previous<12:return
+        _last_pey_reconcile[sid]=time.monotonic()
+    try:
+        result=pey.qr_transactions(sale['qr_id'])
+        items=result.get('items')
+        if not isinstance(items,list) or result.get('nextToken'):
+            return
+        paid=[]
+        for item in items:
+            if not isinstance(item,dict) or item.get('status')!='PAID':continue
+            txid=item.get('id') or item.get('transactionId')
+            if not isinstance(txid,str):return
+            detail=pey.transaction(txid)
+            if (detail.get('id')!=txid or detail.get('status')!='PAID'
+                or detail.get('currency')!='MXN' or detail.get('paymentMethod')!='CODI'
+                or detail.get('payableType')!='API_CODI_QR'
+                or str(detail.get('payableId'))!=str(sale['qr_id'])
+                or money_to_cents(detail.get('amount'))!=sale['charged_cents']):
+                return
+            metadata=detail.get('metadata') or {}
+            ext=metadata.get('externalMetadata') if isinstance(metadata,dict) else {}
+            if isinstance(ext,dict) and ext.get('orderId') and str(ext['orderId'])!=str(sid):
+                return
+            paid.append(txid)
+        # Varios pagos sobre el mismo QR requieren conciliación humana.
+        if len(paid)!=1:return
+        with conn_guard,db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            current=c.execute('SELECT * FROM sales WHERE id=?',(sid,)).fetchone()
+            if not current or current['status']!='PENDIENTE' or current['qr_id']!=sale['qr_id']:
+                return
+            existing=c.execute('SELECT 1 FROM sales WHERE transaction_id=?',(paid[0],)).fetchone()
+            if existing:return
+            try:
+                consume_stock(c,current,'PAGADA_PRUEBA' if TEST_ONE_CENT else 'PAGADA',
+                              paid[0],verified_source='PEY_AUTHENTICATED_QR_API')
+            except (ValueError,sqlite3.IntegrityError):
+                return
+    except (PeyError,ValueError,TypeError,KeyError):
+        # No marcar pagada cuando PEY es inalcanzable o inconsistente.
+        return
+
 @app.get('/api/sales/{sid}/status')
 def sale_status(sid:int):
+    if LIVE:
+        reconcile_sale_from_pey(sid)
     with db() as c:
         sale=c.execute('SELECT id,employee,amount_cents,charged_cents,status,qr_mode,qr_id,transaction_id,verified_source,expires_at,paid_at FROM sales WHERE id=?',(sid,)).fetchone()
         if not sale:raise HTTPException(404,'Venta no encontrada')
@@ -466,7 +542,7 @@ def generate_qr(sid:int):return send_sale_pey(sid,'QR')
 @app.post('/api/sales/{sid}/push')
 def generate_push(sid:int,item:PushIn):return send_sale_pey(sid,'PN',item.phone)
 
-def consume_stock(c, sale_row, mode, transaction_id):
+def consume_stock(c, sale_row, mode, transaction_id, verified_source=None):
     if sale_row['status']!='PENDIENTE': raise ValueError('Venta ya procesada')
     for item in json.loads(sale_row['items_json']):
         c.execute('UPDATE products SET qty=qty-? WHERE id=? AND qty>=?',(item['qty'],item['id'],item['qty']))
@@ -482,7 +558,7 @@ def consume_stock(c, sale_row, mode, transaction_id):
                   (item['id'],-item['qty'],sale_row['employee'],f'Venta #{sale_row["id"]} {mode}',now()))
     c.execute('UPDATE sales SET status=?,transaction_id=?,paid_at=?,verified_source=? WHERE id=?',
               (mode,transaction_id,None if mode=='FIADA' else now(),
-               'PEY_SIGNED_WEBHOOK_AND_API' if mode in ('PAGADA','PAGADA_PRUEBA') else 'SIMULACION' if mode=='DEMO_PAGADA' else 'FIADO',sale_row['id']))
+               (verified_source or 'PEY_SIGNED_WEBHOOK_AND_API') if mode in ('PAGADA','PAGADA_PRUEBA') else 'SIMULACION' if mode=='DEMO_PAGADA' else 'FIADO',sale_row['id']))
     suffix='(FIADO: aún no se pagó)' if mode=='FIADA' else ('(SIMULACIÓN: sin transferencia)' if mode=='DEMO_PAGADA' else ('(PEY PRUEBA REAL: no es venta comercial)' if mode=='PAGADA_PRUEBA' else '(PEY confirmado)'))
     c.execute('INSERT INTO notifications(role,message,created_at) VALUES (?,?,?)',
               ('dueno',f'Venta #{sale_row["id"]}: ${sale_row["amount_cents"]/100:,.2f} · {sale_row["employee"]} · {suffix}',now()))
@@ -527,6 +603,9 @@ def verify_pey_transaction(payload:dict):
     expected_type={'codi.qr.payment_received':'API_CODI_QR','codi.pn.payment_received':'API_CODI_PN'}.get(payload.get('type'))
     try: verified_amount=money_to_cents(detail.get('amount'))
     except ValueError:raise HTTPException(409,'Monto PEY inválido')
+    if (payload.get('type')=='codi.qr.payment_received' and detail.get('payableId') and
+        str(detail['payableId'])!=str(payload.get('codiQrId'))):
+        raise HTTPException(409,'Transacción pertenece a otro QR')
     if (detail.get('status')!='PAID' or detail.get('currency')!='MXN' or
         detail.get('paymentMethod')!='CODI' or detail.get('payableType')!=expected_type or
         detail.get('id')!=txid or verified_amount!=money_to_cents(payload.get('amount'))):
@@ -675,6 +754,7 @@ class CollectPeyIn(BaseModel):
 @app.post('/api/clients/{cid}/payment-requests')
 def make_collect_request(cid:int, item:CollectPeyIn, request:Request):
     if CONFIG_BLOCKED:raise HTTPException(503,'Modo PEY bloqueado: configuracion incompleta')
+    if LIVE and EVALUATOR_DEMO:raise HTTPException(403,'Los abonos no están habilitados en el demo público de $0.01')
     with conn_guard,db() as c:
         c.execute('BEGIN IMMEDIATE')
         client=c.execute('SELECT * FROM clients WHERE id=?',(cid,)).fetchone()
