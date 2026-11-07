@@ -45,6 +45,7 @@ LIVE = bool(LIVE_REQUESTED and PEY_API_KEY and PEY_WEBHOOK_SECRET and
             len(OPERATOR_TOKEN) >= 20 and
             os.getenv('PEY_CONFIRM_REAL_MONEY') == 'YES_I_AUTHORIZE' and
             os.getenv('TIENDITA_PUBLIC_URL', '').startswith('https://') and
+            (os.getenv('TIENDITA_EVALUATOR_DEMO') != '1' or TEST_ONE_CENT) and
             len(EMPLOYEE_SESSION_SECRET)>=32 and
             all(os.getenv('TIENDITA_EMPLOYEE_PIN_'+n,'') for n in ('ANA','LUIS','MARIA')))
 CONFIG_BLOCKED = LIVE_REQUESTED and not LIVE
@@ -93,6 +94,9 @@ async def require_operator(request:Request, call_next):
     return await call_next(request)
 
 app.mount('/static', StaticFiles(directory=ROOT / 'static'), name='static')
+# Recursos oficiales Abarpay reutilizados desde la raíz del repositorio.
+BRANDING_DIR = ROOT.parents[1] / 'assets' / 'branding'
+app.mount('/branding', StaticFiles(directory=BRANDING_DIR), name='branding')
 
 
 def db():
