@@ -52,6 +52,7 @@ def test_empleado_no_puede_abrir_reportes_asesor_ni_asociar_codigo(tmp_path,monk
     assert c.get('/api/reports/daily-close').status_code==401
     assert c.post('/api/employee/login',json={'name':'Ana','pin':'123456'}).status_code==200
     assert c.get('/api/reports/daily-close').status_code==403
+    assert c.post('/api/barcodes/lookup',json={'code':'7501234567890'}).status_code==404
     assert c.post('/api/assistant/ask',json={'question':'cuanto vendi hoy'}).status_code==403
     assert c.post('/api/barcodes/link',json={'code':'7501234567890','product_id':'agua'}).status_code==403
     assert c.get('/api/reports/daily-close',headers=auth).status_code==200
