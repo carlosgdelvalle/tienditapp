@@ -1,4 +1,4 @@
-# docs · Tienditapp
+# docs · Abarpay
 
 Documentos de trabajo del equipo para el hackatón DevDay Exchange (7-8 nov 2026). Complementan el [`README.md`](../README.md) del repo, que sigue siendo la referencia del producto y de la integración con pey.
 

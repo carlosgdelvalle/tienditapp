@@ -1,10 +1,10 @@
-# MVP · Tienditapp v0.1
+# MVP · Abarpay v0.1
 
 Versión fija para revisión: tag `mvp-v0.1` y rama `mvp` (commit `57c480a`). La app vive en [`app/`](../app/README.md).
 
 ## Qué es
 
-La app del MVP de Tienditapp (Python/FastAPI + SQLite + HTML/JS). Recorrido completo: el empleado escribe o dicta la venta, el servidor calcula el total con el catálogo, pide el QR a pey, espera el pago conciliando con pey, avisa en voz alta (también al dueño) y actualiza inventario y corte del día.
+La app del MVP de Abarpay (Python/FastAPI + SQLite + HTML/JS). Recorrido completo: el empleado escribe o dicta la venta, el servidor calcula el total con el catálogo, pide el QR a pey, espera el pago conciliando con pey, avisa en voz alta (también al dueño) y actualiza inventario y corte del día.
 
 ## Cómo correrla
 

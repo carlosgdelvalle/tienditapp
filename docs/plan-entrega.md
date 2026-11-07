@@ -1,4 +1,4 @@
-# Tienditapp · Plan de entrega
+# Abarpay · Plan de entrega
 
 Hoy sábado 7-nov, de 14:20 a 16:00 (en el venue), y del sábado en la noche al domingo 8-nov a las 13:00 (entrega final por correo).
 

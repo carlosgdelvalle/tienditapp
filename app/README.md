@@ -1,4 +1,4 @@
-# app · Tienditapp (MVP del hackatón)
+# app · Abarpay (MVP del hackatón)
 
 Venta dictada → cobro CoDi con pey → confirmación verificada → aviso de voz → inventario y corte del día.
 

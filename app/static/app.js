@@ -1,4 +1,4 @@
-// Tienditapp · cliente del teléfono. Los precios y el estado de pago los decide el servidor.
+// Abarpay · cliente del teléfono. Los precios y el estado de pago los decide el servidor.
 const $ = (id) => document.getElementById(id);
 const peso = (c) => "$" + (c / 100).toLocaleString("es-MX", { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 });
 const S = { products: [], employees: [], empleado: null, carrito: new Map(), venta: null, poll: null, ownerPoll: null, desde: Date.now() / 1000, modoDemo: true };

@@ -1,10 +1,10 @@
-# AGENTS.md · Tienditapp
+# AGENTS.md · Abarpay
 
 Manual único para cualquier agente (Codex, Claude, ChatGPT) y para las personas del equipo. Si algo aquí choca con otro archivo, gana este, salvo las decisiones vigentes de `docs/decisiones/`, que ganan sobre todo.
 
 ## Qué es esto
 
-Tienditapp: cobros CoDi verificados, ventas e inventario para la tiendita de barrio, desde el teléfono. Hackatón DevDay Exchange CDMX, con pey (API de CoDi) y OpenAI. Entrega final: domingo 8-nov-2026, 13:00 CDMX, por correo a hola@aibuilders.lat. Producto completo en [`README.md`](README.md).
+Abarpay: cobros CoDi verificados, ventas e inventario para la tiendita de barrio, desde el teléfono. Hackatón DevDay Exchange CDMX, con pey (API de CoDi) y OpenAI. Entrega final: domingo 8-nov-2026, 13:00 CDMX, por correo a hola@aibuilders.lat. Producto completo en [`README.md`](README.md).
 
 ## Mapa de ruteo
 
