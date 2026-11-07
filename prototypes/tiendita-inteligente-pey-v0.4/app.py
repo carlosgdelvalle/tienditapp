@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 from pey_gateway import PeyClient, PeyError, verify_standard_webhook, money_to_cents
 from cart_intelligence import parse_cart
+from features_v05 import daily_close, answer_local
 
 import qrcode
 from fastapi import FastAPI, HTTPException, Request
@@ -93,7 +94,13 @@ async def require_operator(request:Request, call_next):
                     with db() as c:row=c.execute('SELECT employee FROM sales WHERE id=?',(sale_id,)).fetchone()
                     if not row or row['employee']!=employee:
                         return JSONResponse(status_code=403,content={'detail':'Venta de otro empleado'})
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers['X-Content-Type-Options']='nosniff'
+    response.headers['Referrer-Policy']='no-referrer'
+    response.headers['X-Frame-Options']='DENY'
+    if request.url.path.startswith('/api/'):
+        response.headers['Cache-Control']='no-store'
+    return response
 
 app.mount('/static', StaticFiles(directory=ROOT / 'static'), name='static')
 # Recursos oficiales Abarpay reutilizados desde la raíz del repositorio.
@@ -154,6 +161,10 @@ def create_database():
             );
             CREATE TABLE IF NOT EXISTS webhook_events (
               webhook_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS product_barcodes (
+              code TEXT PRIMARY KEY, product_id TEXT NOT NULL,
+              FOREIGN KEY(product_id) REFERENCES products(id)
             );
             CREATE TABLE IF NOT EXISTS login_failures (
               ip TEXT NOT NULL, created_at TEXT NOT NULL
@@ -263,6 +274,61 @@ def snapshot():
                 'config':{'pey_mode':'REAL' if LIVE else ('BLOQUEADO' if CONFIG_BLOCKED else 'DEMO'),
                           'server_time':now(), 'single_branch':'Sucursal Centro',
                           'needs_internet_for_pey':True,'one_cent_test':TEST_ONE_CENT,'evaluator_demo':EVALUATOR_DEMO,'ai_enabled':bool(os.getenv('OPENAI_API_KEY'))}}
+
+
+# Funciones adicionales de la versión v0.5: lectura local y código de barras.
+@app.get('/api/reports/daily-close')
+def daily_closing(date: str | None = None):
+    if date and (len(date)!=10 or date[4]!='-' or date[7]!='-'):
+        raise HTTPException(422,'Fecha inválida; utiliza AAAA-MM-DD')
+    with db() as c:
+        try:return daily_close(c,date)
+        except ValueError as exc:raise HTTPException(422,str(exc))
+
+
+class BusinessQuestion(BaseModel):
+    question: str = Field(min_length=3,max_length=250)
+
+
+@app.post('/api/assistant/ask')
+def business_question(value:BusinessQuestion):
+    with db() as c:return answer_local(c,value.question)
+
+
+class BarcodeQuery(BaseModel):
+    code: str = Field(min_length=6,max_length=64)
+
+
+class BarcodeLink(BarcodeQuery):
+    product_id: str
+
+
+@app.post('/api/barcodes/lookup')
+def barcode_lookup(value:BarcodeQuery):
+    code=value.code.strip()
+    if not code.isascii() or not code.isalnum():
+        raise HTTPException(422,'Código inválido')
+    with db() as c:
+        row=c.execute("""SELECT p.id,p.name,p.price_cents,p.qty FROM product_barcodes b
+                         JOIN products p ON p.id=b.product_id WHERE b.code=?""",(code,)).fetchone()
+    if not row:raise HTTPException(404,'Código sin asociar. Selecciona el producto para enlazarlo.')
+    return dict(row)
+
+
+@app.post('/api/barcodes/link')
+def barcode_link(value:BarcodeLink):
+    code=value.code.strip()
+    if not code.isascii() or not code.isalnum():
+        raise HTTPException(422,'Código inválido')
+    with conn_guard,db() as c:
+        p=c.execute('SELECT id FROM products WHERE id=?',(value.product_id,)).fetchone()
+        if not p:raise HTTPException(404,'Producto desconocido')
+        old=c.execute('SELECT product_id FROM product_barcodes WHERE code=?',(code,)).fetchone()
+        if old and old['product_id']!=value.product_id:
+            raise HTTPException(409,'Código ya asociado a otro producto; requiere revisión manual')
+        c.execute('INSERT OR IGNORE INTO product_barcodes(code,product_id) VALUES(?,?)',(code,value.product_id))
+    return barcode_lookup(BarcodeQuery(code=code))
+
 
 @app.get('/empleado')
 def employee_home(): return FileResponse(ROOT/'static'/'empleado.html')
