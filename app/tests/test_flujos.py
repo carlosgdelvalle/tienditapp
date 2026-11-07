@@ -162,3 +162,25 @@ def test_dictado_local_arma_carrito_con_precios_del_catalogo(ctx):
     r2 = parse_local("un chicle de menta y una coca", catalog)
     assert any("chicle" in u for u in r2["unmatched"])
     assert [i["name"] for i in r2["items"]] == ["Coca-Cola 600 ml"]
+
+
+def test_codigo_desconocido_se_enlaza_y_despues_se_encuentra(ctx):
+    client, _, _ = ctx
+    assert client.post("/api/barcode/lookup", json={"code": "7500000000001"}).status_code == 404
+    r = client.post("/api/barcode/link", json={"code": "7500000000001", "productId": 1})
+    assert r.status_code == 200 and r.json()["name"] == "Coca-Cola 600 ml"
+    r = client.post("/api/barcode/lookup", json={"code": " 7500000000001 "})
+    assert r.json() == {"productId": 1, "name": "Coca-Cola 600 ml", "unitPriceCents": 1800, "stock": 24}
+
+
+def test_enlazar_a_producto_inexistente_o_codigo_vacio_falla(ctx):
+    client, _, _ = ctx
+    assert client.post("/api/barcode/link", json={"code": "123", "productId": 999}).status_code == 400
+    assert client.post("/api/barcode/lookup", json={"code": "   "}).status_code == 400
+
+
+def test_foto_sin_openai_regresa_503_y_no_inventa_productos(ctx):
+    client, _, _ = ctx
+    r = client.post("/api/cart/photo", json={"image": "aGk="})
+    assert r.status_code == 503
+    assert "OPENAI_API_KEY" in r.json()["detail"]

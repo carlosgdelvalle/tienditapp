@@ -17,7 +17,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from . import db  # noqa: E402
-from .parse import parse_cart  # noqa: E402
+from .parse import VisionUnavailable, parse_cart, parse_photo  # noqa: E402
 from .pey import PeyClient, PeyError, PeyTimeout, verify_webhook  # noqa: E402
 
 QR_EXPIRATION_SEC = 600
@@ -132,6 +132,7 @@ def bootstrap():
         "store": "Tiendita de la Esquina",
         "modoDemo": modo_demo(),
         "ia": "openai" if os.getenv("OPENAI_API_KEY") else "local",
+        "vision": bool(os.getenv("OPENAI_API_KEY")),
         "employees": [dict(r) for r in c.execute("SELECT id, name, role FROM employees ORDER BY id")],
         "products": [dict(r) for r in c.execute(
             "SELECT id, name, price_cents, stock, quick FROM products ORDER BY quick DESC, id")],
@@ -143,6 +144,57 @@ def cart_parse(body: ParseIn):
     if not body.text.strip():
         raise HTTPException(400, "Dicta o escribe qué se lleva el cliente")
     return parse_cart(conn(), body.text)
+
+
+class BarcodeIn(BaseModel):
+    code: str
+
+
+class BarcodeLinkIn(BaseModel):
+    code: str
+    productId: int
+
+
+class PhotoIn(BaseModel):
+    image: str  # base64 (JPEG), sin prefijo data:
+
+
+def _clean_code(code: str) -> str:
+    code = code.strip()
+    if not code or len(code) > 64:
+        raise HTTPException(400, "Código de barras inválido")
+    return code
+
+
+@app.post("/api/barcode/lookup")
+def barcode_lookup(body: BarcodeIn):
+    c = conn()
+    row = c.execute("SELECT p.id, p.name, p.price_cents, p.stock FROM barcodes b JOIN products p ON p.id=b.product_id "
+                    "WHERE b.code=?", (_clean_code(body.code),)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Código sin enlazar")
+    return {"productId": row["id"], "name": row["name"], "unitPriceCents": row["price_cents"], "stock": row["stock"]}
+
+
+@app.post("/api/barcode/link")
+def barcode_link(body: BarcodeLinkIn):
+    c = conn()
+    code = _clean_code(body.code)
+    if not c.execute("SELECT 1 FROM products WHERE id=?", (body.productId,)).fetchone():
+        raise HTTPException(400, "Producto no existe")
+    c.execute("INSERT INTO barcodes(code, product_id) VALUES (?, ?) "
+              "ON CONFLICT(code) DO UPDATE SET product_id=excluded.product_id", (code, body.productId))
+    return barcode_lookup(BarcodeIn(code=code))
+
+
+@app.post("/api/cart/photo")
+def cart_photo(body: PhotoIn):
+    if not body.image or len(body.image) > 8_000_000:
+        raise HTTPException(400, "Foto vacía o demasiado grande")
+    try:
+        return parse_photo(conn(), body.image)
+    except VisionUnavailable as e:
+        raise HTTPException(503, str(e))
 
 
 @app.post("/api/sales")

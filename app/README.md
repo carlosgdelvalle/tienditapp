@@ -26,6 +26,9 @@ Abre `http://localhost:8000` en la laptop. Desde un teléfono en la misma Wi-Fi:
 |---|---|---|
 | GET | `/api/bootstrap` | Tienda, empleados, catálogo, modo demo, motor de IA |
 | POST | `/api/cart/parse` | Texto dictado → carrito (`engine`: `openai` o `local`) |
+| POST | `/api/barcode/lookup` | Código de barras → producto (404 si no está enlazado) |
+| POST | `/api/barcode/link` | Enlaza un código nuevo a un producto del catálogo |
+| POST | `/api/cart/photo` | Foto del mostrador → carrito con OpenAI Vision (503 sin key) |
 | POST | `/api/sales` | Crea la venta y el QR de pey |
 | GET | `/api/sales/{id}` | Estado (concilia con pey) |
 | POST | `/api/sales/{id}/cancel` | Cancela un cobro pendiente |
@@ -39,4 +42,8 @@ Con `OPENAI_API_KEY`, `app/parse.py` usa OpenAI con salida estructurada y el mod
 
 ## Pruebas
 
-`python -m pytest -q app/tests`: 12 pruebas con pey simulado (`FakePey`, etiquetado SIMULADO): totales en servidor, conciliación sin doble descuento, webhook con firma inválida o vieja, duplicados, monto distinto, QR desconocido, timeout de pey, QR vencido, reporte y dictado local.
+`python -m pytest -q app/tests`: 15 pruebas con pey simulado (`FakePey`, etiquetado SIMULADO): totales en servidor, conciliación sin doble descuento, webhook con firma inválida o vieja, duplicados, monto distinto, QR desconocido, timeout de pey, QR vencido, reporte, dictado local, códigos de barras y foto sin key.
+
+## Escáner
+
+En "Cobrar con Pey": **Escanear código** (cámara + `BarcodeDetector` de Chrome; un código nuevo se enlaza una vez a un producto) y **Foto de productos** (OpenAI Vision). La cámara necesita HTTPS o localhost. Ver [decisión 0004](../docs/decisiones/0004-escaner-camara.md).
