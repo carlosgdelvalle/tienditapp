@@ -1,4 +1,4 @@
-name: evaluator-v04
+name: evaluator-v05
 on:
   pull_request:
     paths:
@@ -22,7 +22,7 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Pruebas PEY simuladas y lógica de la app
         working-directory: prototypes/tiendita-inteligente-pey-v0.4
-        run: python -m pytest -q test_flujos.py test_pey_integracion.py test_v04.py test_live_evaluator.py
+        run: python -m pytest -q test_flujos.py test_pey_integracion.py test_v04.py test_live_evaluator.py test_v05.py
       - name: Sintaxis JavaScript
         working-directory: prototypes/tiendita-inteligente-pey-v0.4
         run: |
