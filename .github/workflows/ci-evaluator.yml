@@ -23,6 +23,11 @@ jobs:
       - name: Pruebas PEY simuladas y lógica de la app
         working-directory: prototypes/tiendita-inteligente-pey-v0.4
         run: python -m pytest -q test_flujos.py test_pey_integracion.py test_v04.py test_live_evaluator.py
+      - name: Sintaxis JavaScript
+        working-directory: prototypes/tiendita-inteligente-pey-v0.4
+        run: |
+          node --check static/app.js
+          node --check static/empleado.js
       - name: Verificar ruta de branding
         working-directory: prototypes/tiendita-inteligente-pey-v0.4
         run: |
