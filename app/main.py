@@ -27,6 +27,9 @@ TZ = ZoneInfo("America/Mexico_City")
 app = FastAPI(title="Abarpay")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+# Identidad oficial compartida: assets/branding, sin duplicar archivos binarios.
+BRANDING = Path(__file__).resolve().parent.parent / "assets" / "branding"
+app.mount("/branding", StaticFiles(directory=BRANDING), name="branding")
 
 _state: dict = {"conn": None, "pey": None, "last_reconcile": {}}
 

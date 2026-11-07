@@ -6,10 +6,10 @@
 body{font-family:var(--font);background:var(--nube);color:var(--grafito);min-height:100vh;padding-bottom:84px}
 button{font:inherit;cursor:pointer;color:inherit}
 button:focus-visible,input:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
-.top{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--purple);color:#fff}
-.top-back{background:none;border:0;color:#fff;font-size:22px;padding:0 4px}
-.logo{font-weight:800;font-size:24px;letter-spacing:-.03em;flex:1}
-.chispa{color:var(--violet);margin-left:2px;font-weight:700}
+.top{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--blanco);color:var(--purple);border-bottom:3px solid var(--violet)}
+.top-back{background:none;border:0;color:inherit;font-size:22px;padding:0 4px}
+.logo{flex:1;min-width:0}
+.marca-logo{display:block;width:clamp(126px,35vw,172px);max-width:100%;height:auto;object-fit:contain}
 .quien{font-size:12px;font-weight:700;background:var(--violet);color:#fff;padding:5px 10px;border-radius:99px}
 .quien:empty{display:none}
 .banner{background:var(--lima);color:var(--purple);font-size:13px;font-weight:600;padding:8px 16px;text-align:center}
@@ -94,6 +94,9 @@ h2{font-size:15px;font-weight:700;margin-top:6px}
 .tabs button.activo{color:var(--violet)}
 .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:var(--purple);color:#fff;padding:12px 16px;border-radius:14px;max-width:92vw;font-size:14px;z-index:9}
 @media (prefers-reduced-motion:reduce){.punto,.mic.oyendo{animation:none}}
+
+/* Logo oficial sobre fondo blanco, conservando las vistas y navegación del MVP. */
+@media(max-width:400px){.top{padding:12px}.marca-logo{width:126px}.quien{font-size:11px}}
 
 /* Escáner */
 .scan-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}

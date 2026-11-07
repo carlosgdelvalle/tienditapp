@@ -11,6 +11,10 @@ Entrega de la propuesta a las 16:00 (`docs/propuesta-4pm.md`) y primer pago real
 - Integrado el prototipo independiente v0.4 mediante el [PR #3](https://github.com/carlosgdelvalle/tienditapp/pull/3), commit `fd9ac89`. CI de ese commit en verde; comprobación local `scripts/verificar.sh` aprobada (12 pruebas de la app principal).
 - Prototipo v0.4: 15 pruebas aprobadas con PEY/OpenAI simulados y sintaxis JavaScript válida. Está en modo DEMO en `http://127.0.0.1:8765/` (dueño) y `/empleado`, con una copia migrada de la base demo v0.3. La app del MVP sigue en `app/`, según la decisión 0001.
 
+## Identidad visual del MVP
+
+- PR #5: logo oficial servido desde `assets/branding/`, integrado con el rediseño vigente de `main`. Validación local: 16 pruebas aprobadas y revisión visual con Playwright en 1440 × 1000 y 390 × 844; navegación, carrito, inventario y reportes sin errores. Véase `docs/bitacora/2026-11-07-1549-diseno-branding-mvp.md`.
+
 ## NO VERIFICADO
 - Pago real desde la pantalla de la app (falta escanear un QR generado por la app).
 - OpenAI en vivo (falta `OPENAI_API_KEY`; hoy usa el intérprete local y lo dice).
