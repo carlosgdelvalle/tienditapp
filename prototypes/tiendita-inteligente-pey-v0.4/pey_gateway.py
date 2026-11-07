@@ -1,7 +1,7 @@
 """Cliente PEY basado en documentos oficiales (2026-11). Sin credenciales en código.
 Usar exclusivamente desde backend. No ejecutar contra producción sin autorización explícita.
 """
-import base64, binascii, hashlib, hmac, json, time, urllib.request, urllib.error
+import base64, binascii, hashlib, hmac, json, time, re, urllib.request, urllib.error
 from decimal import Decimal, InvalidOperation
 
 class PeyError(Exception):
@@ -65,6 +65,10 @@ class PeyClient:
         if not isinstance(result.get('transactionId'),str) or not isinstance(result.get('codiId'),str):
             raise PeyError('PUSH_SCHEMA_UNKNOWN')
         return result
+    def qr_transactions(self,qr_id):
+        if not isinstance(qr_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',qr_id):
+            raise PeyError('INVALID_QR_ID')
+        return self.call('GET','/transaction/codi/qr/'+qr_id)
     def transaction(self,txid):
         if not txid.isalnum() or len(txid)>50:raise PeyError('INVALID_TXID')
         return self.call('GET','/transaction/'+txid)
