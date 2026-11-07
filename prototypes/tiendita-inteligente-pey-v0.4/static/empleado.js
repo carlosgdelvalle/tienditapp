@@ -75,5 +75,6 @@ async function pollStatus(){if(!state.sale)return;
  catch(e){$('#connection').textContent='● Reintentando';}
 }
 window.addEventListener('online',()=>{refresh().then(draw);if(state.sale)pollStatus()});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
 window.addEventListener('offline',()=>$('#connection').textContent='● Sin internet');
 (async()=>{const ok=await refresh();if(!ok){loginScreen();return}loginScreen()})();
