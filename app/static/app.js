@@ -12,7 +12,24 @@ async function api(path, opts = {}) {
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => (t.hidden = true), 4500); }
 function ir(vista) {
   document.querySelectorAll(".vista").forEach((v) => (v.hidden = v.id !== "v-" + vista));
+  $("tabs").hidden = vista === "inicio" || vista === "qr" || vista === "pagado";
+  $("atras").hidden = !["cobrar", "inventario", "mitienda"].includes(vista);
+  document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("activo", b.dataset.tab === vista));
   if (vista === "mitienda") cargarMiTienda();
+  if (vista === "home") cargarHome();
+  if (vista === "inventario") cargarInventario();
+  window.scrollTo(0, 0);
+}
+async function cargarHome() {
+  const [r, b] = await Promise.all([api("/api/reports/today"), api("/api/bootstrap")]);
+  S.products = b.products;
+  $("h-ventas").textContent = peso(r.totalCents);
+  $("h-num").textContent = r.salesCount ? `${r.salesCount} ventas pagadas` : "Aún sin ventas hoy";
+  $("h-stock").textContent = b.products.reduce((a, p) => a + p.stock, 0);
+}
+async function cargarInventario() {
+  const b = await api("/api/bootstrap"); S.products = b.products;
+  $("inv").innerHTML = b.products.map((p) => `<li><span>${p.name}<small>${peso(p.price_cents)}</small></span><b class="${p.stock <= 5 ? "bajo" : ""}">${p.stock}</b></li>`).join("");
 }
 function hablar(texto) {
   if (!("speechSynthesis" in window)) return;
@@ -27,6 +44,7 @@ async function init() {
   $("tienda").textContent = b.store;
   $("demo-banner").hidden = !b.modoDemo;
   $("ia").textContent = b.ia === "openai" ? "La IA de OpenAI arma el carrito con el catálogo de la tienda." : "IA no configurada: se usa el intérprete local del catálogo.";
+  $("tienda").textContent = b.store;
   $("empleados").innerHTML = b.employees.map((e) => `<button data-emp="${e.id}">${e.name}<small>${e.role === "owner" ? "Dueña" : "Empleado"}</small></button>`).join("");
   $("rapidos").innerHTML = b.products.filter((p) => p.quick).map((p) => `<button data-prod="${p.id}">${p.name.replace(/ \(.+\)|\s\d.*$/, "")}<br><small>${peso(p.price_cents)}</small></button>`).join("");
 }
@@ -36,7 +54,7 @@ $("empleados").addEventListener("click", (ev) => {
   $("quien").textContent = S.empleado.name;
   hablar(""); // desbloquea el audio con el primer toque
   if (S.empleado.role === "owner") iniciarAvisosDueno();
-  ir("cobrar");
+  ir("home");
 });
 
 // ---------- Carrito ----------
@@ -111,8 +129,7 @@ function vigilar(id) {
   }, 2500);
 }
 function mostrarPagado(s) {
-  const frase = `¡Ya te pagaron ${peso(s.chargedCents)}!`;
-  $("voz-texto").textContent = frase;
+  $("voz-texto").textContent = `Pagado con Pey · ${S.empleado ? S.empleado.name : ""}`;
   $("r-cobrado").textContent = peso(s.chargedCents); $("r-total").textContent = peso(s.totalCents);
   $("r-tx").textContent = s.txId || "";
   ir("pagado"); hablar(`Ya te pagaron ${s.chargedCents === 1 ? "un centavo" : peso(s.chargedCents).replace("$", "") + " pesos"}`);
@@ -151,5 +168,7 @@ async function cargarMiTienda() {
   $("m-pend").hidden = !r.porConciliar; $("m-pend").textContent = `${r.porConciliar} pago(s) por conciliar: revisa en pey antes de cerrar caja.`;
 }
 document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => ir(b.dataset.ir)));
+document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => ir(b.dataset.tab)));
+$("atras").addEventListener("click", () => ir("home"));
 
 init().catch((e) => toast("No pude cargar la tienda: " + e.message));
