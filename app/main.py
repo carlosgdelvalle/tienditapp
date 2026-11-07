@@ -1,4 +1,4 @@
-"""Tienditapp: venta dictada → cobro CoDi con pey → confirmación verificada → inventario y corte."""
+"""Abarpay: venta dictada → cobro CoDi con pey → confirmación verificada → inventario y corte."""
 import json
 import os
 import time
@@ -24,7 +24,7 @@ QR_EXPIRATION_SEC = 600
 RECONCILE_EVERY_SEC = 3.0
 TZ = ZoneInfo("America/Mexico_City")
 
-app = FastAPI(title="Tienditapp")
+app = FastAPI(title="Abarpay")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 # Identidad oficial compartida: assets/branding, sin duplicar archivos binarios.

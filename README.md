@@ -1,8 +1,8 @@
-# Tienditapp
+# Abarpay
 
 **Cobros verificados, ventas e inventario para la tiendita de barrio, desde un teléfono.**
 
-![Tiendita de la Esquina, negocio de demostración de Tienditapp](assets/branding/banner.jpeg)
+![Tiendita de la Esquina, negocio de demostración de Abarpay](assets/branding/banner.jpeg)
 
 Proyecto para el hackatón **DevDay Exchange México 2026**, con **PEY como patrocinador y proveedor de la API de pagos**. La propuesta es convertir cada cobro en un registro útil para administrar el negocio: quién vendió, qué productos salieron, cuánto se recibió y qué necesita reponerse.
 
@@ -12,13 +12,13 @@ Proyecto para el hackatón **DevDay Exchange México 2026**, con **PEY como patr
 
 El brief compartido plantea demostrar una integración funcional con PEY y una transacción de prueba, junto con una explicación de cómo la solución podría convertirse en un negocio sostenible. Señala como entrega el **domingo 8 de noviembre de 2026 a las 13:00**; el horario y los requisitos deben cotejarse con las bases oficiales del evento.
 
-La demostración propuesta se concentra en **una tiendita, un teléfono y un cobro confirmado**, seguido por la actualización de ventas, inventario y caja. “Tiendita de la Esquina” es el comercio ficticio utilizado para presentar Tienditapp.
+La demostración propuesta se concentra en **una tiendita, un teléfono y un cobro confirmado**, seguido por la actualización de ventas, inventario y caja. “Tiendita de la Esquina” es el comercio ficticio utilizado para presentar Abarpay.
 
 ## Negocio: el problema y la propuesta de valor
 
 Las conversaciones identifican problemas cotidianos de los pequeños comercios: dependencia del efectivo y del cambio, inventarios manuales, diferencias entre ventas y dinero recibido, dificultad para supervisar a varios empleados y desconfianza hacia herramientas financieras complejas. Son observaciones del equipo que deberán validarse con comerciantes.
 
-Tienditapp propone aprovechar el teléfono que el comerciante ya utiliza, con una experiencia sencilla y una confirmación de pago comprensible. El objetivo es reducir la inversión inicial en equipo y facilitar el control del negocio.
+Abarpay propone aprovechar el teléfono que el comerciante ya utiliza, con una experiencia sencilla y una confirmación de pago comprensible. El objetivo es reducir la inversión inicial en equipo y facilitar el control del negocio.
 
 | Usuario | Necesidad | Valor propuesto |
 | --- | --- | --- |
@@ -67,7 +67,7 @@ Se propone una interfaz web adaptable al teléfono, potencialmente instalable co
 
 ```mermaid
 flowchart LR
-    E[Teléfono del empleado] --> A[Servidor Tienditapp]
+    E[Teléfono del empleado] --> A[Servidor Abarpay]
     O[Panel del propietario] --> A
     A --> D[(Ventas, inventario y pagos)]
     A -->|Crear QR y consultar transacciones| P[API PEY]
@@ -78,7 +78,7 @@ flowchart LR
     A -.->|Consultas acotadas, etapa posterior| I[Asistente IA]
 ```
 
-El servidor conservará las credenciales y decidirá qué comercio, cuenta e importe corresponden a cada solicitud. Los teléfonos recibirán únicamente los datos necesarios para operar. La propuesta de Tienditapp no incluye una cartera propia ni la custodia de fondos; el flujo financiero se apoyará en PEY y la cuenta habilitada del comercio.
+El servidor conservará las credenciales y decidirá qué comercio, cuenta e importe corresponden a cada solicitud. Los teléfonos recibirán únicamente los datos necesarios para operar. La propuesta de Abarpay no incluye una cartera propia ni la custodia de fondos; el flujo financiero se apoyará en PEY y la cuenta habilitada del comercio.
 
 ### Datos y reglas de consistencia
 
@@ -112,7 +112,7 @@ Ejemplo de cuerpo para crear un QR de demostración, con monto en MXN:
 ```json
 {
   "amount": 0.01,
-  "concept": "Venta demo Tienditapp",
+  "concept": "Venta demo Abarpay",
   "expiration": 600,
   "generateImage": false,
   "metadata": {
@@ -182,8 +182,9 @@ Orden propuesto de trabajo:
 
 - [Banner](assets/branding/banner.jpeg): 1600 × 533 píxeles.
 - [Logo](assets/branding/logo.jpeg) e [identidad visual](assets/branding/identidadVisual.jpeg); guía en [`GuiaIdentidadGrafica.jpeg`](assets/branding/GuiaIdentidadGrafica.jpeg).
+- [Diseño de interfaz de Abarpay](docs/diseno/README.md): maquetas de pantallas, recorridos y sistema de diseño.
 - [Brief compartido del equipo: DevDay Exchange México 2026](https://chatgpt.com/s/t_6aef79ee56148191a6c905d73d32fa2b): problema, enfoque móvil, propuestas del equipo, modelo comercial, plazo y recomendación del MVP. Se presenta como diagnóstico, no como decisión final.
 - **Resumen de projecto.eml**, proporcionado por el equipo: síntesis de la reunión «Open AI PEY», con inventarios móviles, administración, IA, proveedores, fiado, conectividad y etapas de crecimiento. Incluye recomendaciones del autor además de ideas atribuidas a la reunión.
 - [Documentación oficial de PEY](https://docs.pey.mx/): contrato y comportamiento esperado de la integración.
 
-Este documento sintetiza ambos materiales y la preparación técnica de este repositorio. No se han revisado los audios originales; las atribuciones individuales que las fuentes dejan pendientes no se convierten aquí en responsabilidades asignadas. El nombre del producto, el comercio ficticio y sus recursos gráficos corresponden a la preparación de Tienditapp para la demostración.
+Este documento sintetiza ambos materiales y la preparación técnica de este repositorio. No se han revisado los audios originales; las atribuciones individuales que las fuentes dejan pendientes no se convierten aquí en responsabilidades asignadas. El nombre del producto, el comercio ficticio y sus recursos gráficos corresponden a la preparación de Abarpay para la demostración.

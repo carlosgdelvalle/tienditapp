@@ -1,4 +1,4 @@
-# Presentación · Tienditapp
+# Presentación · Abarpay
 
 Láminas verticales para el pitch del hackatón DevDay Exchange México 2026, en orden:
 

@@ -1,4 +1,4 @@
-# Tienditapp
+# Abarpay
 
 **Cobros verificados, ventas e inventario para la tiendita de barrio, desde el teléfono.**
 
@@ -15,7 +15,7 @@ CoDi ya resolvió mover el dinero sin comisión. A finales de 2025 tenía unos 2
 
 ## La solución
 
-Tienditapp convierte el teléfono que el comerciante ya tiene en su caja:
+Abarpay convierte el teléfono que el comerciante ya tiene en su caja:
 
 1. **El empleado dicta la venta**: "dos cocas y unas sabritas". OpenAI propone el carrito con el catálogo de la tienda y el empleado lo confirma. Los precios salen del catálogo, nunca de la IA. Si el dictado falla, hay botones rápidos.
 2. **Se cobra por CoDi con pey**: aparece un QR, el cliente paga desde la app de su banco y no hay comisión por transacción.
@@ -30,7 +30,7 @@ Un recorrido completo y real: una venta dictada, un QR generado por pey, un pago
 ## Por qué pey y por qué ahora
 
 - Conectarse directo a CoDi requiere un trámite de alrededor de 12 meses. Con la API de pey toma minutos y acepta cuentas de cualquier banco participante (instrucciones de pey para el hackatón).
-- pey no custodia fondos: el pago se liquida de banco a banco por la infraestructura de Banxico ([pey, aviso de privacidad](https://pey.mx/legal/aviso-de-privacidad)). Tienditapp tampoco toca el dinero.
+- pey no custodia fondos: el pago se liquida de banco a banco por la infraestructura de Banxico ([pey, aviso de privacidad](https://pey.mx/legal/aviso-de-privacidad)). Abarpay tampoco toca el dinero.
 - El 14 de diciembre de 2026, la Circular 9/2026 obliga a los bancos a estandarizar cómo se ven CoDi y los pagos QR en sus apps ([ClearingPost](https://clearingpost.com/insights/mexico-s-codi-logged-4-4-million-operations-in-2025-as-banxico-sets-december-sta/)). El lado del que paga se vuelve más fácil, y el que llegue con la herramienta del que cobra se queda con el canal.
 
 ## Lo que ya funciona en otros países
@@ -41,13 +41,13 @@ Un recorrido completo y real: una venta dictada, un QR generado por pey, un pago
 | BharatPe (India, UPI) | QR gratis para la tiendita | Préstamos con socio regulado, evaluados con el historial de pagos; 7M+ comercios en 2021 ([TechCrunch](https://techcrunch.com/2021/02/10/india-fintech-bharatpe-valued-at-900-million-in-new-108-million-fundraise)) |
 | InfinitePay (Brasil, Pix) | El celular como terminal y Pix gratis | Comisión de tarjeta y crédito a PyMEs ([Sacra](https://sacra.com/c/cloudwalk/)) |
 
-El patrón se repite: el pago gratis atrae al comercio y el negocio está en lo que se construye encima. Ninguno de estos casos sabe *qué* se vendió, solo *cuánto*. Tienditapp sabe las dos cosas.
+El patrón se repite: el pago gratis atrae al comercio y el negocio está en lo que se construye encima. Ninguno de estos casos sabe *qué* se vendió, solo *cuánto*. Abarpay sabe las dos cosas.
 
 ## Modelo de negocio (hipótesis por validar)
 
 El comerciante no paga por cobrar. Las fuentes de ingreso que vamos a probar:
 
-1. **Servicios financieros con socios regulados**: con meses de ventas verificables, el comercio puede pedir financiamiento a un socio autorizado y Tienditapp cobra comisión por referencia. No prestamos ni custodiamos fondos.
+1. **Servicios financieros con socios regulados**: con meses de ventas verificables, el comercio puede pedir financiamiento a un socio autorizado y Abarpay cobra comisión por referencia. No prestamos ni custodiamos fondos.
 2. **Plan para el dueño**: renta mensual baja por varios empleados, reportes y alertas de resurtido.
 3. **Servicios para proveedores**: pedidos sugeridos y demanda agregada por zona, anónima, siempre con permiso del comercio.
 

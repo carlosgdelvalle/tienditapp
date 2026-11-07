@@ -1,12 +1,12 @@
-# tienditapp · Modelo de negocio
+# Abarpay · Modelo de negocio
 
-Hackatón DevDay Exchange Community · CDMX · 7-8 nov 2026 · equipo tienditapp (pey + OpenAI)
+Hackatón DevDay Exchange Community · CDMX · 7-8 nov 2026 · equipo Abarpay (pey + OpenAI)
 
 > Estado del documento: borrador para el equipo. Lo que dice **Hecho** trae fuente. Lo que dice **Hipótesis** no está probado y el hackatón no lo prueba.
 
 ## 1. En una línea
 
-Tienditapp le cobra al tendero por CoDi sin comisión: el tendero o su empleado dicta la venta, la app arma la cuenta, genera el cobro y le avisa en voz alta cuando ya le pagaron. Cada venta queda registrada producto por producto, y ese historial es lo que después le abre crédito.
+Abarpay le cobra al tendero por CoDi sin comisión: el tendero o su empleado dicta la venta, la app arma la cuenta, genera el cobro y le avisa en voz alta cuando ya le pagaron. Cada venta queda registrada producto por producto, y ese historial es lo que después le abre crédito.
 
 ## 2. El problema
 
@@ -61,7 +61,7 @@ El tendero no paga por cobrar con CoDi. Las fuentes de ingreso, de más probada 
 ## 8. Por qué pey, por qué ahora
 
 - pey ya resolvió la conexión con Banxico: es tercero desarrollador aprobado y no custodia fondos, porque el pago va de banco a banco ([pey](https://pey.mx/codi), [aviso de privacidad](https://pey.mx/legal/aviso-de-privacidad)).
-- A pey le faltan voz, IA, aviso de pago y cualquier cosa del canal de tienditas. Tienditapp es un canal de distribución para su API.
+- A pey le faltan voz, IA, aviso de pago y cualquier cosa del canal de tienditas. Abarpay es un canal de distribución para su API.
 - El 14-dic, con la Circular 9/2026, el lado del que paga se vuelve más fácil. El que llegue primero con la herramienta del que cobra se queda el canal.
 
 ## 9. Riesgos

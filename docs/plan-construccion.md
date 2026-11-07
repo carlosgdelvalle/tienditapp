@@ -1,4 +1,4 @@
-# tienditapp · Plan de construcción (hackatón)
+# Abarpay · Plan de construcción (hackatón)
 
 > **Actualización 7-nov 15:30:** el stack cambió a Python/FastAPI + SQLite (ver [`decisiones/0001-stack.md`](decisiones/0001-stack.md)) y la app vive en `app/`. Los contratos, reglas, fallas a cubrir y el orden de trabajo de este plan siguen vigentes; las rutas y comandos de Next.js/Supabase quedan como referencia. Equivalencias: `lib/pey.ts` → `app/pey.py`, `lib/sales.ts` + webhook → `app/main.py`, `lib/parse.ts` → `app/parse.py`, pantallas → `app/static/`, Supabase → `app/db.py` (SQLite). El aviso a varios teléfonos usa consulta periódica (`/api/paid-since`) en lugar de Realtime.
 
@@ -158,7 +158,7 @@ type DayReport = { totalCents: number; salesCount: number;
 ```ts
 test('manda el monto en pesos y la expiración', async () => {
   const fetchMock = mockFetch({ status: 201, body: { id: 'IDC1', qrString: 'x', qrImage: 'b64' } });
-  await createCodiQr({ amountPesos: 0.01, concept: 'Venta tienditapp', expirationSec: 600 });
+  await createCodiQr({ amountPesos: 0.01, concept: 'Venta Abarpay', expirationSec: 600 });
   expect(fetchMock.lastBody()).toMatchObject({ amount: 0.01, expiration: 600, generateImage: true });
 });
 test('error de pey se propaga con su type', async () => {
