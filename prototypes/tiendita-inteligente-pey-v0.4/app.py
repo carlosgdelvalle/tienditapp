@@ -262,7 +262,7 @@ def snapshot():
                           'demo_sales_count':c.execute("SELECT COUNT(*) FROM sales WHERE status='DEMO_PAGADA'").fetchone()[0], 'low_stock':sum(p['qty']<=p['min_qty'] for p in products),'credit_outstanding_cents':sum(x['balance_cents'] for x in clients)},
                 'config':{'pey_mode':'REAL' if LIVE else ('BLOQUEADO' if CONFIG_BLOCKED else 'DEMO'),
                           'server_time':now(), 'single_branch':'Sucursal Centro',
-                          'needs_internet_for_pey':True,'one_cent_test':TEST_ONE_CENT,'ai_enabled':bool(os.getenv('OPENAI_API_KEY'))}}
+                          'needs_internet_for_pey':True,'one_cent_test':TEST_ONE_CENT,'evaluator_demo':EVALUATOR_DEMO,'ai_enabled':bool(os.getenv('OPENAI_API_KEY'))}}
 
 @app.get('/empleado')
 def employee_home(): return FileResponse(ROOT/'static'/'empleado.html')
