@@ -46,3 +46,12 @@ Los 15 tests anteriores del prototipo v0.4 son simulados; no acreditan un pago r
 La conciliación automática integral si se pierde definitivamente el webhook y los límites de tasa públicos no están completados ni validados.
 Sin cuenta Railway conectada, volumen comprobado, configuración privada y pruebas E2E no existe URL funcional ni cobro real habilitado.
 No fusionar a main ni registrar Webhook/credenciales reales sin validación.
+
+## Actualización de pagos reales — recuperación y controles (7 nov 2026)
+- En modo evaluador, solamente QR por **$0.01 MXN**. Push y abonos PEY en fiados se bloquean (HTTP 403), y la interfaz del dueño los oculta.
+- El backend limita a 20 intentos QR reales por hora para esta demo; las credenciales del empleado bloquean nuevos intentos tras cinco PIN incorrectos por IP en 15 minutos. Este umbral es acotado y **no sustituye** un WAF/rate limit en el perímetro.
+- Si el webhook firmado no llega, la consulta autenticada `GET /transaction/codi/qr/{qrId}` permite detectar transacciones del QR. Para aplicar una venta se exige una sola transacción `PAID` corroborada mediante `GET /transaction/{id}`, con monto exacto, moneda MXN, método CoDi, tipo QR, ID de QR y metadatos de venta coherentes. Ante error, más de una transacción o datos ambiguos, queda PENDIENTE para revisión.
+- El estado y origen de la confirmación se registran como `PEY_AUTHENTICATED_QR_API` o `PEY_SIGNED_WEBHOOK_AND_API`. La operación del inventario es transaccional y no se ejecuta una segunda vez ante confirmación duplicada.
+- El panel del dueño y la vista de empleado consultan el estado para mostrar el pago confirmado; ninguna pantalla de QR por sí sola indica que ya se pagó.
+- Esta vía de recuperación está implementada para **ventas QR**; CoDi Push y abonos siguen fuera del demo público.
+- La recuperación y los controles han sido implementados con simulaciones; siguen pendientes la aceptación bancaria real, el volumen persistente, seguridad pública complementaria, accesibilidad visual, portal PEY y URL HTTPS.
