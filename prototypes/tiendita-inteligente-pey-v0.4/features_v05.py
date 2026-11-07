@@ -46,6 +46,9 @@ def daily_close(connection, day=None):
         if created_today and status not in (*PAID, "PENDIENTE", "CANCELADA"):
             report["uncertain_count"] += 1
             report["exceptions"].append({"id":item["id"],"reason":status})
+        if status == "FIADA" and created_today:
+            report["credit_cents"] += item["amount_cents"]
+            report["credit_count"] += 1
         if not paid_today:
             continue
         group = report["employees"].setdefault(item["employee"], {"commercial_cents":0,"sales":0})
@@ -60,9 +63,6 @@ def daily_close(connection, day=None):
         elif status == "DEMO_PAGADA":
             report["simulated_cents"] += item["amount_cents"]
             report["simulated_count"] += 1
-        elif status == "FIADA":
-            report["credit_cents"] += item["amount_cents"]
-            report["credit_count"] += 1
     report["employees"] = [{"name":name, **metrics} for name,metrics in sorted(report["employees"].items())]
     report["exceptions"] = report["exceptions"][:30]
     report["note"] = "Pruebas, simulaciones y fiados NO son ingresos comerciales cobrados. No es conciliación bancaria ni cierre fiscal."
