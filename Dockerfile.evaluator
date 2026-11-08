@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /workspace
+COPY prototypes/tiendita-inteligente-pey-v0.4/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY prototypes/tiendita-inteligente-pey-v0.4/app.py /workspace/prototypes/tiendita-inteligente-pey-v0.4/app.py
+COPY prototypes/tiendita-inteligente-pey-v0.4/pey_gateway.py /workspace/prototypes/tiendita-inteligente-pey-v0.4/pey_gateway.py
+COPY prototypes/tiendita-inteligente-pey-v0.4/cart_intelligence.py /workspace/prototypes/tiendita-inteligente-pey-v0.4/cart_intelligence.py
+COPY prototypes/tiendita-inteligente-pey-v0.4/static /workspace/prototypes/tiendita-inteligente-pey-v0.4/static
+COPY assets/branding /workspace/assets/branding
+WORKDIR /workspace/prototypes/tiendita-inteligente-pey-v0.4
+ENV TIENDITA_DB=/data/tiendita.db TIENDITA_EVALUATOR_DEMO=1 TIENDITA_TEST_ONE_CENT=1
+EXPOSE 8000
+CMD ["sh","-c","exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
