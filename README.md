@@ -165,7 +165,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
 | Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`; el retry del portal queda pendiente |
-| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `90c60184ddf68c4eb325f2f750bb079e72d49166563c1b6a81ece36866a6de3f`; firma v2 verificada |
+| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `0c58bf192d256ebfefb15a350123edbe7e582ae43190143b2eae28baec0476b6`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
 ## Limitaciones y decisiones abiertas

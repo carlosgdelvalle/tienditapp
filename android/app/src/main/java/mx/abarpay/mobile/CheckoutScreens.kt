@@ -76,6 +76,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
         (search.isBlank() || it.name.contains(search, ignoreCase = true)) && (!quickOnly || it.quick)
     }
     val total = runCatching { cartEstimate(s.cart, products) }.getOrDefault(0)
+    val itemCount = s.cart.sumOf { maxOf(1, it.qtyMilli / 1000) }
     val canPay = s.cart.isNotEmpty() && !s.busy && s.sale == null &&
         (s.paymentMethod != PAYMENT_FIADO || s.customer != null)
 
@@ -417,7 +418,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
         }
         }
         CartActionBar(
-            count = s.cart.size,
+            count = itemCount,
             total = total,
             onCobrar = {
                 if (s.cart.isNotEmpty()) {
