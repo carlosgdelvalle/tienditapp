@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -43,6 +44,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
     var cashInput by rememberSaveable { mutableStateOf("") }
     var customerOpen by rememberSaveable { mutableStateOf(false) }
     var quantityProductId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var paySheetOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -280,53 +282,85 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                 }
             }
         }
-        item {
-            Panel {
-                Text("Total del carrito")
-                Text(money(total), fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                MutedText("El servidor confirma el importe con su catálogo al crear la venta.", 12)
-                if (s.bootstrap?.demoMode == true) {
-                    Text("Modo demo: PEY cobra $0.01 MXN", color = Amber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
-                HorizontalDivider()
-                Text("Forma de pago", fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = s.paymentMethod == PAYMENT_CASH,
-                        onClick = { vm.setPaymentMethod(PAYMENT_CASH) },
-                        enabled = !s.busy,
-                        modifier = Modifier.testTag("pago-efectivo"),
-                        label = { Text("Efectivo") },
-                        leadingIcon = { Icon(Icons.Outlined.Payments, null, Modifier.size(16.dp)) },
-                    )
-                    FilterChip(
-                        selected = s.paymentMethod == PAYMENT_PEY,
-                        onClick = { vm.setPaymentMethod(PAYMENT_PEY) },
-                        enabled = !s.busy,
-                        modifier = Modifier.testTag("pago-pey"),
-                        label = { Text("PEY / CoDi") },
-                        leadingIcon = { Icon(Icons.Outlined.QrCode2, null, Modifier.size(16.dp)) },
-                    )
-                    FilterChip(
-                        selected = s.paymentMethod == PAYMENT_FIADO,
-                        onClick = { vm.setPaymentMethod(PAYMENT_FIADO) },
-                        enabled = !s.busy,
-                        modifier = Modifier.testTag("pago-fiado"),
-                        label = { Text("Fiado") },
-                        leadingIcon = { Icon(Icons.Outlined.AccountBalanceWallet, null, Modifier.size(16.dp)) },
-                    )
-                }
-                MutedText(
-                    when (s.paymentMethod) {
-                        PAYMENT_CASH -> "Recibe el efectivo, registra el cobro y muestra el cambio. No llama a PEY."
-                        PAYMENT_PEY -> "Genera un QR CoDi. Solo el servidor puede confirmarlo como paid_pey."
-                        else -> "Queda a crédito del cliente. El saldo se consulta en Fiado."
-                    },
-                    12,
+        }
+        CartActionBar(
+            count = itemCount,
+            total = total,
+            onCobrar = { if (s.cart.isNotEmpty()) paySheetOpen = true },
+        )
+    }
+    if (paySheetOpen) {
+        PaymentSheet(
+            s = s,
+            vm = vm,
+            total = total,
+            cashInput = cashInput,
+            onCashInput = { cashInput = it },
+            onNewCustomer = { customerOpen = true },
+            onDismiss = { paySheetOpen = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PaymentSheet(
+    s: ShopState,
+    vm: ShopViewModel,
+    total: Long,
+    cashInput: String,
+    onCashInput: (String) -> Unit,
+    onNewCustomer: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val canPay = s.cart.isNotEmpty() && !s.busy && s.sale == null &&
+        (s.paymentMethod != PAYMENT_FIADO || s.customer != null)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Cobrar", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+            Text(money(total), fontSize = 40.sp, fontWeight = FontWeight.Bold)
+            if (s.bootstrap?.demoMode == true) {
+                Text("MODO DEMO · PEY cobra $0.01 MXN", color = Amber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+            HorizontalDivider()
+            Text("Forma de pago", fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = s.paymentMethod == PAYMENT_CASH,
+                    onClick = { vm.setPaymentMethod(PAYMENT_CASH) },
+                    enabled = !s.busy,
+                    modifier = Modifier.testTag("pago-efectivo"),
+                    label = { Text("Efectivo") },
+                    leadingIcon = { Icon(Icons.Outlined.Payments, null, Modifier.size(16.dp)) },
                 )
-                if (s.paymentMethod == PAYMENT_CASH) {
+                FilterChip(
+                    selected = s.paymentMethod == PAYMENT_PEY,
+                    onClick = { vm.setPaymentMethod(PAYMENT_PEY) },
+                    enabled = !s.busy,
+                    modifier = Modifier.testTag("pago-pey"),
+                    label = { Text("PEY / CoDi") },
+                    leadingIcon = { Icon(Icons.Outlined.QrCode2, null, Modifier.size(16.dp)) },
+                )
+                FilterChip(
+                    selected = s.paymentMethod == PAYMENT_FIADO,
+                    onClick = { vm.setPaymentMethod(PAYMENT_FIADO) },
+                    enabled = !s.busy,
+                    modifier = Modifier.testTag("pago-fiado"),
+                    label = { Text("Fiado") },
+                    leadingIcon = { Icon(Icons.Outlined.AccountBalanceWallet, null, Modifier.size(16.dp)) },
+                )
+            }
+            when (s.paymentMethod) {
+                PAYMENT_CASH -> {
                     OutlinedTextField(
-                        cashInput, { cashInput = it },
+                        cashInput, onCashInput,
                         Modifier.fillMaxWidth().testTag("efectivo-recibido"),
                         label = { Text("Efectivo recibido (MXN)") },
                         placeholder = { Text("Ej. 100.00") },
@@ -347,9 +381,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                         Text("Recibido:", color = Muted, fontSize = 12.sp)
                         quickBills.forEach { cents ->
                             OutlinedButton(
-                                onClick = {
-                                    cashInput = "${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
-                                },
+                                onClick = { onCashInput("${cents / 100}.${(cents % 100).toString().padStart(2, '0')}") },
                                 enabled = !s.busy,
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             ) { Text(money(cents)) }
@@ -359,15 +391,13 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                     if (received != null) {
                         val diff = received - total
                         Text(
-                            if (diff >= 0) "Cambio: ${money(diff)}" else "Faltan ${money(-diff)}",
+                            if (diff >= 0) "Cambio: " + money(diff) else "Faltan " + money(-diff),
                             color = if (diff >= 0) Green else Amber,
                             fontWeight = FontWeight.Bold,
                         )
-                    } else if (cashInput.isNotBlank()) {
-                        Text("Escribe un monto válido, por ejemplo 100.00", color = Amber, fontSize = 12.sp)
                     }
                 }
-                if (s.paymentMethod == PAYMENT_FIADO) {
+                PAYMENT_FIADO -> {
                     Text("Cliente del fiado", fontWeight = FontWeight.SemiBold)
                     Row(
                         Modifier.horizontalScroll(rememberScrollState()),
@@ -382,53 +412,43 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                             )
                         }
                         AssistChip(
-                            onClick = { customerOpen = true },
+                            onClick = onNewCustomer,
                             enabled = !s.busy,
                             label = { Text("Nuevo cliente") },
                             leadingIcon = { Icon(Icons.Outlined.PersonAdd, null, Modifier.size(16.dp)) },
                         )
                     }
-                    if (s.customer == null) {
-                        Text("Elige un cliente para continuar.", color = Amber, fontSize = 12.sp)
+                }
+                else -> Text(
+                    "Genera el QR CoDi. Solo el servidor puede confirmar el pago.",
+                    color = Muted,
+                    fontSize = 12.sp,
+                )
+            }
+            val cashCents = parseCashCents(cashInput)
+            Button(
+                onClick = {
+                    when (s.paymentMethod) {
+                        PAYMENT_CASH -> cashCents?.let { vm.payCash(it) }
+                        PAYMENT_PEY -> vm.payPey()
+                        else -> vm.payFiado()
                     }
-                }
-                val cashCents = parseCashCents(cashInput)
-                Button(
-                    onClick = {
-                        when (s.paymentMethod) {
-                            PAYMENT_CASH -> cashCents?.let { vm.payCash(it) }
-                            PAYMENT_PEY -> vm.payPey()
-                            else -> vm.payFiado()
-                        }
+                    onDismiss()
+                },
+                enabled = canPay && (s.paymentMethod != PAYMENT_CASH || (cashCents != null && cashCents >= total)),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text(
+                    when (s.paymentMethod) {
+                        PAYMENT_CASH -> "Cobrar en efectivo"
+                        PAYMENT_PEY -> "Generar QR PEY"
+                        else -> "Cobrar a fiado"
                     },
-                    enabled = canPay && (s.paymentMethod != PAYMENT_CASH || (cashCents != null && cashCents >= total)),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Text(
-                        when (s.paymentMethod) {
-                            PAYMENT_CASH -> "Cobrar en efectivo"
-                            PAYMENT_PEY -> "Generar QR PEY"
-                            else -> "Cobrar a fiado"
-                        },
-                        fontSize = 17.sp,
-                    )
-                }
+                    fontSize = 17.sp,
+                )
             }
         }
-        }
-        CartActionBar(
-            count = itemCount,
-            total = total,
-            onCobrar = {
-                if (s.cart.isNotEmpty()) {
-                    scope.launch {
-                        val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                        listState.animateScrollToItem(last)
-                    }
-                }
-            },
-        )
     }
 }
 
@@ -447,7 +467,7 @@ private fun CartActionBar(count: Int, total: Long, onCobrar: () -> Unit) {
             Button(
                 onClick = onCobrar,
                 enabled = count > 0,
-                modifier = Modifier.heightIn(min = 52.dp),
+                modifier = Modifier.heightIn(min = 52.dp).testTag("abrir-pago"),
                 shape = RoundedCornerShape(16.dp),
             ) { Text("Cobrar") }
         }

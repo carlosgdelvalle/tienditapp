@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,7 +52,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -62,12 +62,18 @@ class MainActivity : ComponentActivity() {
             AbarpayTheme {
                 val model: ShopViewModel = viewModel()
                 val state by model.ui.collectAsStateWithLifecycle()
-                AbarpayApp(state, model) {
-                    GmsBarcodeScanning.getClient(this).startScan()
-                        .addOnSuccessListener { barcode -> barcode.rawValue?.let(model::lookup) }
-                        .addOnFailureListener {
-                            model.message("No se pudo abrir el escáner. Usa el código escrito; la cámara requiere servicios de Google compatibles.")
-                        }
+                var scanning by rememberSaveable { mutableStateOf(false) }
+                Box(Modifier.fillMaxSize()) {
+                    AbarpayApp(state, model) { scanning = true }
+                    if (scanning) {
+                        ContinuousScannerScreen(
+                            onResult = { code ->
+                                scanning = false
+                                model.lookup(code)
+                            },
+                            onClose = { scanning = false },
+                        )
+                    }
                 }
             }
         }

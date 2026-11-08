@@ -1,6 +1,6 @@
 # Rediseño de “Cobrar” para uso real en tiendita
 
-Estado: propuesta de UX. Implementado en la app release: barra fija con total y salto a cobro, escaneo/dictado primero, texto y código opcionales, cantidades por presets y billetes rápidos en efectivo. Pendiente: escáner continuo, hoja de pago dedicada, QR a pantalla completa, perfil persistente y modo mostrador.
+Estado: propuesta de UX. Implementado en la app release: escáner continuo CameraX + ML Kit, barra fija con total, hoja de pago dedicada, escaneo/dictado primero, texto y código opcionales, cantidades por presets y billetes rápidos en efectivo. Pendiente: QR a pantalla completa, perfil persistente y modo mostrador.
 
 ## Contexto de uso
 
