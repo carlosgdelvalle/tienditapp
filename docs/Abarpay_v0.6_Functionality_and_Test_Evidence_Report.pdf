@@ -1,0 +1,413 @@
+%PDF-1.4
+%ÓôÌá
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 9 /Kids [6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R 20 0 R 22 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 423 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (1/9) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 741.0 Td (Abarpay v0.6 | Functionality & Test Evidence) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 4490 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (2/9) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 741.0 Td (ABARPAY  |  v0.6 functional evidence  |  independent prototype 1) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 729.0 Td (ABARPAY) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 719.5 Td (v0.6 Functionality &) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 710.0 Td (Test Evidence Report) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 700.5 Td (Independent Tiendita Inteligente prototype | Technical and functional assessment | 7) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 691.0 Td (November 2026) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 675.5 Td (Traceability Verified value) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 660.0 Td (Repository carlosgdelvalle/tienditapp) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 644.5 Td (Application folder prototypes/tiendita-inteligente-pey-v0.4/) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 629.0 Td (Git branch feature/abarpay-v06-qa-analytics-bounded) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 613.5 Td (Verified commit 015c61f01550ca609fe40c3b575e095ce4614789) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 598.0 Td (Change review Draft PR #9; not merged or deployed) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 582.5 Td (Release environment Local DEMO tested on v0.5; v0.6 manual QA pending) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 567.0 Td (Executive summary) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 555.0 Td (Abarpay v0.6 is a Spanish-language, single-store management and payment prototype with) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 545.5 Td (separate owner and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 536.0 Td (employee experiences. Its implemented capabilities cover product catalogues, inventory,) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 526.5 Td (sales, simulated and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 517.0 Td (PEY-oriented collection flows, fiados, replenishment, reporting, barcodes, local business) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 507.5 Td (queries, and bounded) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 498.0 Td (inventory analytics. Real payments are implemented as controlled API paths, but this report) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 488.5 Td (does not certify a) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 479.0 Td (completed production or public end-to-end bank transaction.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 463.5 Td (Test-evidence distinction: GitHub automated checks are green for the specified v0.6 commit.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 454.0 Td (The user manually) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 444.5 Td (demonstrated several workflows in a locally running v0.5 build. Those demonstrations) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 435.0 Td (support inherited) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 425.5 Td (features, but do not prove that the v0.6 changes pass manual browser or hardware testing.) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 410.0 Td (Validation legend) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 392.0 Td (Code Meaning) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 376.5 Td (AUTO PASS Automated code/HTTP regression test\(s\) passed at v0.6 head; external PEY is) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 367.0 Td (mocked.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 351.5 Td (MANUAL v0.5 User demonstrated a workflow in Chrome on predecessor v0.5, with screenshots or) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 342.0 Td (explicit observations.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 326.5 Td (NOT MANUAL v0.6 Implemented in v0.6 but not yet user-accepted on the new build.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 311.0 Td (UNVERIFIED LIVE Requires actual bank integration, deployed environment, compatible hardware) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 301.5 Td (or operational proof.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 286.0 Td (Evidence: GitHub Actions runs 42429145561 \(ci\) and 42429145554 \(evaluator-v06\), both) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 276.5 Td (successful at the verified commit.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 267.0 Td (Automated tests include mocked banking interfaces; a green Docker build does not imply) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 257.5 Td (deployment.) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 4663 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (3/9) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 741.0 Td (ABARPAY  |  v0.6 functional evidence  |  independent prototype 2) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 729.0 Td (1 | Functionality inventory - Store operations) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 717.0 Td (ID Implemented capability Evidence / acceptance status) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 701.5 Td (F-01 Spanish Abarpay owner dashboard; store health and sales) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 692.0 Td (summary) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 676.5 Td (AUTO PASS; MANUAL v0.5: UI opened, branding and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 667.0 Td (connection confirmed) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 651.5 Td (F-02 Employee checkout screen, login/PIN for LIVE, session/logout AUTO PASS; dedicated) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 642.0 Td (employee UX not manually) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 632.5 Td (accepted) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 617.0 Td (F-03 Eight seeded sample products, prices, categories, stock and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 607.5 Td (availability) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 592.0 Td (AUTO PASS; MANUAL v0.5: products and pricing visible) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 576.5 Td (F-04 Cart quantities, server-calculated sales, employee attribution AUTO PASS; MANUAL v0.5:) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 567.0 Td (simulated sales by Luis and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 557.5 Td (María) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 542.0 Td (F-05 Product reservations before settlement; stock deduction) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 532.5 Td (after confirmation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 517.0 Td (AUTO PASS; manual exact-once inventory test pending) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 501.5 Td (F-06 Inventory, low-stock alerts, reorder suggestion, expiring lots AUTO PASS; MANUAL v0.5:) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 492.0 Td (low-stock and expiry alerts) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 482.5 Td (visible) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 467.0 Td (F-07 Create supplier purchase orders and receive stock with) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 457.5 Td (optional expiry) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 442.0 Td (AUTO PASS; no complete manual cycle recorded) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 426.5 Td (F-08 Fiado customers, credit limits, account balances and demo) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 417.0 Td (settlement) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 401.5 Td (AUTO PASS; manual acceptance pending) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 386.0 Td (F-09 In-app operational notices for owner and employees AUTO PASS; notifications visible;) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 376.5 Td (event-by-event) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 367.0 Td (manual test pending) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 351.5 Td (F-10 Daily close: commercial, PEY test, DEMO, fiado, pending;) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 342.0 Td (employee view) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 326.5 Td (AUTO PASS; MANUAL v0.5: two simulated sales total) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 317.0 Td (MXN 566, separate from MXN 0 collected) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 301.5 Td (F-11 Local read-only Spanish business Q&A over sales, stock,) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 292.0 Td (fiado, pending) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 276.5 Td (AUTO PASS; MANUAL v0.5: correct commercial MXN 0) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 267.0 Td (and DEMO MXN 566 answers) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 251.5 Td (2 | Functionality inventory - Payments and controls) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 233.5 Td (ID Implemented capability Evidence / acceptance status) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 218.0 Td (F-12 QR-generation routes: DEMO, guarded PEY LIVE/CoDi QR and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 208.5 Td (cent-test mode) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 193.0 Td (AUTO PASS with mocked PEY; actual) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 183.5 Td (QR-to-bank-to-app cycle UNVERIFIED LIVE) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 168.0 Td (F-13 CoDi Push and credit collection requests where enabled AUTO PASS with mocked PEY;) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 9 0 R >>
+endobj
+11 0 obj
+<< /Length 1852 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (4/9) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 741.0 Td (blocked in public) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 731.5 Td (one-cent evaluator mode) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 716.0 Td (F-14 Bank webhook signature validation, independent PEY) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 706.5 Td (transaction lookup) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 691.0 Td (AUTO PASS with mocked PEY; live bank reconciliation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 681.5 Td (UNVERIFIED) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 666.0 Td (F-15 Recovery polling for missed QR webhook; duplicate) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 656.5 Td (event/stock protection) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 641.0 Td (AUTO PASS with mocked PEY; live recovery) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 631.5 Td (UNVERIFIED) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 616.0 Td (F-16 Payment-status screen, receipts, sale cancellation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 606.5 Td (safeguards) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 591.0 Td (AUTO PASS for backend cases; manual full) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 581.5 Td (receipt/cancel testing pending) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 566.0 Td (F-17 Bounded owner/employee authorization, PIN attempt limits,) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 556.5 Td (API headers) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 541.0 Td (AUTO PASS; not represented as production-grade) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 531.5 Td (security assurance) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 11 0 R >>
+endobj
+13 0 obj
+<< /Length 5040 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (5/9) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 741.0 Td (ABARPAY  |  v0.6 functional evidence  |  independent prototype 3) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 729.0 Td (3 | Functionality inventory - Capture, PWA and analytics) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 717.0 Td (ID Implemented capability Evidence / acceptance status) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 701.5 Td (F-18 Manual barcode lookup and persistent product association AUTO PASS; MANUAL v0.5:) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 692.0 Td (111222->milk, reused) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 682.5 Td (automatically; 121212->yogurt) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 667.0 Td (F-19 Camera barcode capture with compatible browser) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 657.5 Td (BarcodeDetector) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 642.0 Td (Code implemented; NOT manually tested with physical) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 632.5 Td (barcode/camera) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 617.0 Td (F-20 v0.6 barcode controls: EAN-8/UPC-A/EAN-13 check digit, INT-) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 607.5 Td (codes, explicit confirmation and legacy read) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 592.0 Td (AUTO PASS; NOT MANUAL v0.6) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 576.5 Td (F-21 Voice dictation and local text-to-cart interpretation; optional) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 567.0 Td (AI parser) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 551.5 Td (AUTO PASS for rule-based parsing; microphone and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 542.0 Td (external AI not manually verified) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 526.5 Td (F-22 Owner opt-in audible alert for verified PEY payment notice AUTO source checks; MANUAL) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 517.0 Td (v0.5: activation + visual) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 507.5 Td (notification; sound on paid event UNVERIFIED) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 492.0 Td (F-23 PWA shell, separate owner/employee manifests, limited) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 482.5 Td (offline static resources) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 467.0 Td (AUTO PASS; MANUAL v0.5: Chrome showed installation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 457.5 Td (dialog; install/offline not tested) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 442.0 Td (F-24 v0.6 Abarpay app identity, SVG icon and PNG installation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 432.5 Td (icons) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 417.0 Td (AUTO PASS including PNG validity; Chrome install) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 407.5 Td (dialog NOT MANUAL v0.6) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 392.0 Td (F-25 v0.6 input focus protection during six-second background) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 382.5 Td (refresh) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 367.0 Td (Source regression check PASS; original defect) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 357.5 Td (reproduced on v0.5; NOT MANUAL v0.6) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 342.0 Td (F-26 Single-store supplier demand summary by product/category,) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 332.5 Td (considering open orders) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 317.0 Td (AUTO PASS; no external supplier transmission; NOT) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 307.5 Td (MANUAL v0.6) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 292.0 Td (F-27 Illustrative 14-day sales-unit trend, clear fallback to) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 282.5 Td (catalogue assumptions) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 267.0 Td (AUTO PASS; no proven predictive accuracy; NOT) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 257.5 Td (MANUAL v0.6) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 242.0 Td (Scope and interpretation of analytics) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 230.0 Td (F-26 \(bounded GAP-022\): a private, single-store replenishment summary. It is not) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 220.5 Td (cross-merchant demand) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 211.0 Td (aggregation, supplier data exchange or a supplier commercial platform.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 195.5 Td (F-27 \(bounded GAP-024\): a descriptive estimate, not validated advanced forecasting. When) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 186.0 Td (fewer than three) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 176.5 Td (distinct active sale dates exist in the 14-day window, the display labels estimates as) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 167.0 Td (catalogue assumptions) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 157.5 Td (instead of claiming that observed sales establish a reliable trend. PEY $0.01 tests are) Tj ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 13 0 R >>
+endobj
+15 0 obj
+<< /Length 1279 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (6/9) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 741.0 Td (excluded from the demand) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 731.5 Td (series.) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 716.0 Td (What is intentionally not included) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 704.0 Td (Reliable offline sale creation/synchronization \(GAP-014\), multi-store isolation \(GAP-019\),) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 694.5 Td (cross-store supplier) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 685.0 Td (intelligence, fully validated predictive forecasting, photograph recognition, WhatsApp/SMS) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 675.5 Td (messaging, and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 666.0 Td (external paid integrations are not delivered in this branch. It is not accurate to describe) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 656.5 Td (the PWA shell as an) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 647.0 Td (offline-capable transaction system.) Tj ET
+endstream
+endobj
+16 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 15 0 R >>
+endobj
+17 0 obj
+<< /Length 4336 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (7/9) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 741.0 Td (ABARPAY  |  v0.6 functional evidence  |  independent prototype 4) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 729.0 Td (4 | Test evidence register) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 717.0 Td (Test Area Status Evidence / qualification) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 701.5 Td (T-01 Automated application) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 692.0 Td (tests) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 676.5 Td (PASS Six Python suites: test_flujos, test_pey_integracion, test_v04,) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 667.0 Td (test_live_evaluator, test_v05, test_v06; external PEY and AI mocked.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 651.5 Td (T-02 Code quality and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 642.0 Td (package) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 626.5 Td (PASS JavaScript syntax checks, owner/employee pages and branding) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 617.0 Td (smoke checks, Docker image build.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 601.5 Td (T-03 Cash closing / simulation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 592.0 Td (accounting) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 576.5 Td (MANUAL v0.5 PASS Luis MXN 341 + María MXN 225 = MXN 566 DEMO; commercial) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 567.0 Td (receipts MXN 0.00.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 551.5 Td (T-04 Business question) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 542.0 Td (responses) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 526.5 Td (MANUAL v0.5 PASS Commercial sales MXN 0 and simulated MXN 566 distinguished) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 517.0 Td (correctly.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 501.5 Td (T-05 Question text) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 492.0 Td (preservation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 476.5 Td (v0.5 FAIL; v0.6) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 467.0 Td (AUTO PASS) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 451.5 Td (Text repeatedly cleared during 6-second refresh; v0.6 source logic) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 442.0 Td (modified, manual retest pending.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 426.5 Td (T-06 Barcode registration /) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 417.0 Td (reuse) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 401.5 Td (MANUAL v0.5 PASS Arbitrary codes linked and recognized; newer v0.6) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 392.0 Td (validation/confirmation only AUTO-tested.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 376.5 Td (T-07 Physical barcode camera NOT TESTED No confirmed hardware-scanning screenshot or) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 367.0 Td (acceptance.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 351.5 Td (T-08 Owner voice alert) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 342.0 Td (activation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 326.5 Td (MANUAL v0.5 PASS Activation and toast confirmed; verified-payment speech not tested.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 311.0 Td (T-09 PWA install prompt MANUAL v0.5 PASS Chrome offered installation; old generic icon) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 301.5 Td (observed. v0.6 branded) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 292.0 Td (PNG/SVG tested automatically only.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 276.5 Td (T-10 PWA offline/install) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 267.0 Td (runtime) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 251.5 Td (NOT TESTED No install/standalone launch or offline behavior acceptance.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 236.0 Td (T-11 Exact-once manual) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 226.5 Td (inventory) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 211.0 Td (NOT COMPLETED Automated exact-once coverage exists; owner manual before/after) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 201.5 Td (inventory test not recorded.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 186.0 Td (T-12 Real bank payment /) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 176.5 Td (webhook) Tj ET
+endstream
+endobj
+18 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 17 0 R >>
+endobj
+19 0 obj
+<< /Length 2904 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (8/9) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 741.0 Td (NOT VERIFIED LIVE Code and mocked tests exist; no certified end-to-end paid QR) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 731.5 Td (workflow on deployed v0.6.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 716.0 Td (T-13 v0.6 supplier analytics /) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 706.5 Td (trends) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 691.0 Td (AUTO PASS only Endpoint values, read-only behavior, permissions and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 681.5 Td (insufficient-history labels tested; browser review pending.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 666.0 Td (T-14 Security and role) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 656.5 Td (separation) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 641.0 Td (AUTO PASS only Live-mode simulated PIN/employee restriction checks; no) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 631.5 Td (independent penetration test.) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 616.0 Td (5 | Release and handoff assessment) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 604.0 Td (Engineering state: v0.6 functionality committed to its dedicated feature branch; two GitHub) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 594.5 Td (workflows passed at) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 585.0 Td (the exact commit. QA state: automated regression green; manual acceptance has not been) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 575.5 Td (completed for the) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 566.0 Td (new v0.6 features and corrections. Release state: PR #9 remains draft and unmerged;) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 556.5 Td (hosting, production) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 547.0 Td (security controls and public banking verification are outside this report.) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 531.5 Td (Recommended evidence to gather before using this report as a release sign-off) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 519.5 Td (- Retest continuous Spanish question entry on v0.6 for more than 30 seconds without focus) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 510.0 Td (loss.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 494.5 Td (- Scan an actual EAN/UPC physical barcode, register a new valid code with confirmation and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 485.0 Td (verify re-scan.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 469.5 Td (- Check Chrome install name/icon, launch standalone and inspect offline behaviour without) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 460.0 Td (creating offline) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 450.5 Td (payments.) Tj ET
+endstream
+endobj
+20 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 19 0 R >>
+endobj
+21 0 obj
+<< /Length 1931 >>
+stream
+0.16 0 0.36 rg 0 759 612 33 re f
+BT /F2 11 Tf 1 1 1 rg 38 770 Td (ABARPAY  |  Functionality and Test Evidence  |  v0.6) Tj ET
+0.16 0 0.36 rg 40 42 532 1 re f
+BT /F1 8 Tf 0.28 0.28 0.32 rg 40 29 Td (Independent prototype  -  Reconstructed from verified report content) Tj ET
+BT /F1 8 Tf 0.28 0.28 0.32 rg 525 29 Td (9/9) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 741.0 Td (ABARPAY  |  v0.6 functional evidence  |  independent prototype 5) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 729.0 Td (- Review both analytics tabs in Spanish and confirm "illustrative"/"catalogue assumption") Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 719.5 Td (caveats are visible.) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 710.0 Td (- Complete manual inventory before/after simulation and validate employee restrictions) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 700.5 Td (without using real) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 691.0 Td (money.) Tj ET
+BT /F2 9 Tf 0.20 0 0.45 rg 42 675.5 Td (Evidence sources) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 663.5 Td (GitHub v0.6 source: https://github.com/carlosgdelvalle/tienditapp/tree/feature/abarpay-v06-) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 654.0 Td (qa-analytics-bounded) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 638.5 Td (PR #9: https://github.com/carlosgdelvalle/tienditapp/pull/9) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 623.0 Td (GitHub Actions: https://github.com/carlosgdelvalle/tienditapp/actions/runs/42429145554 and) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 613.5 Td (https://github.com/carlosgdelvalle/tienditapp/actions/runs/42429145561) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 598.0 Td (Manual screenshots and observations: local Chrome acceptance sequence supplied during the) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 588.5 Td (user's v0.5 testing session, 7) Tj ET
+BT /F1 7.5 Tf 0.17 0.17 0.20 rg 42 579.0 Td (November 2026. No user screenshots from v0.6 were represented as tested.) Tj ET
+endstream
+endobj
+22 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 21 0 R >>
+endobj
+xref
+0 23
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000176 00000 n 
+0000000271 00000 n 
+0000000373 00000 n 
+0000000846 00000 n 
+0000000982 00000 n 
+0000005523 00000 n 
+0000005659 00000 n 
+0000010373 00000 n 
+0000010510 00000 n 
+0000012414 00000 n 
+0000012552 00000 n 
+0000017644 00000 n 
+0000017782 00000 n 
+0000019113 00000 n 
+0000019251 00000 n 
+0000023639 00000 n 
+0000023777 00000 n 
+0000026733 00000 n 
+0000026871 00000 n 
+0000028854 00000 n 
+trailer
+<< /Size 23 /Root 1 0 R >>
+startxref
+28992
+%%EOF
