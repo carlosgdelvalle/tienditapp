@@ -12,7 +12,7 @@ Documentos de trabajo del equipo para el hackatón DevDay Exchange (7-8 nov 2026
 | [`modelo-de-negocio.md`](modelo-de-negocio.md) | Modelo de negocio con comparables de India y Brasil. Separa hechos con fuente de hipótesis por validar. |
 | [`boceto-producto.html`](boceto-producto.html) | Boceto de las pantallas (ábrelo en el navegador). Productos, montos y cifras son de ejemplo. |
 | [`diseno/`](diseno/README.md) | Maquetas de Abarpay: pantallas, recorridos y sistema de diseño, con un índice descriptivo. |
-| [`decisiones/`](decisiones/) | Decisiones vigentes: stack (0001), alcance del MVP (0002), credenciales y pagos (0003) y escáner (0004). |
+| [`decisiones/`](decisiones/) | Decisiones vigentes: stack (0001), alcance del MVP (0002), credenciales y pagos (0003), escáner (0004) y entrega v1 (0005). |
 | [`bitacora/`](bitacora/) | Una entrada por PR o hito, con evidencia. |
 | [`AUDITORIA_PROTOTIPO_FASTAPI.md`](AUDITORIA_PROTOTIPO_FASTAPI.md) | Auditoría del prototipo de Ricardo. |
 
