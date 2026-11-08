@@ -20,8 +20,8 @@ class AccessRecoveryUiTest {
     private val prefs get() = RuntimeEnvironment.getApplication().getSharedPreferences("development_session", 0)
 
     @Test fun storedChargeAlwaysTakesPrecedenceOverLogin() {
-        for (status in listOf("pending", "expired")) {
-            val raw = saleJson(Sale("real-reference", 1800, 1, status = status)).toString()
+        for (status in listOf("pending", "por_conciliar", "expired")) {
+            val raw = saleJson(Sale("real-reference", 1800, 1, status = status, paymentMethod = PAYMENT_PEY)).toString()
             assertTrue(prefs.edit().clear().putString("sale", raw).commit())
             ActivityScenario.launch(MainActivity::class.java).use {
                 compose.onNodeWithText("Cobro por revisar").assertIsDisplayed()

@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val keystoreFile = file(System.getProperty("user.home") + "/.config/tienditapp/release.properties")
+val keystoreProps = Properties()
+if (keystoreFile.exists()) {
+    keystoreFile.inputStream().use { keystoreProps.load(it) }
+}
+
 android {
     namespace = "mx.abarpay.mobile"
     compileSdk = 35
@@ -10,8 +19,10 @@ android {
         applicationId = "mx.abarpay.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1-dev"
+        versionCode = 3
+        versionName = "1.0.0"
+        // Fijado para la demo; si cambia el túnel, actualizar aquí y recompilar.
+        buildConfigField("String", "DEMO_SERVER", "\"https://roughly-participant-sbjct-gain.trycloudflare.com\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
@@ -20,9 +31,22 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    signingConfigs {
+        create("release") {
+            if (keystoreFile.exists()) {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         debug { applicationIdSuffix = ".dev" }
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            if (keystoreFile.exists()) signingConfig = signingConfigs.getByName("release")
+        }
     }
 }
 dependencies {
@@ -37,6 +61,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("androidx.compose.ui:ui-test-junit4")

@@ -1,190 +1,198 @@
 # Abarpay
 
-**Cobros verificados, ventas e inventario para la tiendita de barrio, desde un teléfono.**
+**Cobros verificados, ventas e inventario para la tiendita de barrio, desde el teléfono.**
 
 ![Tiendita de la Esquina, negocio de demostración de Abarpay](assets/branding/banner.jpeg)
 
-Proyecto para el hackatón **DevDay Exchange México 2026**, con **PEY como patrocinador y proveedor de la API de pagos**. La propuesta es convertir cada cobro en un registro útil para administrar el negocio: quién vendió, qué productos salieron, cuánto se recibió y qué necesita reponerse.
+Hackatón **DevDay Exchange México 2026** · pagos **PEY (CoDi)** · comercio de demostración **Tiendita de la Esquina** (ficticio).
+Entrega: **domingo 8 de noviembre de 2026, 13:00 CDMX**.
 
-**Estado al 7 de noviembre de 2026, 15:30:** la app del MVP vive en [`app/`](app/README.md) (Python/FastAPI) y ya crea cobros reales con pey. Primer pago real: $0.01 por CoDi, `PAID` a las 15:08. El manual para agentes y personas es [`AGENTS.md`](AGENTS.md); las decisiones, en [`docs/decisiones/`](docs/decisiones/).
+> **Estado v1 (8-nov-2026).** La entrega principal es la **app Android** en [`android/`](android/README.md), con un **backend nuevo** en [`server/`](server/README.md) y una **consola del dueño** en [`/console`](server/static/console.html). Efectivo, PEY, fiado, inventario, reportes y consola están implementados y probados en el dispositivo. El **pago real de $0.01 desde la pantalla** se confirmó el **8-nov a las 10:28:34** por conciliación con PEY (tx `01M6XZTYHZC3H4F1FZRYGKGF75`). El webhook real llegó pero respondió **400 `invalid_payload`** por la forma del payload; ya está corregido y verificado con el payload exacto; falta reintentar el evento en el portal. Las decisiones abiertas están en [`docs/pendientes-manana.md`](docs/pendientes-manana.md).
 
-## El reto del hackatón
+El backend viejo en [`app/`](app/README.md) y los prototipos en [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) quedan como referencia. La app Android ya no los usa.
 
-El brief compartido plantea demostrar una integración funcional con PEY y una transacción de prueba, junto con una explicación de cómo la solución podría convertirse en un negocio sostenible. Señala como entrega el **domingo 8 de noviembre de 2026 a las 13:00**; el horario y los requisitos deben cotejarse con las bases oficiales del evento.
+## Qué es Abarpay
 
-La demostración propuesta se concentra en **una tiendita, un teléfono y un cobro confirmado**, seguido por la actualización de ventas, inventario y caja. “Tiendita de la Esquina” es el comercio ficticio utilizado para presentar Abarpay.
+La tiendita de barrio cobra sobre todo en efectivo, con tickets pequeños y mucha frecuencia. Cuando acepta una transferencia, el dueño tiene que revisar el banco; cuando hay varios empleados, no siempre sabe quién vendió qué ni si la caja cuadra. El inventario vive en la cabeza o en una libreta, y el fiado en otra.
 
-## Negocio: el problema y la propuesta de valor
+Abarpay convierte el teléfono en la caja de la tiendita: el empleado captura la venta con texto, voz, código de barras o botones del catálogo; el servidor calcula el total con sus precios; el cobro PEY/CoDi se confirma con el servidor, no con la pantalla del cliente; y la venta queda asociada a quien la hizo. La app también registra **ventas en efectivo** y **fiado**, porque son la mayoría del negocio. El dueño ve el resultado en una consola web.
 
-Las conversaciones identifican problemas cotidianos de los pequeños comercios: dependencia del efectivo y del cambio, inventarios manuales, diferencias entre ventas y dinero recibido, dificultad para supervisar a varios empleados y desconfianza hacia herramientas financieras complejas. Son observaciones del equipo que deberán validarse con comerciantes.
+Abarpay no custodia dinero. El pago CoDi se liquida entre bancos a través de PEY; Abarpay crea el cobro, verifica la confirmación y registra la operación. El comercio, sus productos y sus empleados son ficticios.
 
-Abarpay propone aprovechar el teléfono que el comerciante ya utiliza, con una experiencia sencilla y una confirmación de pago comprensible. El objetivo es reducir la inversión inicial en equipo y facilitar el control del negocio.
-
-| Usuario | Necesidad | Valor propuesto |
-| --- | --- | --- |
-| Propietario | Saber cuánto se vendió y cobró, incluso cuando está ausente | Panel con ventas, pagos, existencias y actividad por empleado |
-| Empleado o familiar | Capturar una venta y comprobar el cobro con pocos pasos | Catálogo sencillo, QR y confirmación visual clara |
-| Cliente | Pagar y saber que su compra quedó registrada | Pago mediante un flujo bancario compatible y confirmación del comercio |
-| Proveedor, en una etapa posterior | Entender necesidades de abastecimiento | Pedidos y análisis agregado de demanda, sujetos a acuerdos y permisos |
-
-Varios empleados podrían operar desde sus propios teléfonos y dirigir los cobros a la cuenta del propietario. La confianza forma parte del producto: mostrar importe, estado y resultado sin ambigüedad. Las señales sonoras, las recompensas y un indicador físico de confirmación son ideas de evolución.
-
-### Modelo de ingresos por validar
-
-La mesa propuso facilitar la adopción con una inversión inicial baja para el comerciante y explorar ingresos mediante servicios para proveedores: abastecimiento, análisis agregado de ventas, campañas e integraciones. También se discutieron herramientas administrativas adicionales y servicios financieros mediante socios.
-
-Estas son hipótesis comerciales. Aún falta validar quién pagaría, por qué servicio, cuánto y con qué frecuencia; también los costos operativos y las condiciones de PEY. No hay precios, rentabilidad ni acuerdos comerciales confirmados. El uso de datos requeriría permisos claros y controles de acceso; no se plantea entregar historiales identificables de clientes o comercios por defecto.
-
-El piloto debería medir tiempo de cobro, pagos confirmados, diferencias de inventario, errores de caja, uso recurrente y satisfacción del comerciante. Las metas se fijarán después de observar una línea base.
-
-## Producto: alcance propuesto del MVP
-
-El resumen del equipo describe una plataforma amplia. Para el hackatón se propone demostrar primero un recorrido completo:
-
-1. Un empleado entra al comercio de demostración y selecciona productos de un catálogo pequeño.
-2. El sistema calcula el total y crea una venta pendiente, asociada al empleado.
-3. El servidor solicita un QR de cobro a PEY y lo muestra en el teléfono.
-4. El cliente autoriza el pago desde una aplicación bancaria compatible.
-5. El servidor verifica la confirmación y la relaciona con la venta.
-6. La aplicación muestra el pago confirmado y actualiza una sola vez la venta, el inventario y el corte de caja.
-7. El propietario consulta el resultado desde su panel.
-
-| Prioridad | Funcionalidad | Criterio de aceptación propuesto |
-| --- | --- | --- |
-| Esencial | Comercio de demostración y roles de propietario y empleado | Las ventas quedan asociadas al comercio y al usuario correcto |
-| Esencial | Catálogo, existencias y captura de venta | El total se calcula en el servidor y se conservan productos, cantidades y precios |
-| Esencial | Cobro QR mediante PEY | Se conserva el identificador del QR y se relaciona con la venta |
-| Esencial | Confirmación verificable | Solo un pago validado permite marcar la venta como pagada |
-| Esencial | Inventario y corte de caja básicos | Una confirmación repetida no descuenta inventario ni suma ingresos otra vez |
-| Extensión | Lectura de códigos de barras con la cámara | El código identifica un producto previamente configurado |
-| Extensión | Asistente de IA acotado | Responde una consulta sobre datos registrados o propone una captura que el usuario confirma |
-
-La incorporación de nuevos comercios y cuentas bancarias forma parte del producto previsto. Para la demostración puede utilizarse un comercio preconfigurado, con una cuenta habilitada, sin depender de completar un alta bancaria durante la presentación.
-
-## Tecnología: arquitectura propuesta
-
-Se propone una interfaz web adaptable al teléfono, potencialmente instalable como PWA, un servidor propio y una base de datos transaccional. Elección para el hackatón: Python/FastAPI + SQLite con frontend estático, OpenAI para el dictado ([decisión 0001](docs/decisiones/0001-stack.md)). Instrucciones en [`app/README.md`](app/README.md).
+## Arquitectura
 
 ```mermaid
 flowchart LR
-    E[Teléfono del empleado] --> A[Servidor Abarpay]
-    O[Panel del propietario] --> A
-    A --> D[(Ventas, inventario y pagos)]
-    A -->|Crear QR y consultar transacciones| P[API PEY]
-    P -->|Webhook firmado| W[Receptor de eventos]
-    W --> A
-    C[Cliente con aplicación bancaria] -->|Autoriza pago CoDi| B[Infraestructura bancaria]
-    B -->|Confirmación a través de PEY| P
-    A -.->|Consultas acotadas, etapa posterior| I[Asistente IA]
+    A[APK Android<br/>Dueño y empleados] -->|HTTPS / JSON| B[Backend Abarpay<br/>FastAPI + SQLite]
+    C[Consola del dueño<br/>/console] --> B
+    B -->|POST /codi/qr<br/>GET /transaction/codi/qr/id| P[API PEY]
+    P -->|Webhook firmado| B
+    D[Cliente con app bancaria] -->|Autoriza CoDi| P
 ```
 
-El servidor conservará las credenciales y decidirá qué comercio, cuenta e importe corresponden a cada solicitud. Los teléfonos recibirán únicamente los datos necesarios para operar. La propuesta de Abarpay no incluye una cartera propia ni la custodia de fondos; el flujo financiero se apoyará en PEY y la cuenta habilitada del comercio.
+- El APK y la consola **no** hablan directo con PEY ni contienen la API key. Solo el backend la usa.
+- La venta, los renglones, el intento de cobro, el QR, la transacción y el evento recibido se guardan por separado.
+- SQLite vive en el servidor. La app no copia la base ni guarda claves.
+- La API v1 es de una sola tienda y no autentica. No exponerla a internet con datos reales sin agregar sesiones, permisos y aislamiento.
 
-### Datos y reglas de consistencia
+## Entregables y estado
 
-El modelo inicial propuesto incluye comercio, usuario y rol, producto, venta y partidas, intento de cobro, transacción de pago, movimiento de inventario y evento recibido. Deben conservarse por separado el identificador interno de la venta, el del QR y el de cada transacción PEY.
+| Entregable | Estado | Dónde |
+| --- | --- | --- |
+| **Backend v1** | Implementado: efectivo, PEY, fiado, inventario, reportes, webhook y consola. 57 pruebas. | [`server/`](server/README.md) |
+| **APK Android v1** | Release firmado 1.0.0; instalado y probado en SM-A165M. Servidor de demo fijo y de solo lectura, conexión automática. Cash, PEY QR, fiado, abono, inventario y reportes. | [`android/`](android/README.md) |
+| **Consola del dueño** | `/console` con PIN demo 1234 y refresco cada 3 s; ventas, efectivo/PEY/fiado, inventario y equipo. | [`server/static/console.html`](server/static/console.html) |
+| **Pago real PEY** | Confirmado por conciliación: `sale_fed4e2ffe9684050b4d6`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, $0.01 `PAID` a las 10:28:34. El webhook real llegó con 400 `invalid_payload` (payload plano); corregido y verificado con el payload exacto. Falta reintentar el evento en el portal. | Ver [`docs/pendientes-manana.md`](docs/pendientes-manana.md) |
+| **Referencia** | App vieja y prototipos; no son la entrega v1. | [`app/`](app/README.md), [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) |
+| **Documentación** | Contrato v1, decisiones, bitácora, pendientes y presentación. | [`docs/`](docs/README.md), [`presentacion/`](presentacion/README.md) |
 
-- Calcular importes con precisión decimal o unidades monetarias enteras; evitar errores de punto flotante al sumar precios.
-- Validar comercio, relación con la venta, moneda e importe antes de aplicar un pago. Un importe diferente o un pago adicional requiere conciliación.
-- Verificar la firma antes de procesar un webhook y deduplicar tanto eventos como transacciones de pago.
-- Aplicar venta pagada, movimiento de inventario e ingreso de caja dentro de una operación consistente. Conservar un registro para conciliación y recuperación.
-- Mantener un estado pendiente o por conciliar cuando la respuesta sea incierta. La pantalla del cliente o la generación del QR no prueban que el pago terminó.
-- Permitir, como evolución, captura local sin conexión y sincronización posterior. La falta de internet nunca debe convertirse en una confirmación de pago.
+## Flujos de la app
 
-Estas reglas son criterios de implementación, no capacidades ya desarrolladas.
+- **Acceso mockup**: dueño o empleado de ejemplo desde `GET /api/bootstrap`. No hay contraseñas, OAuth ni sesiones; el acceso no autentica.
+- **Cobrar**: escáner continuo con CameraX + ML Kit, dictado primero y texto/código manual en una acción secundaria. Barra fija con artículos y total; hoja de pago dedicada con métodos, billetes rápidos y cantidades por presets. El carrito usa `qtyMilli`; el servidor confirma precios y total.
+- **Efectivo**: se captura el efectivo recibido, el servidor calcula el cambio y registra `paid_cash`; no se llama a PEY.
+- **PEY/CoDi**: el servidor crea el QR; la app lo muestra y consulta cada 3 s. Solo pasa a éxito con `paid_pey`. En modo demo se cobra **$0.01** y la pantalla lo dice.
+- **Fiado**: cliente existente o alta con nombre/teléfono; la venta queda `credit`, con saldo y abonos.
+- **Inventario**: consulta y ajuste simple de ±1000 miliunidades; cada cambio deja un movimiento y el stock negativo está permitido en la demo.
+- **Reportes**: total registrado, cobrado, efectivo, PEY, fiado, pendientes, fiado por cobrar, por empleado y productos más vendidos.
+
+## Cómo correr
+
+### Backend
+
+Desde la raíz del repositorio:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r server/requirements.txt
+# para correr las pruebas:
+pip install -r server/requirements-dev.txt
+cp .env.example .env
+# Editar .env: PEY_API_KEY, PEY_WEBHOOK_SECRET, MODO_DEMO, OWNER_PIN
+ABARPAY_LOAD_DOTENV=1 \
+ABARPAY_DB=server/data/abarpay.db \
+MODO_DEMO=true \
+uvicorn server.main:app --host 0.0.0.0 --port 8000
+```
+
+- El `.env` nunca se sube al repositorio; `PEY_API_KEY` y `PEY_WEBHOOK_SECRET` viven solo en el servidor.
+- `ABARPAY_LOAD_DOTENV=1` es explícito para que las pruebas no lean credenciales reales.
+- `OWNER_PIN` es el PIN de demostración de la consola (default 1234).
+- La base se crea y se siembra sola si está vacía: una tienda, 3 empleados, 12 productos y 5 códigos de barras.
+- Consola: `http://127.0.0.1:8000/console`. El resumen muestra el monto pendiente; `GET /api/console/webhooks?limit=20` audita eventos y `GET /api/console/pending` lista cobros pendientes/por revisar.
+
+Para un teléfono físico hace falta HTTPS. Con un túnel temporal:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:8000
+```
+
+La app release ya trae fija la URL actual `https://roughly-participant-sbjct-gain.trycloudflare.com` (campo de solo lectura) y se conecta sola. Usar `.../webhooks/pey` en el portal de PEY. El túnel es efímero: si cambia, actualizar `DEMO_SERVER` en `android/app/build.gradle.kts`, recompilar e instalar; y actualizar el webhook.
+
+### Android
+
+Requisitos: JDK 17 o 21, Android SDK Platform 35, Build Tools 35.0.0, Gradle 8.13.
+
+```bash
+cd android
+./gradlew assembleDebug
+./gradlew testDebugUnitTest
+```
+
+Si el wrapper no descarga Gradle en esta red, usar la instalación local:
+
+```bash
+cd android
+JAVA_HOME=/Library/Java/JavaVirtualMachines/microsoft-21.jdk/Contents/Home \
+ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" \
+/tmp/gradle-8.13/bin/gradle testDebugUnitTest assembleDebug --no-daemon
+```
+
+- Debug: paquete `mx.abarpay.mobile.dev`.
+- Release: paquete `mx.abarpay.mobile`, versión 1.0.0; se firma con `~/.config/tienditapp/release.properties` y el keystore local, fuera del repositorio.
+- Release: servidor fijo de demo, campo de solo lectura y conexión automática; no hay botón de simulación. Si el túnel cambia, hay que recompilar con el nuevo `DEMO_SERVER`.
+- Debug: si hay un servidor guardado lo usa; si no, inicia simulación para las pruebas. La pantalla de Ajustes de esta compilación también queda fijada al servidor de demo.
+- APK de release generado en `android/app/build/outputs/apk/release/app-release.apk`.
+
+### Pruebas
+
+```bash
+python -m pytest server/tests -q
+./scripts/check_v1.sh                 # salud, reporte y consola
+./scripts/check_v1.sh <saleId>        # estado de una venta
+cd android && ./scripts/test-core.sh
+```
+
+- Backend: **57 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
+- Android: **46 pruebas Gradle** y **35 pruebas de núcleo JVM** en la evidencia del agente.
+- No hay pago real en las pruebas. El pago real de $0.01 lo hace una persona.
 
 ## Integración con PEY
 
-La [referencia de la API](https://docs.pey.mx/docs/category/api-reference/) y el [contrato OpenAPI](https://docs.pey.mx/openapi.json), versión consultada `2026-10-20`, son las fuentes técnicas. La base de producción es `https://api.pey.mx` y la autenticación utiliza el encabezado `Authorization: Bearer <API_KEY>`.
+Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 
-| Operación | Endpoint | Uso previsto |
+| Operación | Endpoint | Uso |
 | --- | --- | --- |
-| Comprobar acceso y consultar pagos | `GET /transaction/api-key` | Validación inicial de solo lectura y conciliación |
-| Crear un QR | `POST /codi/qr` | Solicitar el cobro de una venta |
-| Consultar pagos de un QR | `GET /transaction/codi/qr/{id}` | Recuperar las transacciones asociadas al QR |
-| Consultar una transacción | `GET /transaction/{id}` | Verificar un pago concreto |
-| Consultar una cuenta registrada por API | `GET /bank-account/{id}` | Comprobar su estado de habilitación |
+| Validar acceso | `GET /transaction/api-key` | Comprobar la clave |
+| Crear QR | `POST /codi/qr` | Cobro de una venta |
+| Consultar pagos del QR | `GET /transaction/codi/qr/{id}` | Conciliación y respaldo del webhook |
+| Consultar transacción | `GET /transaction/{id}` | Verificación puntual |
+| Webhook | `POST /webhooks/pey` | Confirmación firmada |
 
-Un QR y una transacción tienen identificadores distintos. Las consultas paginadas deben recorrer `nextToken` cuando corresponda. PEY también documenta registro de cuentas, solicitudes push y enlaces de pago, disponibles para ampliar el alcance posteriormente.
+- El monto se envía en pesos y se conserva en centavos; en demo el cargo es `0.01` y el total comercial queda en `totalCents`.
+- La venta PEY nace `pending`; solo `apply_payment` la pasa a `paid_pey` después de un webhook firmado o una conciliación correcta.
+- Webhook Standard Webhooks: se verifican `webhook-id`, `webhook-timestamp` y `webhook-signature` contra `PEY_WEBHOOK_SECRET`; se deduplica por evento y transacción.
+- Un monto distinto deja la venta en `por_conciliar`; un pago extra se registra con `applied=0` y nota, no se descarta.
+- Un timeout al crear el QR devuelve la venta `por_conciliar` con `saleId`, para no perder la referencia. Sin `qrId` la conciliación automática no es posible y requiere revisión manual.
 
-Ejemplo de cuerpo para crear un QR de demostración, con monto en MXN:
+## Seguridad y reglas de pago
 
-```json
-{
-  "amount": 0.01,
-  "concept": "Venta demo Abarpay",
-  "expiration": 600,
-  "generateImage": false,
-  "metadata": {
-    "saleId": "demo-001"
-  }
-}
-```
+- **Credenciales solo en `.env` del servidor** y variables del deploy. Nunca en el APK, el repositorio, capturas, logs o chats.
+- **Cada pago de prueba es dinero real.** PEY no tiene sandbox; se usa **$0.01 MXN** y lo paga una persona desde su app bancaria. Ningún script ni agente paga.
+- **Una venta PEY solo pasa a pagada** en `apply_payment`, con un pago verificado por PEY. La pantalla del cliente y el QR no prueban nada.
+- **Efectivo no es lo mismo que CoDi.** La venta en efectivo se registra y se marca `paid_cash`; no se presenta como verificada por un banco.
+- **Nunca se muestra un monto distinto del cobrado.** En modo demo la pantalla dice “Modo demo: se cobra $0.01”.
+- **Lo simulado se etiqueta SIMULADO.** La app tiene modo sin conexión y las pruebas usan `FakePey`.
+- **Cero datos de terceros.** El catálogo y los empleados son ficticios.
+- **La API v1 no autentica.** No abrirla a internet con datos reales ni dejar el túnel público más de lo necesario.
 
-El servidor debe generar y validar la referencia de venta. La respuesta incluye `id` y `qrString`, que permite dibujar el QR. Si se utiliza `bankAccountId`, la cuenta registrada debe estar `ACTIVE`; si se omite, se utiliza la cuenta CoDi vinculada a la clave. Véase [Create QR](https://docs.pey.mx/docs/api/create-qr/).
+## Evidencia
 
-### Confirmaciones y credenciales
-
-PEY firma las notificaciones con Standard Webhooks. La implementación deberá verificar el cuerpo original de la solicitud con el secreto del webhook y usar `webhook-id` para detectar entregas repetidas. El secreto de firma es distinto de la API key. La configuración admite una URL de webhook por clave. Fuentes: [validación de webhooks](https://docs.pey.mx/docs/webhooks/introduction/) y [configuración](https://docs.pey.mx/docs/tutorials/getting-started/set-up-webhooks/).
-
-Las claves se mantendrán fuera del repositorio y de la aplicación cliente. Para el desarrollo local se acordó un archivo privado en `~/.config/tienditapp/pey-api-key`, con permisos `600`; aún no existe código que lo cargue automáticamente. En un despliegue deberán inyectarse desde la configuración segura del servidor. No deben aparecer en capturas, registros ni material de la demo.
-
-La [guía de PEY](https://docs.pey.mx/docs/tutorials/getting-started/create-an-api-key/) indica que el entorno de pruebas dedicado está pendiente y propone pruebas en producción con montos pequeños, como **$0.01 MXN**. Son operaciones reales. Antes de la demostración debe verificarse la cuenta receptora y utilizar un pagador del equipo.
-
-No se encontró un mecanismo de idempotencia para crear cobros en el contrato revisado. Si una solicitud termina con un tiempo de espera agotado, la implementación deberá conservar el intento incierto y conciliarlo antes de crear otro cobro automáticamente.
-
-## Inteligencia artificial y evolución del producto
-
-La IA se plantea como ayuda para operar y entender el negocio. El primer caso deberá ser pequeño y comprobable: consultar ventas y existencias con lenguaje natural, o convertir un dictado en una propuesta de captura que el empleado revise. La elección sigue pendiente. Los cálculos, permisos y cambios financieros deberán ejecutarse mediante reglas del servidor.
-
-| Etapa propuesta | Capacidades discutidas | Dependencia principal |
-| --- | --- | --- |
-| MVP del hackatón | Venta, QR, confirmación, inventario y caja | Acceso funcional a PEY y recorrido completo |
-| Asistencia al comerciante | Voz, consultas, reportes y alertas de reposición | Datos confiables y acciones supervisadas |
-| Operación ampliada | Fiado digital, recordatorios por WhatsApp, roles ampliados y sincronización sin conexión | Permisos, trazabilidad y recuperación de conflictos |
-| Relación con proveedores | Pedidos sugeridos, demanda agregada y campañas | Validación comercial y acuerdos sobre datos |
-| Investigación posterior | Pronóstico de demanda, visión artificial, gemelo digital, recompensas e indicador físico | Historial suficiente, pruebas de utilidad y privacidad |
-| Servicios financieros | Historial comercial para evaluar opciones de financiamiento | Autorización del comercio y socios habilitados |
-
-El escaneo de códigos de barras requiere un catálogo y reglas de presentación: una caja y una unidad no son equivalentes por defecto. El reconocimiento visual de productos es una capacidad distinta que necesita validación propia. El acceso a crédito es una oportunidad futura, no un resultado garantizado.
-
-## Guion de demostración y validación
-
-1. Presentar el problema de la tiendita y la ventaja de operar desde el teléfono.
-2. Capturar una venta con productos preparados para la demostración.
-3. Generar el QR de PEY y realizar un pago pequeño autorizado por el equipo.
-4. Mostrar la confirmación obtenida del servidor y su relación con la venta.
-5. Abrir el panel del propietario y mostrar venta, inventario y corte de caja actualizados.
-6. Explicar el modelo de ingresos como hipótesis y la evolución hacia IA, fiado y proveedores.
-
-La validación debe centrarse en el comportamiento que se presenta: cobro correcto, firma inválida rechazada, evento repetido sin efectos dobles, importe inesperado sin cierre automático y recuperación después de una interrupción. Si se utiliza una simulación como respaldo de la presentación, deberá identificarse claramente; no sustituye la evidencia de una integración real con PEY.
-
-## Estado y siguientes pasos
-
-| Elemento | Situación al 7 de noviembre de 2026 |
+| Evidencia | Resultado |
 | --- | --- |
-| Concepto de negocio y fuentes del equipo | Integrados en este README |
-| Identidad del comercio de demostración | Logo y banner JPG disponibles |
-| Aplicación, servidor y base de datos | `app/` funciona en local; 12 pruebas automáticas y CI en verde |
-| Cuenta receptora | Activa: pey generó QR y recibió un pago real |
-| Acceso a la API | `GET /transaction/api-key` con la nueva clave → HTTP 200 (15:00) |
-| Webhook y cobro completo | Pago real conciliado (tx `01M6VXE5HTXV66NPJCR1XY7T4A`, 15:08). Webhook firmado implementado; falta URL pública |
+| Backend | **57 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado |
+| Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
+| PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
+| Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`; el retry del portal queda pendiente |
+| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 34 MB; SHA-256 `da8b14c6a85b66093b06a5d3b789bdf34fe05022a409cae60f36252737937dfc`; firma v2 verificada |
+| Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
-Orden propuesto de trabajo:
+## Limitaciones y decisiones abiertas
 
-1. Sustituir la credencial local por la nueva clave completa y validar `GET /transaction/api-key`.
-2. Confirmar alcance de la demo, tecnologías y responsables; decidir si cabe un caso acotado de IA.
-3. Implementar catálogo, venta pendiente y creación del QR.
-4. Publicar el receptor de webhooks, configurar su URL y completar la confirmación y conciliación.
-5. Conectar inventario y caja; validar los casos de error relevantes y ensayar la presentación.
+- Acceso **mockup** sin autenticación; consola con PIN demo compartido, no sesiones firmadas.
+- Una sola tienda; no hay multi-tienda ni aislamiento por comercio.
+- El túnel es temporal y expone la app sin auth.
+- Falta probar cámara y dictado en un teléfono físico con hardware real (el escáner y la voz están implementados; el flujo manual, el parser y la media kilo sí se probaron).
+- Las ventas PEY pendientes cuentan en el total “registrado” del reporte; “Cobrado” solo suma efectivo + PEY pagado. Ver decisión 2 en [`docs/pendientes-manana.md`](docs/pendientes-manana.md).
+- No hay corte de caja/arqueo, reembolsos ni edición de catálogo.
+- El webhook real de PEY **sí llegó**, pero respondió 400 `invalid_payload` porque envía `codiQrId`, `transactionId` y `amount` en la raíz, no en `data`. Ya se corrigió y el replay exacto dio 200; falta que el portal reintente el evento para cerrar la evidencia del webhook.
 
-## Recursos y fuentes
+## Repositorio
 
-- [Banner](assets/branding/banner.jpeg): 1600 × 533 píxeles.
-- [Logo](assets/branding/logo.jpeg) e [identidad visual](assets/branding/identidadVisual.jpeg); guía en [`GuiaIdentidadGrafica.jpeg`](assets/branding/GuiaIdentidadGrafica.jpeg).
-- [Diseño de interfaz de Abarpay](docs/diseno/README.md): maquetas de pantallas, recorridos y sistema de diseño.
-- [Brief compartido del equipo: DevDay Exchange México 2026](https://chatgpt.com/s/t_6aef79ee56148191a6c905d73d32fa2b): problema, enfoque móvil, propuestas del equipo, modelo comercial, plazo y recomendación del MVP. Se presenta como diagnóstico, no como decisión final.
-- **Resumen de projecto.eml**, proporcionado por el equipo: síntesis de la reunión «Open AI PEY», con inventarios móviles, administración, IA, proveedores, fiado, conectividad y etapas de crecimiento. Incluye recomendaciones del autor además de ideas atribuidas a la reunión.
-- [Documentación oficial de PEY](https://docs.pey.mx/): contrato y comportamiento esperado de la integración.
+| Ruta | Qué es |
+| --- | --- |
+| [`server/`](server/README.md) | Backend v1 FastAPI + SQLite y consola. |
+| [`android/`](android/README.md) | App Android v1 (Kotlin/Compose). |
+| [`docs/v1-contract.md`](docs/v1-contract.md) | Contrato de API, datos y supuestos. |
+| [`docs/pendientes-manana.md`](docs/pendientes-manana.md) | Pago pendiente y decisiones para la mañana. |
+| [`app/`](app/README.md) | MVP anterior; referencia. |
+| [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) | Prototipos; referencia. |
+| [`presentacion/`](presentacion/README.md) | Láminas del pitch. |
+| [`docs/diseno/`](docs/diseno/README.md) | Maquetas y sistema de diseño. |
 
-Este documento sintetiza ambos materiales y la preparación técnica de este repositorio. No se han revisado los audios originales; las atribuciones individuales que las fuentes dejan pendientes no se convierten aquí en responsabilidades asignadas. El nombre del producto, el comercio ficticio y sus recursos gráficos corresponden a la preparación de Abarpay para la demostración.
+## Equipo
+
+Mesa de innovación colaborativa: Sergio Arturo Gasca, Carlos del Valle, Ricardo Flores, Agustín Vaquero, Eduardo García, Oswaldo, Luis Murillo y compañeros. Atribuciones por confirmar.
+
+“Tiendita de la Esquina” es un comercio ficticio para la demostración. El nombre, los recursos gráficos y los datos del catálogo corresponden a la preparación de Abarpay para el hackatón.

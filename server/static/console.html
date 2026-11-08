@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Abarpay · Consola de la dueña</title>
+  <style>
+    :root {
+      --ink: #14211d;
+      --ink-soft: #475852;
+      --paper: #f6f3ec;
+      --card: #ffffff;
+      --line: #e2ded3;
+      --green: #0b7a5c;
+      --green-dark: #07543f;
+      --mint: #dff5ea;
+      --orange: #ef8a4d;
+      --amber: #f4c95d;
+      --red: #c44242;
+      --red-soft: #fbe7e5;
+      --shadow: 0 18px 45px rgba(20, 33, 29, 0.10);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(11, 122, 92, 0.12), transparent 34rem),
+        radial-gradient(circle at 100% 10%, rgba(239, 138, 77, 0.12), transparent 30rem),
+        var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    .login-screen {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 390px;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .brand { font-size: 30px; font-weight: 800; letter-spacing: -0.045em; }
+    .brand .dot { color: var(--orange); }
+    .muted { color: var(--ink-soft); }
+    .login-card p { margin: 8px 0 0; line-height: 1.45; }
+    .login-card form { margin-top: 26px; display: grid; gap: 10px; }
+    label { font-size: 13px; font-weight: 700; letter-spacing: 0.01em; }
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #fff;
+      color: var(--ink);
+      outline: none;
+      font-size: 20px;
+      letter-spacing: 0.18em;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(11, 122, 92, 0.12); }
+    button {
+      border: 0;
+      border-radius: 13px;
+      padding: 14px 18px;
+      background: var(--green);
+      color: #fff;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 0.08s ease, background 0.15s;
+    }
+    button:hover { background: var(--green-dark); }
+    button:active { transform: translateY(1px); }
+    .error { color: var(--red); font-size: 13px; font-weight: 650; }
+    .fineprint { color: #7b8882; font-size: 12px; line-height: 1.5; }
+    .app-shell { min-height: 100vh; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 30px;
+      border-bottom: 1px solid rgba(226, 222, 211, 0.85);
+      background: rgba(246, 243, 236, 0.88);
+      backdrop-filter: blur(14px);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+    .topbar .brand { font-size: 23px; white-space: nowrap; }
+    .store-pill {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.65);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: 12px; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 5px; box-shadow: 0 0 0 4px rgba(11, 122, 92, 0.12); }
+    .ghost-btn { background: transparent; color: var(--ink-soft); padding: 8px 10px; border: 1px solid transparent; }
+    .ghost-btn:hover { background: #fff; border-color: var(--line); color: var(--ink); }
+    main { max-width: 1440px; margin: 0 auto; padding: 26px 30px 56px; }
+    .demo-banner {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 18px;
+      padding: 13px 16px;
+      border: 1px solid #f2d8a2;
+      border-radius: 14px;
+      background: #fff6df;
+      color: #70521b;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .demo-banner.show { display: flex; }
+    .demo-banner strong { color: #4e360c; }
+    .cards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .card {
+      min-width: 0;
+      padding: 18px 18px 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+      box-shadow: 0 9px 28px rgba(20, 33, 29, 0.04);
+    }
+    .card .label { margin-bottom: 9px; color: var(--ink-soft); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.09em; }
+    .card .value { font-size: clamp(21px, 2.1vw, 29px); font-weight: 800; letter-spacing: -0.035em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card .detail { margin-top: 5px; color: #7b8882; font-size: 12px; }
+    .card.accent { background: var(--green); border-color: var(--green); color: #fff; }
+    .card.accent .label, .card.accent .detail { color: rgba(255,255,255,0.72); }
+    .card.warn .value { color: #a35d12; }
+    .grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 16px; align-items: start; }
+    .grid .span-2 { grid-column: 1 / -1; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+      box-shadow: 0 9px 28px rgba(20, 33, 29, 0.04);
+      overflow: hidden;
+    }
+    .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 17px 19px 13px; border-bottom: 1px solid #eeebe2; }
+    .panel-title { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; }
+    .panel-sub { color: #7b8882; font-size: 11px; font-weight: 650; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid #f0ede5; white-space: nowrap; }
+    th { color: #7b8882; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; background: #fcfbf7; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fbfaf6; }
+    .right { text-align: right; }
+    .mono { font-variant-numeric: tabular-nums; }
+    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.01em; }
+    .badge.ok { color: #07543f; background: var(--mint); }
+    .badge.pey { color: #315c9e; background: #e6effd; }
+    .badge.warn { color: #70521b; background: #fff1cd; }
+    .badge.bad { color: #9b2f2f; background: var(--red-soft); }
+    .badge.credit { color: #8b4a13; background: #fdebd9; }
+    .badge.muted { color: #65726c; background: #eeece5; }
+    .sale-items { color: #7b8882; font-size: 11.5px; }
+    .empty { padding: 22px 18px; color: #7b8882; font-size: 12.5px; }
+    .list { margin: 0; padding: 7px 18px 14px; list-style: none; }
+    .list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f2efe8; }
+    .list li:last-child { border-bottom: 0; }
+    .list .rank { width: 23px; color: #9aa49e; font-size: 11px; font-weight: 800; }
+    .list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+    .list .amount { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .low-stock { color: var(--red); font-weight: 750; }
+    .stock-good { color: var(--ink-soft); }
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 50;
+      max-width: 360px;
+      padding: 12px 15px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 12.5px;
+      box-shadow: 0 16px 34px rgba(20, 33, 29, 0.24);
+    }
+    .footer { margin-top: 22px; color: #8b9892; font-size: 11.5px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    [hidden] { display: none !important; }
+    @media (max-width: 1180px) {
+      .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .grid .span-2 { grid-column: auto; }
+      .topbar { padding: 14px 18px; }
+      main { padding: 20px 18px 46px; }
+      .store-pill { display: none; }
+    }
+    @media (max-width: 560px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .topbar-right .updated { display: none; }
+      .login-card { padding: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <section id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="brand">abarpay<span class="dot">.</span></div>
+      <p class="muted">Consola de la dueña</p>
+      <p class="fineprint">Vista de demostración para la Tiendita de la Esquina. No usa cuentas ni sesiones de producción.</p>
+      <form id="login-form" autocomplete="off">
+        <label for="pin">PIN de dueño</label>
+        <input id="pin" name="pin" type="password" inputmode="numeric" maxlength="16" placeholder="••••" autofocus>
+        <button type="submit">Entrar a la consola</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+      <p class="fineprint">La consola se actualiza cada 3 segundos mientras está abierta.</p>
+    </div>
+  </section>
+
+  <div id="app" class="app-shell" hidden>
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand">abarpay<span class="dot">.</span></div>
+        <div class="store-pill" id="store-pill">Tiendita de la Esquina</div>
+      </div>
+      <div class="topbar-right">
+        <span class="updated" id="updated"><span class="live-dot"></span>Actualizando</span>
+        <button type="button" class="ghost-btn" id="refresh-now">Actualizar</button>
+        <button type="button" class="ghost-btn" id="logout">Salir</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="demo-banner" class="demo-banner">
+        <strong>Modo demo:</strong>
+        <span>se cobra $0.01 MXN por PEY; el total comercial de la venta se conserva.</span>
+      </div>
+
+      <section class="cards" id="cards" aria-label="Resumen de hoy"></section>
+
+      <section class="grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Últimas ventas</div>
+            <div class="panel-sub" id="sales-sub">Hoy</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Hora</th><th>Folio</th><th>Detalle</th><th>Pago</th><th>Estado</th><th class="right">Total</th></tr>
+              </thead>
+              <tbody id="sales-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Más vendidos hoy</div>
+            <div class="panel-sub">Top 5</div>
+          </div>
+          <ul class="list" id="top-products"></ul>
+          <div class="panel-head" style="border-top:1px solid #eeebe2; border-bottom:0; padding-top:15px;">
+            <div class="panel-title">Equipo</div>
+            <div class="panel-sub">Ventas de hoy</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Persona</th><th>Rol</th><th class="right">Ventas</th><th class="right">Total</th></tr></thead>
+              <tbody id="employees-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel span-2">
+          <div class="panel-head">
+            <div class="panel-title">Inventario</div>
+            <div class="panel-sub">Stock en piezas y kilos · negativo permitido en demo</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Producto</th><th>Unidad</th><th class="right">Precio</th><th class="right">Stock</th><th>Estado</th></tr></thead>
+              <tbody id="inventory-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel span-2">
+          <div class="panel-head">
+            <div class="panel-title">Fiado</div>
+            <div class="panel-sub" id="fiado-sub">Saldo pendiente</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cliente</th><th>Teléfono</th><th class="right">Saldo</th></tr></thead>
+              <tbody id="fiado-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer">
+        <span>Abarpay v1 · consola de demostración</span>
+        <span id="footer-mode">Modo demo</span>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var PIN_KEY = "abarpayOwnerPin";
+      var REFRESH_MS = 3000;
+      var pin = "";
+      var refreshTimer = null;
+      var refreshing = false;
+      var toastTimer = null;
+
+      var loginScreen = document.getElementById("login-screen");
+      var app = document.getElementById("app");
+      var loginForm = document.getElementById("login-form");
+      var pinInput = document.getElementById("pin");
+      var loginError = document.getElementById("login-error");
+      var toast = document.getElementById("toast");
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function money(cents) {
+        var value = Number(cents || 0) / 100;
+        return new Intl.NumberFormat("es-MX", {
+          style: "currency",
+          currency: "MXN",
+          minimumFractionDigits: 2
+        }).format(value);
+      }
+
+      function quantity(milli, unit) {
+        var value = Number(milli || 0) / 1000;
+        var text = Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+        return text + (unit === "kg" ? " kg" : " pza");
+      }
+
+      function timeLabel(epoch) {
+        if (!epoch) return "—";
+        try {
+          return new Date(Number(epoch) * 1000).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+        } catch (error) {
+          return "—";
+        }
+      }
+
+      function dateLabel(epoch) {
+        if (!epoch) return "—";
+        try {
+          return new Date(Number(epoch) * 1000).toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+        } catch (error) {
+          return "—";
+        }
+      }
+
+      function shortId(id) {
+        var text = String(id || "");
+        text = text.replace("sale_", "");
+        return text.slice(0, 8).toUpperCase();
+      }
+
+      function statusBadge(status) {
+        var map = {
+          paid_cash: ["Pagada", "ok"],
+          paid_pey: ["Pagada PEY", "pey"],
+          pending: ["Pendiente", "warn"],
+          por_conciliar: ["Por conciliar", "bad"],
+          credit: ["Fiado", "credit"],
+          canceled: ["Cancelada", "muted"],
+          expired: ["Expirada", "muted"],
+          failed: ["Fallida", "bad"]
+        };
+        var item = map[status] || [status || "—", "muted"];
+        return '<span class="badge ' + item[1] + '">' + escapeHtml(item[0]) + '</span>';
+      }
+
+      function methodLabel(method) {
+        var map = { cash: "Efectivo", pey: "PEY", fiado: "Fiado" };
+        return map[method] || method || "—";
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.hidden = false;
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.hidden = true; }, 4200);
+      }
+
+      function showLogin(message) {
+        stopRefresh();
+        app.hidden = true;
+        loginScreen.hidden = false;
+        pin = "";
+        pinInput.value = "";
+        sessionStorage.removeItem(PIN_KEY);
+        loginError.hidden = !message;
+        loginError.textContent = message || "";
+        setTimeout(function () { pinInput.focus(); }, 40);
+      }
+
+      function showApp() {
+        loginScreen.hidden = true;
+        app.hidden = false;
+        loginError.hidden = true;
+      }
+
+      function stopRefresh() {
+        if (refreshTimer) {
+          clearInterval(refreshTimer);
+          refreshTimer = null;
+        }
+      }
+
+      function authFailure() {
+        showLogin("Tu PIN dejó de ser válido. Vuelve a entrar.");
+      }
+
+      function consoleFetch(path, options) {
+        var opts = options || {};
+        var headers = opts.headers || {};
+        headers["X-Owner-Pin"] = pin;
+        if (opts.body) headers["Content-Type"] = "application/json";
+        return fetch(path, { method: opts.method || "GET", headers: headers, body: opts.body })
+          .then(function (response) {
+            if (response.status === 401) {
+              authFailure();
+              throw new Error("AUTH");
+            }
+            return response.json().catch(function () { return {}; }).then(function (body) {
+              if (!response.ok) {
+                throw new Error(body.detail || "No se pudo consultar la consola");
+              }
+              return body;
+            });
+          });
+      }
+
+      function loginRequest(value) {
+        return fetch("/api/console/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin: value })
+        }).then(function (response) {
+          if (response.status === 401) throw new Error("PIN incorrecto");
+          if (!response.ok) throw new Error("No se pudo iniciar sesión");
+          return response.json();
+        });
+      }
+
+      function startRefresh() {
+        stopRefresh();
+        refreshAll();
+        refreshTimer = setInterval(refreshAll, REFRESH_MS);
+      }
+
+      function renderCards(summary) {
+        var today = summary.today || {};
+        var cards = [
+          { label: "Ventas de hoy", value: money(today.totalCents), detail: String(today.salesCount || 0) + " ventas", cls: "accent" },
+          { label: "Cobrado", value: money(today.collectedCents), detail: "efectivo + PEY", cls: "" },
+          { label: "Efectivo", value: money(today.cashCents), detail: "ventas líquidas", cls: "" },
+          { label: "PEY", value: money(today.peyCents), detail: "total comercial verificado", cls: "" },
+          { label: "Fiado por cobrar", value: money(summary.fiadoOutstandingCents), detail: "saldo total", cls: "warn" },
+          { label: "Pendientes", value: String(today.pending || 0), detail: (today.pendingCents ? money(today.pendingCents) + " · " : "") + "PEY por conciliar", cls: "warn" }
+        ];
+        var html = "";
+        for (var i = 0; i < cards.length; i += 1) {
+          var card = cards[i];
+          html += '<article class="card ' + card.cls + '">' +
+            '<div class="label">' + escapeHtml(card.label) + '</div>' +
+            '<div class="value">' + escapeHtml(card.value) + '</div>' +
+            '<div class="detail">' + escapeHtml(card.detail) + '</div>' +
+            '</article>';
+        }
+        document.getElementById("cards").innerHTML = html;
+      }
+
+      function renderSales(sales) {
+        var items = (sales.items || []).slice(0, 20);
+        var body = document.getElementById("sales-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="6" class="empty">Todavía no hay ventas hoy.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < items.length; i += 1) {
+          var sale = items[i];
+          var saleItems = sale.items || [];
+          var detail = saleItems.length ? saleItems[0].name : "—";
+          if (saleItems.length > 1) detail += " +" + (saleItems.length - 1);
+          var customer = sale.customer && sale.customer.name ? " · " + sale.customer.name : "";
+          var chargedNote = "";
+          if (sale.paymentMethod === "pey" && Number(sale.chargedCents) !== Number(sale.totalCents)) {
+            chargedNote = '<div class="sale-items">cobro PEY ' + escapeHtml(money(sale.chargedCents)) + '</div>';
+          }
+          html += '<tr>' +
+            '<td class="mono">' + escapeHtml(timeLabel(sale.createdAt)) + '</td>' +
+            '<td class="mono">' + escapeHtml(shortId(sale.id)) + '</td>' +
+            '<td><div>' + escapeHtml(detail) + '</div><div class="sale-items">' + escapeHtml(saleItems.length) + ' partida(s)' + escapeHtml(customer) + '</div></td>' +
+            '<td>' + escapeHtml(methodLabel(sale.paymentMethod)) + '</td>' +
+            '<td>' + statusBadge(sale.status) + '</td>' +
+            '<td class="right mono">' + escapeHtml(money(sale.totalCents)) + chargedNote + '</td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+        document.getElementById("sales-sub").textContent = items.length + " recientes";
+      }
+
+      function renderTopProducts(summary) {
+        var items = (summary.today && summary.today.topProducts) || [];
+        var list = document.getElementById("top-products");
+        if (!items.length) {
+          list.innerHTML = '<li><span class="empty">Aún no hay productos vendidos hoy.</span></li>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < items.length; i += 1) {
+          var item = items[i];
+          html += '<li><span class="rank">' + (i + 1) + '</span><span class="name">' + escapeHtml(item.name) + '</span><span class="amount">' + escapeHtml(money(item.totalCents)) + '</span></li>';
+        }
+        list.innerHTML = html;
+      }
+
+      function renderEmployees(summary) {
+        var employees = summary.employees || [];
+        var totals = {};
+        var report = (summary.today && summary.today.byEmployee) || [];
+        for (var i = 0; i < report.length; i += 1) totals[report[i].employeeId] = report[i];
+        var body = document.getElementById("employees-body");
+        if (!employees.length) {
+          body.innerHTML = '<tr><td colspan="4" class="empty">Sin empleados activos.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var j = 0; j < employees.length; j += 1) {
+          var employee = employees[j];
+          var row = totals[employee.id] || { salesCount: 0, totalCents: 0 };
+          html += '<tr>' +
+            '<td>' + escapeHtml(employee.name) + '</td>' +
+            '<td>' + escapeHtml(employee.role === "owner" ? "Dueña" : "Empleado") + '</td>' +
+            '<td class="right mono">' + escapeHtml(String(row.salesCount || 0)) + '</td>' +
+            '<td class="right mono">' + escapeHtml(money(row.totalCents)) + '</td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      function renderInventory(inventory) {
+        var items = inventory.items || [];
+        var body = document.getElementById("inventory-body");
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="5" class="empty">Sin productos.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < items.length; i += 1) {
+          var product = items[i];
+          var low = Number(product.stockMilli) <= Number(product.lowStockMilli);
+          html += '<tr>' +
+            '<td>' + escapeHtml(product.name) + '</td>' +
+            '<td>' + escapeHtml(product.unit === "kg" ? "kg" : "pieza") + '</td>' +
+            '<td class="right mono">' + escapeHtml(money(product.priceCents)) + '</td>' +
+            '<td class="right mono ' + (low ? "low-stock" : "stock-good") + '">' + escapeHtml(quantity(product.stockMilli, product.unit)) + '</td>' +
+            '<td>' + (low ? '<span class="badge bad">Stock bajo</span>' : '<span class="badge ok">Disponible</span>') + '</td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      function renderFiado(fiado) {
+        var customers = fiado.customers || [];
+        var body = document.getElementById("fiado-body");
+        document.getElementById("fiado-sub").textContent = money(fiado.totalOutstandingCents) + " pendiente";
+        if (!customers.length) {
+          body.innerHTML = '<tr><td colspan="3" class="empty">Sin clientes de fiado todavía.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < customers.length; i += 1) {
+          var customer = customers[i];
+          html += '<tr>' +
+            '<td>' + escapeHtml(customer.name) + '</td>' +
+            '<td>' + escapeHtml(customer.phone || "—") + '</td>' +
+            '<td class="right mono">' + escapeHtml(money(customer.balanceCents)) + '</td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      function renderAll(summary, sales, inventory, fiado) {
+        var store = summary.store ? summary.store.name : "Tiendita de la Esquina";
+        document.getElementById("store-pill").textContent = store;
+        document.getElementById("demo-banner").className = (summary.today && summary.today.demoMode) ? "demo-banner show" : "demo-banner";
+        document.getElementById("footer-mode").textContent = (summary.today && summary.today.demoMode) ? "Modo demo" : "Modo live";
+        renderCards(summary);
+        renderSales(sales);
+        renderTopProducts(summary);
+        renderEmployees(summary);
+        renderInventory(inventory);
+        renderFiado(fiado);
+        document.getElementById("updated").innerHTML = '<span class="live-dot"></span>Actualizado ' + escapeHtml(timeLabel(Date.now() / 1000)) + ' · ' + escapeHtml(dateLabel(Date.now() / 1000));
+      }
+
+      function refreshAll() {
+        if (!pin || refreshing) return;
+        refreshing = true;
+        Promise.all([
+          consoleFetch("/api/console/summary"),
+          consoleFetch("/api/console/sales?limit=25"),
+          consoleFetch("/api/console/inventory"),
+          consoleFetch("/api/console/fiado")
+        ]).then(function (results) {
+          renderAll(results[0], results[1], results[2], results[3]);
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") return;
+          showToast(error && error.message ? error.message : "No se pudo actualizar la consola");
+        }).then(function () {
+          refreshing = false;
+        });
+      }
+
+      loginForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var value = pinInput.value.trim();
+        if (!value) {
+          loginError.hidden = false;
+          loginError.textContent = "Escribe tu PIN.";
+          return;
+        }
+        loginRequest(value).then(function () {
+          pin = value;
+          sessionStorage.setItem(PIN_KEY, value);
+          showApp();
+          startRefresh();
+        }).catch(function (error) {
+          loginError.hidden = false;
+          loginError.textContent = error && error.message ? error.message : "PIN incorrecto";
+          pinInput.select();
+        });
+      });
+
+      document.getElementById("refresh-now").addEventListener("click", function () {
+        refreshAll();
+      });
+
+      document.getElementById("logout").addEventListener("click", function () {
+        showLogin("");
+      });
+
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden && pin) refreshAll();
+      });
+
+      function boot() {
+        var saved = sessionStorage.getItem(PIN_KEY);
+        if (!saved) {
+          showLogin("");
+          return;
+        }
+        pin = saved;
+        loginRequest(saved).then(function () {
+          showApp();
+          startRefresh();
+        }).catch(function () {
+          showLogin("Ingresa tu PIN para abrir la consola.");
+        });
+      }
+
+      boot();
+    }());
+  </script>
+</body>
+</html>

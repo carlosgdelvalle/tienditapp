@@ -14,10 +14,11 @@ import org.robolectric.annotation.Config
 class RecoveryTest {
     private val app get() = RuntimeEnvironment.getApplication()
     private val prefs get() = app.getSharedPreferences("development_session", 0)
+
     @Before fun clearSession() { assertTrue(prefs.edit().clear().commit()) }
 
     @Test fun knownSaleWithoutServerRemainsBlockedAndNeverPollsSimulation() = runBlocking {
-        val sale = Sale("real-reference", 1800, 1, status = "pending")
+        val sale = Sale("real-reference", 1800, 1, status = "pending", paymentMethod = PAYMENT_PEY, qrId = "qr-1")
         assertTrue(prefs.edit().putString("sale", saleJson(sale).toString()).commit())
         val vm = ShopViewModel(app)
         assertFalse(vm.ui.value.simulated)
@@ -26,7 +27,7 @@ class RecoveryTest {
         vm.poll()
         assertEquals(message, vm.ui.value.message)
         assertEquals(sale, vm.ui.value.sale)
-        assertFalse(vm.ui.value.sale!!.paid)
+        assertFalse(vm.ui.value.sale!!.settled)
     }
 
     @Test fun corruptStoredSaleFailsClosed() {
@@ -43,5 +44,16 @@ class RecoveryTest {
         assertTrue(vm.ui.value.uncertain)
         assertNull(vm.ui.value.sale)
         assertTrue(prefs.getBoolean("creating", false))
+    }
+
+    @Test fun storedSaleKeepsPaymentMethodAndChange() {
+        val sale = Sale("cash-reference", 3600, 3600, status = "paid_cash", paymentMethod = PAYMENT_CASH,
+            cashReceivedCents = 5000, changeCents = 1400)
+        assertTrue(prefs.edit().putString("sale", saleJson(sale).toString()).commit())
+        val vm = ShopViewModel(app)
+        assertFalse(vm.ui.value.simulated)
+        assertEquals(sale, vm.ui.value.sale)
+        assertEquals(1400L, vm.ui.value.sale!!.changeCents)
+        assertTrue(vm.ui.value.sale!!.settled)
     }
 }

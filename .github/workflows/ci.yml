@@ -20,6 +20,18 @@ jobs:
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
             detect --source=/repo --redact --verbose --exit-code 1
 
+  servidor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Pruebas del backend v1
+        run: |
+          pip install -r server/requirements-dev.txt
+          python -m pytest -q server/tests
+
   pruebas:
     runs-on: ubuntu-latest
     steps:

@@ -33,6 +33,10 @@ Todas las imágenes de esta sección tienen 1086 × 1448 píxeles.
 
 Estas láminas son referencias rasterizadas; no incluyen fuentes tipográficas, iconos individuales ni componentes implementados.
 
+## Propuesta de interacción
+
+[Rediseño de “Cobrar” para uso real en tiendita](rediseno-cobrar.md): prioriza escaneo continuo, zona del pulgar, carrito fijo, cantidades por botones, pago sin teclado y modo con el teléfono apoyado.
+
 ## Organización y procedencia
 
 Los archivos llegaron a `assets/mockup/` con nombres de exportación de WhatsApp. Se conservaron los JPEG originales, sin recomprimir ni modificar su contenido, y se renombraron según lo que muestran.
