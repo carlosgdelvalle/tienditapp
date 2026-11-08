@@ -39,7 +39,7 @@ flowchart LR
 
 | Entregable | Estado | Dónde |
 | --- | --- | --- |
-| **Backend v1** | Implementado: efectivo, PEY, fiado, inventario, reportes, webhook y consola. 54 pruebas. | [`server/`](server/README.md) |
+| **Backend v1** | Implementado: efectivo, PEY, fiado, inventario, reportes, webhook y consola. 55 pruebas. | [`server/`](server/README.md) |
 | **APK Android v1** | Release firmado 1.0.0; instalado y probado en SM-A165M. Cash, PEY QR, fiado, abono, inventario y reportes. | [`android/`](android/README.md) |
 | **Consola del dueño** | `/console` con PIN demo 1234 y refresco cada 3 s; ventas, efectivo/PEY/fiado, inventario y equipo. | [`server/static/console.html`](server/static/console.html) |
 | **Pago real PEY** | QR real creado y mostrado; **falta que una persona pague $0.01**. | Ver [`docs/pendientes-manana.md`](docs/pendientes-manana.md) |
@@ -123,7 +123,7 @@ python -m pytest server/tests -q
 cd android && ./scripts/test-core.sh
 ```
 
-- Backend: **54 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
+- Backend: **55 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
 - Android: **46 pruebas Gradle** y **35 pruebas de núcleo JVM** en la evidencia del agente.
 - No hay pago real en las pruebas. El pago real de $0.01 lo hace una persona.
 
@@ -160,7 +160,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 
 | Evidencia | Resultado |
 | --- | --- |
-| Backend | **54 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado |
+| Backend | **55 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado |
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | QR real creado y mostrado; **pago real de $0.01 pendiente de una persona** |
 | Webhook | Firma real verificada con evento sintético; evento real de PEY pendiente del pago |

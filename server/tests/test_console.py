@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from server.tests.conftest import create_cash_sale, create_customer
+from server.tests.conftest import (
+    create_cash_sale,
+    create_customer,
+    create_pey_sale,
+    event_payload,
+    post_webhook,
+)
 
 
 def test_console_page_is_static_and_auto_refreshes(client):
@@ -85,3 +91,21 @@ def test_console_endpoints_require_owner_pin(client):
 def test_console_header_is_case_insensitive(client):
     response = client.get("/api/console/inventory", headers={"x-owner-pin": "1234"})
     assert response.status_code == 200
+
+
+def test_console_pending_and_webhook_audit(client):
+    headers = {"X-Owner-Pin": "1234"}
+    sale = create_pey_sale(client)
+
+    pending = client.get("/api/console/pending", headers=headers).json()
+    assert [item["id"] for item in pending["items"]] == [sale["id"]]
+
+    response = post_webhook(client, event_payload(sale["qrId"], "tx_console", 0.01), "wh_console")
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "applied"
+
+    pending = client.get("/api/console/pending", headers=headers).json()
+    assert pending["items"] == []
+
+    hooks = client.get("/api/console/webhooks?limit=5", headers=headers).json()
+    assert any(item["outcome"] == "applied" for item in hooks["items"])

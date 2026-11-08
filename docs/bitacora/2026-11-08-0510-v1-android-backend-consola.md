@@ -5,7 +5,7 @@
 - **Por qué:** la entrega es el APK Android; el MVP y los prototipos quedan como referencia. Ver [decisión 0005](../decisiones/0005-v1-android-backend-consola.md).
 - **Evidencia:**
   ```text
-  pytest server/tests -q                          → 54 passed
+  pytest server/tests -q                          → 55 passed
   ./gradle testDebugUnitTest                      → 46 tests, 0 failures
   apksigner verify app-release.apk                → Verifies, v2
   adb install -r app-release.apk                  → Success

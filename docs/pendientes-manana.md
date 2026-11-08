@@ -27,7 +27,7 @@ La venta debe mostrar status paid_pey, txId y paidAt; la consola debe bajar PEND
 
 ## Estado actual
 
-- Backend v1 nuevo en **server/**: FastAPI + SQLite, 54 pruebas.
+- Backend v1 nuevo en **server/**: FastAPI + SQLite, 55 pruebas.
 - Android v1 release firmado: paquete **mx.abarpay.mobile**, versión **1.0.0**, versionCode **3**.
 - APK de release: **android/app/build/outputs/apk/release/app-release.apk** (12 MB); SHA-256 **6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d**.
 - Consola del dueño: **/console**, PIN demo **1234**.
@@ -87,7 +87,7 @@ Consola: **https://<algo>.trycloudflare.com/console** (PIN 1234).
 
 ## Evidencia que ya existe
 
-- Backend: 54 pruebas aprobadas con FakePey; smoke de salud, bootstrap, efectivo, consola y webhook firmado.
+- Backend: 55 pruebas aprobadas con FakePey; smoke de salud, bootstrap, efectivo, consola y webhook firmado.
 - Android: build release firmado; 46 pruebas Gradle y 35 de núcleo en el reporte del agente; instalación y ejecución en SM-A165M.
 - Dispositivo: venta en efectivo, venta fiada, abono, ajuste de inventario y consola verificados.
 - PEY: QR real creado y mostrado; pendiente el pago humano.
