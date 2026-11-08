@@ -6,7 +6,7 @@ Este archivo resume lo que quedó hecho, lo único que está bloqueado por una p
 
 ## Lo único bloqueado: el pago real de $0.01
 
-El agente no puede pagar; **una persona debe escanear y pagar**. El QR que estaba en el teléfono (sale_37fbb44419dd47578f18, QR 355b286b39) vencía alrededor de las **05:18 CDMX**, así que probablemente ya no sirve. Para cerrar la evidencia:
+El agente no puede pagar; **una persona debe escanear y pagar**. El QR que estaba en el teléfono (sale_37fbb44419dd47578f18, QR 355b286b39) venció y se canceló localmente; **no hay un QR activo en este momento**. Hay que crear uno nuevo desde la app. Para cerrar la evidencia:
 
 1. Verificar que el backend y el túnel siguen vivos (ver comandos abajo).
 2. En el teléfono SM-A165M, abrir **Abarpay** (release, paquete mx.abarpay.mobile).
