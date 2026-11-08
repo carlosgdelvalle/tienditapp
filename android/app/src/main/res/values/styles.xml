@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.Abarpay" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#2A0065</item>
+        <item name="android:navigationBarColor">#F5F0FB</item>
+    </style>
+</resources>
