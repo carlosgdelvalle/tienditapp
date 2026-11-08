@@ -19,8 +19,9 @@ Si el backend o el túnel se reinician, hay que repetir el QR; el portal de PEY 
 
 ## Cómo verificar el pago
 
-    curl -s http://127.0.0.1:8000/api/sales/<saleId>
-    curl -s -H 'X-Owner-Pin: 1234' http://127.0.0.1:8000/api/console/summary
+    ./scripts/check_v1.sh <saleId>
+
+También se puede revisar a mano con curl: /api/sales/<saleId> y /api/console/summary con el header X-Owner-Pin: 1234.
 
 La venta debe mostrar status paid_pey, txId y paidAt; la consola debe bajar PENDIENTES a 0 y sumar el monto en PEY. Si el pago llega después de cancelar/vencer, el servidor lo registra con applied=0 y no reabre la venta.
 

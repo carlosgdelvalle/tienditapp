@@ -118,6 +118,8 @@ ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" \
 
 ```bash
 python -m pytest server/tests -q
+./scripts/check_v1.sh                 # salud, reporte y consola
+./scripts/check_v1.sh <saleId>        # estado de una venta
 cd android && ./scripts/test-core.sh
 ```
 
