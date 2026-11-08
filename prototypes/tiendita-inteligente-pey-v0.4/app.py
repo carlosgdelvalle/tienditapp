@@ -9,6 +9,8 @@ import base64
 import hashlib
 import hmac
 import io
+import re
+import math
 import json
 import os
 import secrets
@@ -165,6 +167,7 @@ def create_database():
             );
             CREATE TABLE IF NOT EXISTS product_barcodes (
               code TEXT PRIMARY KEY, product_id TEXT NOT NULL,
+              code_kind TEXT NOT NULL DEFAULT 'LEGACY',
               FOREIGN KEY(product_id) REFERENCES products(id)
             );
             CREATE TABLE IF NOT EXISTS login_failures (
@@ -206,6 +209,8 @@ def create_database():
                 existing={r[1] for r in c.execute(f'PRAGMA table_info({tab})')}
                 for col,typ in cols.items():
                     if col not in existing:c.execute(f'ALTER TABLE {tab} ADD COLUMN {col} {typ}')
+            if 'code_kind' not in {row[1] for row in c.execute('PRAGMA table_info(product_barcodes)')}:
+                c.execute("ALTER TABLE product_barcodes ADD COLUMN code_kind TEXT NOT NULL DEFAULT 'LEGACY'")
             c.execute('UPDATE sales SET charged_cents=amount_cents WHERE charged_cents IS NULL')
             c.execute('CREATE UNIQUE INDEX IF NOT EXISTS ix_sales_requesttx ON sales(pey_request_txid)')
             c.execute('CREATE UNIQUE INDEX IF NOT EXISTS ix_pr_qr ON payment_requests(pey_qr_id)')
@@ -390,39 +395,107 @@ def business_question(value:BusinessQuestion):
     with db() as c:return answer_local(c,value.question)
 
 
+def barcode_kind(code: str) -> str:
+    if re.fullmatch(r'INT-[A-Z0-9]{4,28}', code):
+        return 'INTERNO'
+    if re.fullmatch(r'[0-9]{8}|[0-9]{12}|[0-9]{13}', code):
+        weighted=sum(int(n)*(3 if i%2==0 else 1) for i,n in enumerate(code[:-1][::-1]))
+        if (10-weighted%10)%10==int(code[-1]):
+            return {8:'EAN-8',12:'UPC-A',13:'EAN-13'}[len(code)]
+    raise ValueError('Usa EAN-8, UPC-A, EAN-13 con dígito verificador o código interno INT-XXXX')
+
+
 class BarcodeQuery(BaseModel):
     code: str = Field(min_length=6,max_length=64)
 
 
 class BarcodeLink(BarcodeQuery):
     product_id: str
+    confirm_registration: bool = False
 
 
 @app.post('/api/barcodes/lookup')
 def barcode_lookup(value:BarcodeQuery):
-    code=value.code.strip()
-    if not code.isascii() or not code.isalnum():
-        raise HTTPException(422,'Código inválido')
+    code=value.code.strip().upper()
+    if not re.fullmatch(r'[A-Z0-9-]{6,64}',code):raise HTTPException(422,'Código inválido')
     with db() as c:
-        row=c.execute("""SELECT p.id,p.name,p.price_cents,p.qty FROM product_barcodes b
+        row=c.execute("""SELECT p.id,p.name,p.price_cents,p.qty,b.code_kind FROM product_barcodes b
                          JOIN products p ON p.id=b.product_id WHERE b.code=?""",(code,)).fetchone()
-    if not row:raise HTTPException(404,'Código sin asociar. Selecciona el producto para enlazarlo.')
+    if not row:raise HTTPException(404,'Código sin asociar; confirma la asociación con el dueño.')
     return dict(row)
 
 
 @app.post('/api/barcodes/link')
 def barcode_link(value:BarcodeLink):
-    code=value.code.strip()
-    if not code.isascii() or not code.isalnum():
-        raise HTTPException(422,'Código inválido')
+    code=value.code.strip().upper()
+    try:kind=barcode_kind(code)
+    except ValueError as exc:raise HTTPException(422,str(exc))
+    if not value.confirm_registration:raise HTTPException(422,'Confirmación explícita necesaria')
     with conn_guard,db() as c:
-        p=c.execute('SELECT id FROM products WHERE id=?',(value.product_id,)).fetchone()
-        if not p:raise HTTPException(404,'Producto desconocido')
+        if not c.execute('SELECT 1 FROM products WHERE id=?',(value.product_id,)).fetchone():
+            raise HTTPException(404,'Producto desconocido')
         old=c.execute('SELECT product_id FROM product_barcodes WHERE code=?',(code,)).fetchone()
         if old and old['product_id']!=value.product_id:
-            raise HTTPException(409,'Código ya asociado a otro producto; requiere revisión manual')
-        c.execute('INSERT OR IGNORE INTO product_barcodes(code,product_id) VALUES(?,?)',(code,value.product_id))
+            raise HTTPException(409,'Código ya asignado a otro producto')
+        c.execute('INSERT OR IGNORE INTO product_barcodes(code,product_id,code_kind) VALUES(?,?,?)',(code,value.product_id,kind))
     return barcode_lookup(BarcodeQuery(code=code))
+
+
+def supplier_demand_summary(c):
+    """Vista interna de demanda para UNA tienda. No comunica con proveedores."""
+    incoming={r['product_id']:max(0,r['qty']) for r in c.execute(
+        "SELECT product_id,SUM(qty_requested-qty_received) AS qty FROM purchases WHERE status='PENDIENTE' GROUP BY product_id")}
+    products=[];categories={}
+    for p in c.execute('SELECT * FROM products ORDER BY category,name'):
+        target=max(p['min_qty'],math.ceil(p['min_qty']+p['sales_day']*p['lead_days']))
+        suggested=max(0,target-p['qty']-incoming.get(p['id'],0))
+        item={'id':p['id'],'name':p['name'],'category':p['category'],'stock':p['qty'],
+              'open_order_qty':incoming.get(p['id'],0),'suggested_units':suggested}
+        products.append(item)
+        cat=categories.setdefault(p['category'],{'category':p['category'],'suggested_units':0,'items':0})
+        cat['suggested_units']+=suggested
+        cat['items']+=int(suggested>0)
+    return {'scope':'UNA_SUCURSAL','categories':list(categories.values()),'products':products,
+        'note':'Sugerencia ilustrativa basada en mínimo, rotación CONFIGURADA, plazo y pedidos pendientes. Sin proveedores externos.'}
+
+
+def demand_trends(c):
+    """Promedio simple, no predicción validada; excluye bancarios de prueba."""
+    today=datetime.now(ZONE).date();start=today-timedelta(days=13)
+    dates=set();quantities={}
+    for r in c.execute("SELECT items_json,created_at FROM sales WHERE status IN ('PAGADA','DEMO_PAGADA')"):
+        try:
+            day=datetime.fromisoformat(r['created_at']).astimezone(ZONE).date()
+            if day<start or day>today:continue
+            items=json.loads(r['items_json'])
+        except (ValueError,TypeError,KeyError):continue
+        dates.add(day.isoformat())
+        for item in items:
+            if isinstance(item.get('id'),str) and type(item.get('qty')) is int and item['qty']>0:
+                pid=item['id'];quantities[pid]=quantities.get(pid,0)+item['qty']
+    enough=len(dates)>=3
+    result=[]
+    for p in c.execute('SELECT id,name,qty,sales_day FROM products ORDER BY name'):
+        observed=quantities.get(p['id'],0)
+        daily=round(observed/14 if enough else p['sales_day'],2)
+        result.append({'id':p['id'],'name':p['name'],'stock':p['qty'],
+            'units_14d':observed,'daily_estimate':daily,'next_7_days_units':round(daily*7,1),
+            'basis':'HISTORIAL_14_DIAS' if enough else 'SUPUESTO_CATALOGO'})
+    return {'scope':'UNA_SUCURSAL','window_days':14,'activity_days':len(dates),
+        'historical_sufficient':enough,'rows':result,
+        'note':('Promedio ilustrativo de unidades en 14 días. No es un pronóstico validado.'
+            if enough else 'Historial insuficiente: estimaciones basadas en rotación configurada, NO en ventas observadas.'),
+        'excluded':'Pruebas PEY $0.01, fiados, pendientes y canceladas.'}
+
+
+@app.get('/api/analytics/supplier-demand')
+def supplier_demand():
+    with db() as c:return supplier_demand_summary(c)
+
+
+@app.get('/api/analytics/demand-trends')
+def supplier_trends():
+    with db() as c:return demand_trends(c)
 
 
 @app.get('/empleado')
