@@ -51,6 +51,7 @@ Protegidos con X-Owner-Pin:
 - GET /api/console/inventory
 - GET /api/console/fiado
 - GET /api/console/webhooks?limit=20
+- GET /api/console/pending
 
 ## Reglas de dinero y stock
 

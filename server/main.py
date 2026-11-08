@@ -902,6 +902,16 @@ def _install_routes(app: FastAPI) -> None:
         ).fetchall()
         return {"items": [sale_to_dict(conn, row) for row in rows]}
 
+    @console.get("/pending")
+    def console_pending(conn: sqlite3.Connection = Depends(get_db)):
+        rows = conn.execute(
+            """SELECT * FROM sales WHERE store_id = ?
+               AND status IN ('pending','por_conciliar','failed')
+               ORDER BY created_at DESC LIMIT 50""",
+            (STORE_ID,),
+        ).fetchall()
+        return {"items": [sale_to_dict(conn, row) for row in rows]}
+
     @console.get("/inventory")
     def console_inventory(conn: sqlite3.Connection = Depends(get_db)):
         rows = conn.execute(
