@@ -12,8 +12,13 @@ from test_pey_integracion import make_real
 def test_codigo_existente_legacy_no_se_pierde(tmp_path, monkeypatch):
     c=demo_client(tmp_path,monkeypatch)
     # Migration-safe legacy links are still readable, but new unverified links are not allowed.
-    from app import db
-    # Test against the isolated TestClient database through the endpoint-created link.
+    import sqlite3
+    # Simulate a barcode created in v0.5 before the new validation rules.
+    with sqlite3.connect(str(tmp_path/'demo.db')) as connection:
+        connection.execute("INSERT INTO product_barcodes(code,product_id) VALUES(?,?)",('111222','leche'))
+    old_code=c.post('/api/barcodes/lookup',json={'code':'111222'})
+    assert old_code.status_code==200 and old_code.json()['id']=='leche'
+    assert old_code.json()['code_kind']=='LEGACY'
     assert c.post('/api/barcodes/link',json={
         'code':'INT-9999','product_id':'agua','confirm_registration':True}).status_code==200
     assert c.post('/api/barcodes/lookup',json={'code':'INT-9999'}).json()['id']=='agua'
@@ -77,4 +82,9 @@ def test_qa_interfaz_no_borra_pregunta_y_pwa_identidad(tmp_path,monkeypatch):
     assert '#29005C' in icon and '#CAFF38' in icon
     sw=(base/'service-worker.js').read_text(encoding='utf8')
     assert '/static/abarpay-icon.svg' in sw
+    from PIL import Image
+    for size in (192,512):
+        with Image.open(base/f'icon-{size}.png') as img:
+            assert img.format=='PNG' and img.size==(size,size)
+            assert img.convert('RGB').getpixel((0,0))==(41,0,92)
 
