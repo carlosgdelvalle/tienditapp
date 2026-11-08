@@ -956,6 +956,7 @@ def _install_routes(app: FastAPI) -> None:
     app.include_router(api)
     app.include_router(console)
 
+    @app.post("/api/webhooks/pey", include_in_schema=False)
     @app.post("/webhooks/pey")
     async def pey_webhook(
         request: Request,
@@ -970,12 +971,18 @@ def _install_routes(app: FastAPI) -> None:
 
         raw_body = await request.body()
         if not verify_webhook(request.headers, raw_body, settings.pey_webhook_secret):
+            logger.warning(
+                "PEY webhook rejected: invalid signature (id=%s, path=%s)",
+                request.headers.get("webhook-id", ""),
+                request.url.path,
+            )
             return JSONResponse(
                 status_code=401,
                 content={"ok": False, "error": "invalid_signature"},
             )
 
         webhook_id = request.headers.get("webhook-id", "").strip()
+        logger.info("PEY webhook accepted for processing id=%s path=%s", webhook_id, request.url.path)
         if not webhook_id:
             return JSONResponse(
                 status_code=401,
@@ -1022,8 +1029,13 @@ def _install_routes(app: FastAPI) -> None:
                 content={"ok": True, "outcome": "ignored_event"},
             )
 
+        # PEY sends the payment fields at the top level; older/test payloads
+        # may nest them under "data". Accept both shapes.
         data = event.get("data")
         if not isinstance(data, dict):
+            data = event
+        if not isinstance(data, dict):
+            logger.warning("PEY webhook rejected: invalid payload (id=%s)", webhook_id)
             return JSONResponse(
                 status_code=400,
                 content={"ok": False, "error": "invalid_payload"},

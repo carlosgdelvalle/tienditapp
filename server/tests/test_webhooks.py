@@ -24,6 +24,30 @@ def test_invalid_signature_rejected(client, fake_pey, db):
     assert db.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
 
 
+def test_top_level_pey_payload_is_applied(client):
+    sale = create_pey_sale(client)
+    payload = {
+        "type": "codi.qr.payment_received",
+        "amount": 0.01,
+        "codiQrId": sale["qrId"],
+        "transactionId": "tx_top_level",
+        "datePaid": 1794155313,
+    }
+    body, headers = sign_webhook(payload, "wh_top_level")
+    response = client.post("/webhooks/pey", content=body, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["outcome"] == "applied"
+
+
+def test_legacy_api_webhook_alias(client):
+    sale = create_pey_sale(client)
+    payload = event_payload(sale["qrId"], "tx_alias", 0.01)
+    body, headers = sign_webhook(payload, "wh_alias")
+    response = client.post("/api/webhooks/pey", content=body, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "applied"
+
+
 def test_valid_webhook_applies_once_and_dedupes(client, fake_pey, db):
     sale = create_pey_sale(client)
     payload = event_payload(sale["qrId"], "tx_once", 0.01)

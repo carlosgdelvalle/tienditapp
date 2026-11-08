@@ -10,7 +10,7 @@ Este archivo resume el pago real ya verificado, la evidencia y las decisiones qu
 - QR PEY: **352712e8e3**.
 - Transacción PEY: **01M6XZTYHZC3H4F1FZRYGKGF75**, estado **PAID**, **0.01 MXN**.
 - Fecha PEY: 8-nov-2026, 10:28:33 CDMX; el servidor la aplicó a las 10:28:34.
-- Origen de la confirmación: **reconciliación/consulta** con PEY. El webhook real no llegó; la auditoría de webhooks está vacía.
+- Origen de la confirmación: **reconciliación/consulta** con PEY. El webhook real **sí llegó**, pero respondió 400 `invalid_payload` porque PEY manda `codiQrId`, `transactionId` y `amount` en la raíz, no en `data`. Ya se corrigió y el replay exacto devolvió 200 `duplicate_transaction`; falta que el portal reintente el evento.
 - Consola: 3 ventas, PEY comercial $36.00, efectivo $18.00, fiado $18.00, fiado por cobrar $13.00, pendientes 0.
 - No hace falta hacer otro pago para la demo; este ya quedó en la base y en la consola.
 
@@ -24,12 +24,12 @@ La venta muestra status paid_pey, txId y paidAt; la consola debe tener PENDIENTE
 
 ## Estado actual
 
-- Backend v1 nuevo en **server/**: FastAPI + SQLite, 55 pruebas.
+- Backend v1 nuevo en **server/**: FastAPI + SQLite, 57 pruebas.
 - Android v1 release firmado: paquete **mx.abarpay.mobile**, versión **1.0.0**, versionCode **3**.
 - APK de release: **android/app/build/outputs/apk/release/app-release.apk** (12 MB); SHA-256 **6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d**.
 - Consola del dueño: **/console**, PIN demo **1234**.
 - Efectivo, fiado, abono, ajuste de inventario y consola probados en el dispositivo/API.
-- PEY: pago real confirmado por conciliación; tx 01M6XZTYHZC3H4F1FZRYGKGF75, PAID $0.01 a las 10:28:34. El webhook real no llegó.
+- PEY: pago real confirmado por conciliación; tx 01M6XZTYHZC3H4F1FZRYGKGF75, PAID $0.01 a las 10:28:34. El webhook real llegó con 400 por payload plano; corregido; retry del portal pendiente.
 - El backend y el túnel están corriendo en esta sesión.
 
 ## Comandos para levantarlo
@@ -84,7 +84,7 @@ Consola: **https://<algo>.trycloudflare.com/console** (PIN 1234).
 
 ## Evidencia que ya existe
 
-- Backend: 55 pruebas aprobadas con FakePey; smoke de salud, bootstrap, efectivo, consola y webhook firmado.
+- Backend: 57 pruebas aprobadas con FakePey; smoke de salud, bootstrap, efectivo, consola y webhook firmado.
 - Android: build release firmado; 46 pruebas Gradle y 35 de núcleo en el reporte del agente; instalación y ejecución en SM-A165M.
 - Dispositivo: venta en efectivo, venta fiada, abono, ajuste de inventario y consola verificados.
-- PEY: pago real confirmado por conciliación; tx 01M6XZTYHZC3H4F1FZRYGKGF75, PAID $0.01 a las 10:28:34; webhook real no recibido.
+- PEY: pago real confirmado por conciliación; tx 01M6XZTYHZC3H4F1FZRYGKGF75, PAID $0.01 a las 10:28:34; webhook real llegó con 400 por payload plano, corregido; retry del portal pendiente.

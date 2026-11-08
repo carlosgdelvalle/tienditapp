@@ -7,7 +7,7 @@
 Hackatón **DevDay Exchange México 2026** · pagos **PEY (CoDi)** · comercio de demostración **Tiendita de la Esquina** (ficticio).
 Entrega: **domingo 8 de noviembre de 2026, 13:00 CDMX**.
 
-> **Estado v1 (8-nov-2026).** La entrega principal es la **app Android** en [`android/`](android/README.md), con un **backend nuevo** en [`server/`](server/README.md) y una **consola del dueño** en [`/console`](server/static/console.html). Efectivo, PEY, fiado, inventario, reportes y consola están implementados y probados en el dispositivo. El **pago real de $0.01 desde la pantalla** se confirmó el **8-nov a las 10:28:34** por conciliación con PEY (tx `01M6XZTYHZC3H4F1FZRYGKGF75`); el webhook real no llegó. Las decisiones abiertas están en [`docs/pendientes-manana.md`](docs/pendientes-manana.md).
+> **Estado v1 (8-nov-2026).** La entrega principal es la **app Android** en [`android/`](android/README.md), con un **backend nuevo** en [`server/`](server/README.md) y una **consola del dueño** en [`/console`](server/static/console.html). Efectivo, PEY, fiado, inventario, reportes y consola están implementados y probados en el dispositivo. El **pago real de $0.01 desde la pantalla** se confirmó el **8-nov a las 10:28:34** por conciliación con PEY (tx `01M6XZTYHZC3H4F1FZRYGKGF75`). El webhook real llegó pero respondió **400 `invalid_payload`** por la forma del payload; ya está corregido y verificado con el payload exacto; falta reintentar el evento en el portal. Las decisiones abiertas están en [`docs/pendientes-manana.md`](docs/pendientes-manana.md).
 
 El backend viejo en [`app/`](app/README.md) y los prototipos en [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) quedan como referencia. La app Android ya no los usa.
 
@@ -39,10 +39,10 @@ flowchart LR
 
 | Entregable | Estado | Dónde |
 | --- | --- | --- |
-| **Backend v1** | Implementado: efectivo, PEY, fiado, inventario, reportes, webhook y consola. 55 pruebas. | [`server/`](server/README.md) |
+| **Backend v1** | Implementado: efectivo, PEY, fiado, inventario, reportes, webhook y consola. 57 pruebas. | [`server/`](server/README.md) |
 | **APK Android v1** | Release firmado 1.0.0; instalado y probado en SM-A165M. Cash, PEY QR, fiado, abono, inventario y reportes. | [`android/`](android/README.md) |
 | **Consola del dueño** | `/console` con PIN demo 1234 y refresco cada 3 s; ventas, efectivo/PEY/fiado, inventario y equipo. | [`server/static/console.html`](server/static/console.html) |
-| **Pago real PEY** | Confirmado por conciliación: `sale_fed4e2ffe9684050b4d6`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, $0.01 `PAID` a las 10:28:34. El webhook real no llegó. | Ver [`docs/pendientes-manana.md`](docs/pendientes-manana.md) |
+| **Pago real PEY** | Confirmado por conciliación: `sale_fed4e2ffe9684050b4d6`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, $0.01 `PAID` a las 10:28:34. El webhook real llegó con 400 `invalid_payload` (payload plano); corregido y verificado con el payload exacto. Falta reintentar el evento en el portal. | Ver [`docs/pendientes-manana.md`](docs/pendientes-manana.md) |
 | **Referencia** | App vieja y prototipos; no son la entrega v1. | [`app/`](app/README.md), [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) |
 | **Documentación** | Contrato v1, decisiones, bitácora, pendientes y presentación. | [`docs/`](docs/README.md), [`presentacion/`](presentacion/README.md) |
 
@@ -123,7 +123,7 @@ python -m pytest server/tests -q
 cd android && ./scripts/test-core.sh
 ```
 
-- Backend: **55 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
+- Backend: **57 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
 - Android: **46 pruebas Gradle** y **35 pruebas de núcleo JVM** en la evidencia del agente.
 - No hay pago real en las pruebas. El pago real de $0.01 lo hace una persona.
 
@@ -160,10 +160,10 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 
 | Evidencia | Resultado |
 | --- | --- |
-| Backend | **55 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado |
+| Backend | **57 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado |
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
-| Webhook | Firma real verificada con evento sintético; el evento real de PEY no llegó; la confirmación fue por polling/reconciliación |
+| Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`; el retry del portal queda pendiente |
 | Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
@@ -175,7 +175,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 - Falta probar cámara y dictado en un teléfono físico con hardware real (el escáner y la voz están implementados; el flujo manual, el parser y la media kilo sí se probaron).
 - Las ventas PEY pendientes cuentan en el total “registrado” del reporte; “Cobrado” solo suma efectivo + PEY pagado. Ver decisión 2 en [`docs/pendientes-manana.md`](docs/pendientes-manana.md).
 - No hay corte de caja/arqueo, reembolsos ni edición de catálogo.
-- El webhook real de PEY no llegó en la prueba de $0.01; la venta se confirmó por polling/reconciliación. La prueba real del webhook queda pendiente.
+- El webhook real de PEY **sí llegó**, pero respondió 400 `invalid_payload` porque envía `codiQrId`, `transactionId` y `amount` en la raíz, no en `data`. Ya se corrigió y el replay exacto dio 200; falta que el portal reintente el evento para cerrar la evidencia del webhook.
 
 ## Repositorio
 

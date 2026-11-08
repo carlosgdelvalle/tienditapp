@@ -5,12 +5,12 @@
 - **Por qué:** la entrega es el APK Android; el MVP y los prototipos quedan como referencia. Ver [decisión 0005](../decisiones/0005-v1-android-backend-consola.md).
 - **Evidencia:**
   ```text
-  pytest server/tests -q                          → 55 passed
+  pytest server/tests -q                          → 57 passed
   ./gradle testDebugUnitTest                      → 46 tests, 0 failures
   apksigner verify app-release.apk                → Verifies, v2
   adb install -r app-release.apk                  → Success
   SM-A165M: efectivo, fiado, abono, inventario y consola verificados
   PEY: pago real $0.01 PAID, tx 01M6XZTYHZC3H4F1FZRYGKGF75, conciliado por polling
   ```
-- **Riesgos abiertos:** el webhook real de PEY no llegó; la confirmación fue por polling/reconciliación. Cámara y voz no se probaron con hardware real; el túnel es temporal; el acceso es mockup y la consola usa PIN demo; el reporte incluye pendientes en el total (ver [estado](../pendientes-manana.md)).
+- **Riesgos abiertos:** el webhook real de PEY llegó con 400 `invalid_payload` por su formato plano; ya se acepta ese formato y el replay exacto devolvió 200, pero el retry del portal queda pendiente. Cámara y voz no se probaron con hardware real; el túnel es temporal; el acceso es mockup y la consola usa PIN demo; el reporte incluye pendientes en el total (ver [estado](../pendientes-manana.md)).
 - **Siguiente:** que una persona pague un QR nuevo de $0.01, verificar `paid_pey`, webhook, consola y actualizar la evidencia del README.
