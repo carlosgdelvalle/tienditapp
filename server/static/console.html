@@ -489,7 +489,7 @@
           { label: "Efectivo", value: money(today.cashCents), detail: "ventas líquidas", cls: "" },
           { label: "PEY", value: money(today.peyCents), detail: "total comercial verificado", cls: "" },
           { label: "Fiado por cobrar", value: money(summary.fiadoOutstandingCents), detail: "saldo total", cls: "warn" },
-          { label: "Pendientes", value: String(today.pending || 0), detail: "PEY por conciliar", cls: "warn" }
+          { label: "Pendientes", value: String(today.pending || 0), detail: (today.pendingCents ? money(today.pendingCents) + " · " : "") + "PEY por conciliar", cls: "warn" }
         ];
         var html = "";
         for (var i = 0; i < cards.length; i += 1) {

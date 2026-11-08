@@ -94,6 +94,7 @@ def test_abono_reduces_outstanding_and_pending_pey_is_counted(client, fake_pey):
 
     report = client.get("/api/reports/today").json()
     assert report["pending"] == 1
+    assert report["pendingCents"] == 1700
     assert report["salesCount"] == 2
     assert report["collectedCents"] == 0
     assert report["fiadoOutstandingCents"] == 1000

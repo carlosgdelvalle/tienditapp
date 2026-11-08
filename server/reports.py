@@ -60,6 +60,7 @@ def build_today_report(
     pey_cents = 0
     fiado_cents = 0
     pending = 0
+    pending_cents = 0
     aggregates: dict[int, dict[str, Any]] = {}
 
     employee_ids = {row["employee_id"] for row in rows}
@@ -82,6 +83,7 @@ def build_today_report(
             fiado_cents += row["total_cents"]
         if row["status"] in {"pending", "por_conciliar"}:
             pending += 1
+            pending_cents += row["total_cents"]
         employee_id = row["employee_id"]
         bucket = aggregates.setdefault(
             employee_id,
@@ -140,6 +142,7 @@ def build_today_report(
         "topProducts": top_products,
         "lowStock": [product_to_dict(row) for row in low_stock_rows],
         "pending": pending,
+        "pendingCents": pending_cents,
         "fiadoOutstandingCents": fiado_outstanding_cents(conn),
         "demoMode": settings.modo_demo,
     }

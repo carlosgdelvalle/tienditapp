@@ -910,6 +910,27 @@ def _install_routes(app: FastAPI) -> None:
         ).fetchall()
         return {"items": [product_to_dict(row) for row in rows]}
 
+    @console.get("/webhooks")
+    def console_webhooks(
+        limit: int = Query(default=20, ge=1, le=200),
+        conn: sqlite3.Connection = Depends(get_db),
+    ):
+        rows = conn.execute(
+            """SELECT webhook_id, received_at, outcome FROM webhook_events
+               ORDER BY received_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return {
+            "items": [
+                {
+                    "webhookId": row["webhook_id"],
+                    "receivedAt": row["received_at"],
+                    "outcome": row["outcome"],
+                }
+                for row in rows
+            ]
+        }
+
     @console.get("/fiado")
     def console_fiado(conn: sqlite3.Connection = Depends(get_db)):
         rows = conn.execute(

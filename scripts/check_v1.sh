@@ -15,6 +15,9 @@ echo
 echo "== consola =="
 curl -fsS -H "X-Owner-Pin: $PIN" "$BASE/api/console/summary"
 echo
+echo "== webhooks recientes =="
+curl -fsS -H "X-Owner-Pin: $PIN" "$BASE/api/console/webhooks?limit=5"
+echo
 if [ "${1:-}" != "" ]; then
   echo "== venta $1 =="
   curl -fsS "$BASE/api/sales/$1"

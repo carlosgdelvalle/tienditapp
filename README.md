@@ -80,7 +80,7 @@ uvicorn server.main:app --host 0.0.0.0 --port 8000
 - `ABARPAY_LOAD_DOTENV=1` es explícito para que las pruebas no lean credenciales reales.
 - `OWNER_PIN` es el PIN de demostración de la consola (default 1234).
 - La base se crea y se siembra sola si está vacía: una tienda, 3 empleados, 12 productos y 5 códigos de barras.
-- Consola: `http://127.0.0.1:8000/console`.
+- Consola: `http://127.0.0.1:8000/console`. El resumen muestra el monto pendiente y `GET /api/console/webhooks?limit=20` permite auditar los eventos recibidos.
 
 Para un teléfono físico hace falta HTTPS. Con un túnel temporal:
 

@@ -33,6 +33,7 @@ def test_console_endpoints_require_owner_pin(client):
         "/api/console/sales",
         "/api/console/inventory",
         "/api/console/fiado",
+        "/api/console/webhooks",
     ):
         assert client.get(path).status_code == 401
         assert client.get(path, headers={"X-Owner-Pin": "0000"}).status_code == 401
@@ -64,6 +65,10 @@ def test_console_endpoints_require_owner_pin(client):
     inventory = client.get("/api/console/inventory", headers=headers)
     assert inventory.status_code == 200
     assert len(inventory.json()["items"]) == 12
+
+    webhooks = client.get("/api/console/webhooks?limit=5", headers=headers)
+    assert webhooks.status_code == 200
+    assert "items" in webhooks.json()
 
     create_customer(client, "Cliente Consola", "555-0101")
     fiado = client.get("/api/console/fiado", headers=headers)
