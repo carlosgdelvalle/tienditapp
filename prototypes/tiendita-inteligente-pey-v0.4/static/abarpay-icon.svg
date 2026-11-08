@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Abarpay">
+<rect width="512" height="512" rx="110" fill="#29005C"/>
+<path d="M130 354 237 130h54l104 224h-68l-19-45H216l-19 45zm111-100h43l-22-54z" fill="#fff"/>
+<path d="M377 115v-34M404 132l24-24M417 170h34" stroke="#CAFF38" stroke-width="20" stroke-linecap="round"/>
+</svg>

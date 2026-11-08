@@ -1,1 +1,27 @@
-{"name": "Tiendita Inteligente — App del empleado", "short_name": "Abarpay Cobros", "start_url": "/empleado", "display": "standalone", "background_color": "#FFFFFF", "theme_color": "#29005C", "lang": "es-MX", "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]}
+{
+  "name": "Abarpay — Cobros del empleado",
+  "short_name": "Abarpay Cobros",
+  "start_url": "/empleado",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#29005C",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "/static/abarpay-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

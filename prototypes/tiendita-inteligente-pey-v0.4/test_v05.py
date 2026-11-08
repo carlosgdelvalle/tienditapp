@@ -9,15 +9,20 @@ from test_pey_integracion import make_real, stock
 
 def test_codigo_barras_asocia_producto_sin_inventar_precios(tmp_path,monkeypatch):
     c=demo_client(tmp_path,monkeypatch)
-    v=c.post('/api/barcodes/lookup',json={'code':'7501234567890'})
+    v=c.post('/api/barcodes/lookup',json={'code':'7501234567893'})
     assert v.status_code==404
-    assert c.post('/api/barcodes/link',json={'code':'7501234567890','product_id':'producto-inexistente'}).status_code==404
-    r=c.post('/api/barcodes/link',json={'code':'7501234567890','product_id':'agua'})
+    assert c.post('/api/barcodes/link',json={'code':'7501234567893','product_id':'producto-inexistente','confirm_registration':True}).status_code==404
+    r=c.post('/api/barcodes/link',json={'code':'7501234567893','product_id':'agua','confirm_registration':True})
     assert r.status_code==200,r.text
     assert r.json()['id']=='agua' and r.json()['price_cents']==1500
-    assert c.post('/api/barcodes/link',json={'code':'7501234567890','product_id':'pan'}).status_code==409
-    assert c.post('/api/barcodes/lookup',json={'code':'7501234567890'}).json()['id']=='agua'
+    assert c.post('/api/barcodes/link',json={'code':'7501234567893','product_id':'pan','confirm_registration':True}).status_code==409
+    assert c.post('/api/barcodes/lookup',json={'code':'7501234567893'}).json()['id']=='agua'
     assert c.post('/api/barcodes/lookup',json={'code':'abc?xyz'}).status_code==422
+    assert c.post('/api/barcodes/link',json={'code':'121212','product_id':'pan','confirm_registration':True}).status_code==422
+    assert c.post('/api/barcodes/link',json={'code':'7501234567890','product_id':'pan','confirm_registration':True}).status_code==422
+    assert c.post('/api/barcodes/link',json={'code':'INT-1234','product_id':'pan'}).status_code==422
+    internal=c.post('/api/barcodes/link',json={'code':'INT-1234','product_id':'pan','confirm_registration':True})
+    assert internal.status_code==200 and internal.json()['code_kind']=='INTERNO'
 
 def test_corte_separa_pruebas_fiados_y_simulaciones(tmp_path,monkeypatch):
     c=demo_client(tmp_path,monkeypatch,True)
@@ -52,9 +57,9 @@ def test_empleado_no_puede_abrir_reportes_asesor_ni_asociar_codigo(tmp_path,monk
     assert c.get('/api/reports/daily-close').status_code==401
     assert c.post('/api/employee/login',json={'name':'Ana','pin':'123456'}).status_code==200
     assert c.get('/api/reports/daily-close').status_code==403
-    assert c.post('/api/barcodes/lookup',json={'code':'7501234567890'}).status_code==404
+    assert c.post('/api/barcodes/lookup',json={'code':'7501234567893'}).status_code==404
     assert c.post('/api/assistant/ask',json={'question':'cuanto vendi hoy'}).status_code==403
-    assert c.post('/api/barcodes/link',json={'code':'7501234567890','product_id':'agua'}).status_code==403
+    assert c.post('/api/barcodes/link',json={'code':'7501234567893','product_id':'agua','confirm_registration':True}).status_code==403
     assert c.get('/api/reports/daily-close',headers=auth).status_code==200
 
 def test_pwa_sin_cache_de_api_y_audio_distingue_pago(tmp_path,monkeypatch):
