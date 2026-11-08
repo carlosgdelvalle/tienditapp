@@ -49,7 +49,7 @@ flowchart LR
 ## Flujos de la app
 
 - **Acceso mockup**: dueño o empleado de ejemplo desde `GET /api/bootstrap`. No hay contraseñas, OAuth ni sesiones; el acceso no autentica.
-- **Cobrar**: catálogo con búsqueda y atajos, texto, dictado con el reconocimiento de voz de Android, escáner con Google Code Scanner y código manual. El carrito usa `qtyMilli`; el servidor confirma precios y total.
+- **Cobrar**: escaneo y dictado primero; texto/código manual quedan en una acción secundaria. Barra fija con artículos, total y salto al cobro; cantidades por presets (incluida media kilo) y billetes rápidos en efectivo. El carrito usa `qtyMilli`; el servidor confirma precios y total.
 - **Efectivo**: se captura el efectivo recibido, el servidor calcula el cambio y registra `paid_cash`; no se llama a PEY.
 - **PEY/CoDi**: el servidor crea el QR; la app lo muestra y consulta cada 3 s. Solo pasa a éxito con `paid_pey`. En modo demo se cobra **$0.01** y la pantalla lo dice.
 - **Fiado**: cliente existente o alta con nombre/teléfono; la venta queda `credit`, con saldo y abonos.
@@ -165,7 +165,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
 | Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`; el retry del portal queda pendiente |
-| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `6b8cf1cbd612a209e3bfa3a54791cb5f498155c8f8fe421bfe8239733ff55d48`; firma v2 verificada |
+| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `90c60184ddf68c4eb325f2f750bb079e72d49166563c1b6a81ece36866a6de3f`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
 ## Limitaciones y decisiones abiertas

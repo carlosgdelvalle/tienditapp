@@ -48,7 +48,8 @@ class MobileFlowTest {
 
     private fun addCokes(times: Int) {
         repeat(times) {
-            compose.onNodeWithContentDescription("Agregar Coca-Cola 600 ml").performScrollTo().performClick()
+            compose.onNode(hasScrollToIndexAction()).performScrollToKey("product-1")
+            compose.onNodeWithContentDescription("Agregar Coca-Cola 600 ml").performClick()
         }
     }
 
@@ -122,6 +123,7 @@ class MobileFlowTest {
         compose.onNodeWithTag("tab-Cobrar").performClick()
         compose.onNodeWithContentDescription("Dictar venta").assertIsDisplayed()
         compose.onNodeWithText("Escanear código").assertIsDisplayed()
+        compose.onNodeWithText("Escribir venta o código").performClick()
         compose.onNodeWithText("O escribe el código").assertIsDisplayed()
     }
 }
