@@ -66,6 +66,8 @@ Desde la raíz del repositorio:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r server/requirements.txt
+# para correr las pruebas:
+pip install -r server/requirements-dev.txt
 cp .env.example .env
 # Editar .env: PEY_API_KEY, PEY_WEBHOOK_SECRET, MODO_DEMO, OWNER_PIN
 ABARPAY_LOAD_DOTENV=1 \
@@ -115,7 +117,7 @@ ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" \
 ### Pruebas
 
 ```bash
-/tmp/abar-venv/bin/python -m pytest server/tests -q
+python -m pytest server/tests -q
 cd android && ./scripts/test-core.sh
 ```
 

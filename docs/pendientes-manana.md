@@ -17,6 +17,13 @@ El agente no puede pagar; **una persona debe escanear y pagar**. El QR que estab
 
 Si el backend o el túnel se reinician, hay que repetir el QR; el portal de PEY no cambia si el túnel sigue siendo el mismo.
 
+## Cómo verificar el pago
+
+    curl -s http://127.0.0.1:8000/api/sales/<saleId>
+    curl -s -H 'X-Owner-Pin: 1234' http://127.0.0.1:8000/api/console/summary
+
+La venta debe mostrar status paid_pey, txId y paidAt; la consola debe bajar PENDIENTES a 0 y sumar el monto en PEY. Si el pago llega después de cancelar/vencer, el servidor lo registra con applied=0 y no reabre la venta.
+
 ## Estado actual
 
 - Backend v1 nuevo en **server/**: FastAPI + SQLite, 54 pruebas.
