@@ -19,6 +19,7 @@ class FakePey:
         self.create_timeout = False
         self.create_error: Exception | None = None
         self.reconcile_timeout = False
+        self.create_image = "data:image/png;base64,U0lNVUxBRE8="
 
     def create_qr(
         self,
@@ -42,7 +43,7 @@ class FakePey:
         self.transactions.setdefault(qr_id, [])
         return {
             "id": qr_id,
-            "image": "data:image/png;base64,U0lNVUxBRE8=",
+            "image": self.create_image,
             "simulated": True,
         }
 

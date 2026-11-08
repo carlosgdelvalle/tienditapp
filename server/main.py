@@ -269,8 +269,13 @@ def _pey_qr_image(payload: dict[str, Any]) -> str:
     for container in _pey_containers(payload):
         for key in ("image", "qrImage", "imageUrl", "qr_image"):
             value = container.get(key)
-            if value:
-                return str(value)
+            if not value:
+                continue
+            raw = str(value).strip()
+            if raw.startswith("data:"):
+                return raw
+            # PEY may return raw base64. The Android client only decodes data URLs.
+            return "data:image/png;base64," + raw
     return ""
 
 

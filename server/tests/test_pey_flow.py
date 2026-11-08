@@ -57,6 +57,12 @@ def test_pey_pending_then_reconcile_with_fake(client, fake_pey, db):
     assert movements == 1
 
 
+def test_raw_base64_qr_image_is_normalized_to_data_url(client, fake_pey):
+    fake_pey.create_image = "U0lNVUxBRE8="
+    sale = create_pey_sale(client)
+    assert sale["qrImage"] == "data:image/png;base64,U0lNVUxBRE8="
+
+
 def test_pey_timeout_returns_202_with_sale_id(client, fake_pey, db):
     fake_pey.create_timeout = True
     response = client.post(
