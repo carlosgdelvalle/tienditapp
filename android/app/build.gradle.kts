@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val keystoreFile = file(System.getProperty("user.home") + "/.config/tienditapp/release.properties")
+val keystoreProps = Properties()
+if (keystoreFile.exists()) {
+    keystoreFile.inputStream().use { keystoreProps.load(it) }
+}
+
 android {
     namespace = "mx.abarpay.mobile"
     compileSdk = 35
@@ -10,8 +19,8 @@ android {
         applicationId = "mx.abarpay.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1-dev"
+        versionCode = 3
+        versionName = "1.0.0"
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
@@ -20,9 +29,22 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    signingConfigs {
+        create("release") {
+            if (keystoreFile.exists()) {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         debug { applicationIdSuffix = ".dev" }
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            if (keystoreFile.exists()) signingConfig = signingConfigs.getByName("release")
+        }
     }
 }
 dependencies {
