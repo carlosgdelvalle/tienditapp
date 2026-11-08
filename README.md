@@ -161,7 +161,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 | Evidencia | Resultado |
 | --- | --- |
 | Backend | **54 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado |
-| Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario y consola |
+| Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | QR real creado y mostrado; **pago real de $0.01 pendiente de una persona** |
 | Webhook | Firma real verificada con evento sintético; evento real de PEY pendiente del pago |
 | Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d`; firma v2 verificada |
