@@ -1,29 +1,26 @@
-# Pendientes para la mañana · Abarpay v1
+# Estado y decisiones · Abarpay v1
 
-Actualizado: 2026-11-08 05:05 CDMX.
+Actualizado: 2026-11-08 10:38 CDMX.
 
-Este archivo resume lo que quedó hecho, lo único que está bloqueado por una persona y las decisiones que conviene confirmar antes de la entrega.
+Este archivo resume el pago real ya verificado, la evidencia y las decisiones que conviene confirmar antes de la entrega.
 
-## Lo único bloqueado: el pago real de $0.01
+## Pago real verificado
 
-El agente no puede pagar; **una persona debe escanear y pagar**. El QR que estaba en el teléfono (sale_37fbb44419dd47578f18, QR 355b286b39) venció y se canceló; además se retiró el registro de prueba de la consola. **No hay un QR activo en este momento.** Hay que crear uno nuevo desde la app. Para cerrar la evidencia:
-
-1. Verificar que el backend y el túnel siguen vivos (ver comandos abajo).
-2. En el teléfono SM-A165M, abrir **Abarpay** (release, paquete mx.abarpay.mobile).
-3. Elegir **Lupita**, **Cobrar**, agregar un producto, elegir **PEY / CoDi**, **Generar QR PEY**.
-4. Escanear el QR con la app bancaria y pagar **$0.01 MXN**.
-5. Dejar la app abierta; consulta el estado cada 3 s. También puede usar **Consultar estado**.
-6. Avisar al agente o revisar la consola. La venta debe pasar a paid_pey, con folio PEY y sin descontar inventario dos veces.
-
-Si el backend o el túnel se reinician, hay que repetir el QR; el portal de PEY no cambia si el túnel sigue siendo el mismo.
+- Venta: **sale_fed4e2ffe9684050b4d6**.
+- QR PEY: **352712e8e3**.
+- Transacción PEY: **01M6XZTYHZC3H4F1FZRYGKGF75**, estado **PAID**, **0.01 MXN**.
+- Fecha PEY: 8-nov-2026, 10:28:33 CDMX; el servidor la aplicó a las 10:28:34.
+- Origen de la confirmación: **reconciliación/consulta** con PEY. El webhook real no llegó; la auditoría de webhooks está vacía.
+- Consola: 3 ventas, PEY comercial $36.00, efectivo $18.00, fiado $18.00, fiado por cobrar $13.00, pendientes 0.
+- No hace falta hacer otro pago para la demo; este ya quedó en la base y en la consola.
 
 ## Cómo verificar el pago
 
-    ./scripts/check_v1.sh <saleId>
+    ./scripts/check_v1.sh sale_fed4e2ffe9684050b4d6
 
-También se puede revisar a mano con curl: /api/sales/<saleId> y /api/console/summary con el header X-Owner-Pin: 1234.
+También se puede revisar a mano con curl: /api/sales/sale_fed4e2ffe9684050b4d6 y /api/console/summary con el header X-Owner-Pin: 1234.
 
-La venta debe mostrar status paid_pey, txId y paidAt; la consola debe bajar PENDIENTES a 0 y sumar el monto en PEY. Si el pago llega después de cancelar/vencer, el servidor lo registra con applied=0 y no reabre la venta.
+La venta muestra status paid_pey, txId y paidAt; la consola debe tener PENDIENTES 0. Si en el futuro un pago llega después de cancelar/vencer, el servidor lo registra con applied=0 y no reabre la venta.
 
 ## Estado actual
 
@@ -32,7 +29,7 @@ La venta debe mostrar status paid_pey, txId y paidAt; la consola debe bajar PEND
 - APK de release: **android/app/build/outputs/apk/release/app-release.apk** (12 MB); SHA-256 **6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d**.
 - Consola del dueño: **/console**, PIN demo **1234**.
 - Efectivo, fiado, abono, ajuste de inventario y consola probados en el dispositivo/API.
-- PEY: el QR real se creó y se mostró en el teléfono; el pago real sigue pendiente.
+- PEY: pago real confirmado por conciliación; tx 01M6XZTYHZC3H4F1FZRYGKGF75, PAID $0.01 a las 10:28:34. El webhook real no llegó.
 - El backend y el túnel están corriendo en esta sesión.
 
 ## Comandos para levantarlo
@@ -90,4 +87,4 @@ Consola: **https://<algo>.trycloudflare.com/console** (PIN 1234).
 - Backend: 55 pruebas aprobadas con FakePey; smoke de salud, bootstrap, efectivo, consola y webhook firmado.
 - Android: build release firmado; 46 pruebas Gradle y 35 de núcleo en el reporte del agente; instalación y ejecución en SM-A165M.
 - Dispositivo: venta en efectivo, venta fiada, abono, ajuste de inventario y consola verificados.
-- PEY: QR real creado y mostrado; pendiente el pago humano.
+- PEY: pago real confirmado por conciliación; tx 01M6XZTYHZC3H4F1FZRYGKGF75, PAID $0.01 a las 10:28:34; webhook real no recibido.

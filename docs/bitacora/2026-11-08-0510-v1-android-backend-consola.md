@@ -10,7 +10,7 @@
   apksigner verify app-release.apk                → Verifies, v2
   adb install -r app-release.apk                  → Success
   SM-A165M: efectivo, fiado, abono, inventario y consola verificados
-  PEY: QR real creado y mostrado; pago humano pendiente
+  PEY: pago real $0.01 PAID, tx 01M6XZTYHZC3H4F1FZRYGKGF75, conciliado por polling
   ```
-- **Riesgos abiertos:** el pago real de $0.01 y el webhook real no se han ejercitado; cámara y voz no se probaron con hardware real; el túnel es temporal; el acceso es mockup y la consola usa PIN demo; el reporte incluye pendientes en el total (ver [pendientes](../pendientes-manana.md)).
+- **Riesgos abiertos:** el webhook real de PEY no llegó; la confirmación fue por polling/reconciliación. Cámara y voz no se probaron con hardware real; el túnel es temporal; el acceso es mockup y la consola usa PIN demo; el reporte incluye pendientes en el total (ver [estado](../pendientes-manana.md)).
 - **Siguiente:** que una persona pague un QR nuevo de $0.01, verificar `paid_pey`, webhook, consola y actualizar la evidencia del README.
