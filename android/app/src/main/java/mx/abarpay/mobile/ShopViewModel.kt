@@ -37,7 +37,9 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
     private var checking = false
 
     init {
-        val server = prefs.getString("server", "").orEmpty()
+        // Release: servidor de demo fijo y sin configuración manual. Debug: conserva
+        // el servidor guardado o el modo simulación para las pruebas locales.
+        val server = if (BuildConfig.DEBUG) prefs.getString("server", "").orEmpty() else BuildConfig.DEMO_SERVER
         val (sale, uncertain) = recoverJournal(prefs.getString("sale", null), prefs.getBoolean("creating", false))
         state = MutableStateFlow(
             when {

@@ -40,7 +40,7 @@ flowchart LR
 | Entregable | Estado | Dónde |
 | --- | --- | --- |
 | **Backend v1** | Implementado: efectivo, PEY, fiado, inventario, reportes, webhook y consola. 57 pruebas. | [`server/`](server/README.md) |
-| **APK Android v1** | Release firmado 1.0.0; instalado y probado en SM-A165M. Cash, PEY QR, fiado, abono, inventario y reportes. | [`android/`](android/README.md) |
+| **APK Android v1** | Release firmado 1.0.0; instalado y probado en SM-A165M. Servidor de demo fijo y de solo lectura, conexión automática. Cash, PEY QR, fiado, abono, inventario y reportes. | [`android/`](android/README.md) |
 | **Consola del dueño** | `/console` con PIN demo 1234 y refresco cada 3 s; ventas, efectivo/PEY/fiado, inventario y equipo. | [`server/static/console.html`](server/static/console.html) |
 | **Pago real PEY** | Confirmado por conciliación: `sale_fed4e2ffe9684050b4d6`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, $0.01 `PAID` a las 10:28:34. El webhook real llegó con 400 `invalid_payload` (payload plano); corregido y verificado con el payload exacto. Falta reintentar el evento en el portal. | Ver [`docs/pendientes-manana.md`](docs/pendientes-manana.md) |
 | **Referencia** | App vieja y prototipos; no son la entrega v1. | [`app/`](app/README.md), [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) |
@@ -88,7 +88,7 @@ Para un teléfono físico hace falta HTTPS. Con un túnel temporal:
 cloudflared tunnel --url http://127.0.0.1:8000
 ```
 
-Usar la URL `https://...trycloudflare.com` como servidor en la app y `.../webhooks/pey` en el portal de PEY. El túnel es efímero: si cambia, actualizar la app y el webhook.
+La app release ya trae fija la URL actual `https://roughly-participant-sbjct-gain.trycloudflare.com` (campo de solo lectura) y se conecta sola. Usar `.../webhooks/pey` en el portal de PEY. El túnel es efímero: si cambia, actualizar `DEMO_SERVER` en `android/app/build.gradle.kts`, recompilar e instalar; y actualizar el webhook.
 
 ### Android
 
@@ -111,7 +111,8 @@ ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" \
 
 - Debug: paquete `mx.abarpay.mobile.dev`.
 - Release: paquete `mx.abarpay.mobile`, versión 1.0.0; se firma con `~/.config/tienditapp/release.properties` y el keystore local, fuera del repositorio.
-- Emulador: servidor `http://10.0.2.2:8000`. Teléfono físico: HTTPS.
+- Release: servidor fijo de demo, campo de solo lectura y conexión automática; no hay botón de simulación. Si el túnel cambia, hay que recompilar con el nuevo `DEMO_SERVER`.
+- Debug: si hay un servidor guardado lo usa; si no, inicia simulación para las pruebas. La pantalla de Ajustes de esta compilación también queda fijada al servidor de demo.
 - APK de release generado en `android/app/build/outputs/apk/release/app-release.apk`.
 
 ### Pruebas
@@ -164,7 +165,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
 | Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`; el retry del portal queda pendiente |
-| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d`; firma v2 verificada |
+| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `6b8cf1cbd612a209e3bfa3a54791cb5f498155c8f8fe421bfe8239733ff55d48`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
 ## Limitaciones y decisiones abiertas

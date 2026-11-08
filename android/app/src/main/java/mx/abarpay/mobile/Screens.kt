@@ -353,8 +353,6 @@ private fun CustomerDetailScreen(s: ShopState, vm: ShopViewModel, detail: Custom
 
 @Composable
 internal fun SettingsScreen(s: ShopState, vm: ShopViewModel, close: () -> Unit) {
-    var url by rememberSaveable { mutableStateOf(s.server.ifBlank { "http://10.0.2.2:8000" }) }
-    var accepted by rememberSaveable { mutableStateOf(false) }
     val canChange = s.sale == null && !s.uncertain && !s.busy
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Title("Ajustes") }
@@ -382,40 +380,43 @@ internal fun SettingsScreen(s: ShopState, vm: ShopViewModel, close: () -> Unit) 
                 if (s.cart.isNotEmpty()) Text("Termina o vacía el carrito antes de cambiar de perfil.", fontSize = 12.sp)
             }
         }
-        item { SectionLabel("Servidor") }
+        item { SectionLabel("Servidor fijado para la demo") }
         item {
             OutlinedTextField(
-                url, { url = it; accepted = false },
+                BuildConfig.DEMO_SERVER, {},
                 Modifier.fillMaxWidth(),
-                label = { Text("Dirección del servidor") },
-                supportingText = { Text("HTTPS. En debug se permite http://10.0.2.2:8000 para el emulador.") },
+                label = { Text("Dirección del servidor (fija)") },
+                supportingText = { Text("Configuración de esta demo; no editable desde el APK.") },
                 singleLine = true,
+                readOnly = true,
                 enabled = canChange,
             )
         }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(accepted, { accepted = it }, enabled = canChange)
+                Checkbox(true, {}, enabled = false)
                 Text(
-                    "Es mi servidor de desarrollo; entiendo que los cobros PEY son reales y no hay control de acceso.",
+                    "Servidor de demo aprobado. Los cobros PEY son reales por $0.01 y la API no tiene control de acceso.",
                     fontSize = 13.sp,
                 )
             }
         }
         item {
             Button(
-                onClick = { vm.connect(url) },
-                enabled = canChange && accepted,
+                onClick = { vm.connect(BuildConfig.DEMO_SERVER) },
+                enabled = canChange,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 shape = RoundedCornerShape(16.dp),
-            ) { Text("Conectar API") }
+            ) { Text("Reconectar API de demo") }
         }
-        item {
-            OutlinedButton(
-                onClick = vm::useSimulation,
-                enabled = canChange,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Usar simulación sin conexión") }
+        if (BuildConfig.DEBUG) {
+            item {
+                OutlinedButton(
+                    onClick = vm::useSimulation,
+                    enabled = canChange,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Usar simulación sin conexión (solo debug)") }
+            }
         }
         item { TextButton(onClick = close) { Text("Volver a la tienda") } }
     }

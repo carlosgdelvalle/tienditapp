@@ -26,7 +26,7 @@ La venta muestra status paid_pey, txId y paidAt; la consola debe tener PENDIENTE
 
 - Backend v1 nuevo en **server/**: FastAPI + SQLite, 57 pruebas.
 - Android v1 release firmado: paquete **mx.abarpay.mobile**, versión **1.0.0**, versionCode **3**.
-- APK de release: **android/app/build/outputs/apk/release/app-release.apk** (12 MB); SHA-256 **6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d**.
+- APK de release: **android/app/build/outputs/apk/release/app-release.apk** (12 MB); SHA-256 **6b8cf1cbd612a209e3bfa3a54791cb5f498155c8f8fe421bfe8239733ff55d48**. La app release trae el servidor de demo fijo, de solo lectura y se conecta sola.
 - Consola del dueño: **/console**, PIN demo **1234**.
 - Efectivo, fiado, abono, ajuste de inventario y consola probados en el dispositivo/API.
 - PEY: pago real confirmado por conciliación; tx 01M6XZTYHZC3H4F1FZRYGKGF75, PAID $0.01 a las 10:28:34. El webhook real llegó con 400 por payload plano; corregido; retry del portal pendiente.

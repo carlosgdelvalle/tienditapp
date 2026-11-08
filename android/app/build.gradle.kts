@@ -21,6 +21,8 @@ android {
         targetSdk = 35
         versionCode = 3
         versionName = "1.0.0"
+        // Fijado para la demo; si cambia el túnel, actualizar aquí y recompilar.
+        buildConfigField("String", "DEMO_SERVER", "\"https://roughly-participant-sbjct-gain.trycloudflare.com\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }

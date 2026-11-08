@@ -15,7 +15,7 @@ Conserva la identidad visual Abarpay: púrpura `#2A0065`, violeta `#8400FF`, lav
 - **Barcode**: si `POST /api/barcode/lookup` responde 404 se abre un selector de producto, se enlaza con `POST /api/barcode/link` y se agrega al carrito.
 - **Inventario**: búsqueda y ajuste simple de ±1 unidad (1000 milli) con `POST /api/inventory/adjust`; el stock se muestra como `stockMilli` y en unidades legibles (pza / kg).
 - **Reportes**: efectivo, PEY, fiado, cobrado, pendiente por conciliar, fiado por cobrar, por empleado, productos más vendidos y stock bajo.
-- **Ajustes**: dirección del servidor (HTTPS; en debug se permite `http://10.0.2.2:8000` para el emulador), cambio entre API y simulación. Sin claves de PEY, OpenAI ni OAuth en el APK.
+- **Ajustes**: en release el servidor de demo está fijo y es de solo lectura (`BuildConfig.DEMO_SERVER`); la app se conecta sola. Si cambia el túnel, actualizar ese valor y recompilar. El modo simulación queda disponible solo en debug. Sin claves de PEY, OpenAI ni OAuth en el APK.
 - **Simulación**: `DemoRepository` replica las formas v1 sin red ni dinero. El QR PEY simulado no es escaneable y la confirmación es explícitamente SIMULADA. Datos ficticios: los códigos `DEMO-1`…`DEMO-12` y los del seed (`7500000000001`…`7500000000005`). La simulación se reinicia al cerrar el proceso.
 
 ## Contrato usado
