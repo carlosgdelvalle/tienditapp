@@ -21,7 +21,7 @@ Si el backend o el túnel se reinician, hay que repetir el QR; el portal de PEY 
 
 - Backend v1 nuevo en **server/**: FastAPI + SQLite, 54 pruebas.
 - Android v1 release firmado: paquete **mx.abarpay.mobile**, versión **1.0.0**, versionCode **3**.
-- APK de release: **android/app/build/outputs/apk/release/app-release.apk** (12 MB); SHA-256 **8f18089724e7b8cb20d50ccb20e42ac0ebc8a16131c1aedb928765e578a1c9ff**.
+- APK de release: **android/app/build/outputs/apk/release/app-release.apk** (12 MB); SHA-256 **6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d**.
 - Consola del dueño: **/console**, PIN demo **1234**.
 - Efectivo, fiado, abono, ajuste de inventario y consola probados en el dispositivo/API.
 - PEY: el QR real se creó y se mostró en el teléfono; el pago real sigue pendiente.

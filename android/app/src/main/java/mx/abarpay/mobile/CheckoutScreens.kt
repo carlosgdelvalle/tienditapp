@@ -548,13 +548,13 @@ internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                     shape = RoundedCornerShape(16.dp),
                 ) { Text("Nuevo cobro") }
-            } else if (sale.failed || sale.status == "canceled") {
+            } else if (sale.failed || sale.status == "canceled" || sale.status == "expired") {
                 Button(
                     onClick = vm::dismissSale,
                     enabled = !s.busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                     shape = RoundedCornerShape(16.dp),
-                ) { Text("Volver al carrito") }
+                ) { Text(if (sale.status == "expired") "Nuevo cobro" else "Volver al carrito") }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(

@@ -374,7 +374,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         val current = state.value
         if (current.busy) return
         val sale = current.sale ?: return
-        if (!sale.settled && sale.status != "failed" && sale.status != "canceled") return
+        if (!sale.settled && sale.status != "failed" && sale.status != "canceled" && sale.status != "expired") return
         if (!current.simulated) prefs.edit().remove("sale").putBoolean("qrHidden", false).commit()
         state.update { it.copy(sale = null, tab = "Cobrar", qrHidden = false) }
         refresh()

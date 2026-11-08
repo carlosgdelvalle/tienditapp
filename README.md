@@ -160,7 +160,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario y consola |
 | PEY | QR real creado y mostrado; **pago real de $0.01 pendiente de una persona** |
 | Webhook | Firma real verificada con evento sintético; evento real de PEY pendiente del pago |
-| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `8f18089724e7b8cb20d50ccb20e42ac0ebc8a16131c1aedb928765e578a1c9ff`; firma v2 verificada |
+| Release APK | `android/app/build/outputs/apk/release/app-release.apk`; 12 MB; SHA-256 `6bc70411c953faf845674e3a60347d2b13bbab39e02eee810a74bdf2413ff17d`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
 ## Limitaciones y decisiones abiertas
