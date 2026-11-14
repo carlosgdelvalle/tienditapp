@@ -5,6 +5,33 @@ en un disco persistente. Android consume la URL HTTPS pública; `/console` sirve
 la consola del dueño. Se conserva el modelo de acceso de demostración descrito
 en [la decisión 0005](decisiones/0005-v1-android-backend-consola.md).
 
+## Instancia desplegada · 14-nov-2026
+
+- API: <https://abarpay-api.onrender.com>
+- Consola: <https://abarpay-api.onrender.com/console>
+- [Servicio en Render](https://dashboard.render.com/web/srv-dbsccfdg1s2s73eplcu0).
+- Workspace autorizado: `tea-d8s3sf36sc1c73c0q6m0`.
+- Código del backend desplegado desde `main`: `f0ada025b3d8f3c1c92b601db6288261ae0106d0`.
+
+La instancia se creó directamente con MCP, Dashboard y API; no está gestionada
+por un Blueprint. `render.yaml` representa su configuración final de referencia.
+Actualizarlo si se cambian ajustes manualmente. Aplicarlo como un Blueprint nuevo
+puede crear otro servicio: no hacerlo sin revisar el plan y la base que utilizará.
+
+Se importó la base local con los 17 productos, 11 ventas, 8 pagos y el historial
+de fiado e inventario. Se comprobó la igualdad del esquema y del contenido de
+todas las tablas antes del arranque y después de un reinicio de la instancia.
+El backend y el túnel locales quedaron detenidos; la base original se conserva
+para recuperación. El APK 1.0.5 apunta a Render; requiere instalar esa versión
+en los teléfonos que todavía tienen la dirección del túnel.
+
+El webhook de la clave activa en PEY apunta a
+`https://abarpay-api.onrender.com/webhooks/pey`. Su secreto de firma se renovó
+durante el cambio de URL y se sincronizó al entorno de Render. La clave SSH usada
+temporalmente para la transferencia se retiró al terminar la verificación.
+La configuración del callback no sustituye una prueba de entrega real: no se
+generaron cobros ni pagos durante la migración.
+
 ## Recursos
 
 | Ajuste | Valor |
@@ -12,7 +39,7 @@ en [la decisión 0005](decisiones/0005-v1-android-backend-consola.md).
 | Servicio | `abarpay-api`, Web Service, Python |
 | Región | Oregon |
 | Instancia | `0.5c-512mb`, una instancia, un worker |
-| Disco | `abarpay-data`, 1 GB, montaje `/var/data` |
+| Disco | `disk`, 1 GB, montaje `/var/data` |
 | Base | `ABARPAY_DB=/var/data/abarpay.db` |
 | Build, desde la raíz del repo | `pip install -r server/requirements.txt` |
 | Arranque | El comando de `render.yaml`; verifica que exista la base antes de arrancar Uvicorn |
