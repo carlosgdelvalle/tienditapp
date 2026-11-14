@@ -31,7 +31,7 @@ def test_health_and_bootstrap(client):
     ]
 
     products = body["products"]
-    assert len(products) == 12
+    assert len(products) == 13
     assert products[0] == {
         "id": 1,
         "name": "Coca-Cola 600 ml",

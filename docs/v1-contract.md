@@ -45,6 +45,11 @@ Products (name, unit, price cents, stock milli, low stock milli, quick):
 - Jabón Zote, pieza, 2300, 9000, 5000, false
 - Galletas Marías, pieza, 1900, 14000, 5000, false
 - Fanta 600 ml, pieza, 1700, 12000, 5000, false
+- Tacos de pastor, pieza, 2000, 0, 0, true; `unlimitedStock=true`.
+
+The pastor product is also added once to existing demo databases on startup,
+without resetting other products or transactions. Aliases include `de pastor`,
+`al pastor`, `taco de pastor` and `tacos al pastor`.
 
 Barcodes seed: `7500000000001`→Coca-Cola, `7500000000002`→Sabritas, `7500000000003`→Pan Bimbo, `7500000000004`→Huevo, `7500000000005`→Leche.
 

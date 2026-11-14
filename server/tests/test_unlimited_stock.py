@@ -72,4 +72,19 @@ def test_legacy_database_migration_preserves_catalog(tmp_path):
     initialize_db(path)
     initialize_db(path)
     with sqlite3.connect(path) as conn:
-        assert conn.execute("SELECT id,price_cents,stock_milli,unlimited_stock FROM products").fetchall() == [(42, 123, 7000, 0)]
+        assert conn.execute("SELECT id,price_cents,stock_milli,unlimited_stock FROM products WHERE id=42").fetchall() == [(42, 123, 7000, 0)]
+        assert conn.execute("SELECT COUNT(*) FROM products WHERE name='Tacos de pastor'").fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("text", ["dos de pastor", "2 tacos de pastor", "dos al pastor"])
+def test_pastor_aliases_use_catalog_price_and_unlimited_inventory(client, text):
+    product = next(p for p in client.get('/api/bootstrap').json()['products'] if p['name'] == 'Tacos de pastor')
+    assert product['priceCents'] == 2000
+    assert product['unlimitedStock'] is True
+    parsed = client.post('/api/cart/parse', json={'text': text})
+    assert parsed.status_code == 200
+    assert parsed.json()['unmatched'] == []
+    line = parsed.json()['items'][0]
+    assert line['productId'] == product['id']
+    assert line['qtyMilli'] == 2000
+    assert line['lineTotalCents'] == 4000

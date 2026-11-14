@@ -10,6 +10,10 @@ Desde la raíz del repositorio:
 
 La base se crea y se siembra sola al arrancar (tienda, 3 empleados, 12 productos y 5 códigos de barras). La ruta por defecto es server/abarpay.db; se puede cambiar con ABARPAY_DB.
 
+Al iniciar se agrega una sola vez «Tacos de pastor», $20.00 MXN por pieza, con
+inventario sin límite. El dictado admite «de pastor», «al pastor» y «taco de
+pastor». La actualización conserva el catálogo y las operaciones existentes.
+
 El archivo .env de la raíz no se lee por defecto para que las pruebas y el demo no tomen credenciales reales. Si quieres cargarlo explícitamente:
 
     ABARPAY_LOAD_DOTENV=1 /tmp/abar-venv/bin/python -m uvicorn server.main:app --port 8000
