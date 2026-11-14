@@ -209,8 +209,5 @@ private fun People(s: ShopState, vm: ShopViewModel) {
         }
         if (s.bootstrap?.employees.isNullOrEmpty()) item { MutedText("El servidor no devolvió empleados.") }
         item { androidx.compose.material3.OutlinedButton(onClick = vm::refresh, enabled = !s.busy) { Text("Reintentar") } }
-        item {
-            MutedText("Próxima etapa: acceso real de dueño y empleados. Esta entrega sigue siendo un mockup sin autenticación.")
-        }
     }
 }

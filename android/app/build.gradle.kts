@@ -19,8 +19,8 @@ android {
         applicationId = "mx.abarpay.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.0.2"
+        versionCode = 6
+        versionName = "1.0.3"
         // Fijado para la demo; si cambia el túnel, actualizar aquí y recompilar.
         buildConfigField("String", "DEMO_SERVER", "\"https://watt-finances-essay-scores.trycloudflare.com\"")
     }
