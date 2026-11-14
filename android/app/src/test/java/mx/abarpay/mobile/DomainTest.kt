@@ -4,6 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DomainTest {
+    @Test fun unlimitedStockIsLabelledAndNeverLow() {
+        val unlimited = Product(18, "Tacos de pastor", "pieza", 1000, 0, unlimitedStock = true)
+        assertEquals("Sin límite", unlimited.stockLabel)
+        assertFalse(unlimited.isLowStock)
+        assertTrue(unlimited.copy(unlimitedStock = false).isLowStock)
+    }
+
     private val catalog = listOf(
         Product(1, "Coca-Cola 600 ml", "pieza", 1800, 24000),
         Product(4, "Huevo (kg)", "kg", 4500, 10000),

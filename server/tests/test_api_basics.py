@@ -40,6 +40,7 @@ def test_health_and_bootstrap(client):
         "stockMilli": 24000,
         "lowStockMilli": 5000,
         "quick": True,
+        "unlimitedStock": False,
     }
     assert products[8]["name"] == "Tortillas (kg)"
     assert products[8]["unit"] == "kg"

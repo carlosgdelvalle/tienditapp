@@ -10,6 +10,13 @@ import org.junit.Test
 import java.util.concurrent.TimeUnit
 
 class RepositoryTest {
+    @Test fun productStockFlagSupportsNewAndExistingServers() {
+        val json = JSONObject("""{"id":18,"name":"Tacos de pastor","unit":"pieza","priceCents":1000,"stockMilli":0,"unlimitedStock":true}""")
+        assertTrue(readProduct(json).unlimitedStock)
+        json.remove("unlimitedStock")
+        assertFalse(readProduct(json).unlimitedStock)
+    }
+
     private fun repo(server: MockWebServer) = ApiRepository(server.url("/").toString().trimEnd('/'))
 
     @Test fun postIsNotRetriedAfterServerReceivesItAndDisconnects() = runBlocking {

@@ -112,7 +112,7 @@ def build_today_report(
 
     low_stock_rows = conn.execute(
         """SELECT * FROM products
-           WHERE store_id = ? AND stock_milli <= low_stock_milli
+           WHERE store_id = ? AND unlimited_stock = 0 AND stock_milli <= low_stock_milli
            ORDER BY stock_milli ASC, id ASC""",
         (STORE_ID,),
     ).fetchall()

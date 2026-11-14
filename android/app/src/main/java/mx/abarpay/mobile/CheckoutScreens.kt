@@ -221,8 +221,8 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                         Text(product.name, fontWeight = FontWeight.SemiBold)
                         Text("${money(product.priceCents)} · ${qtyText(1000, product.unit)}", color = Muted, fontSize = 12.sp)
                         Text(
-                            "Stock ${qtyText(product.stockMilli, product.unit)}" + if (product.stockMilli <= product.lowStockMilli) " · bajo" else "",
-                            color = if (product.stockMilli <= product.lowStockMilli) Amber else Muted,
+                            "Stock ${product.stockLabel}" + if (product.isLowStock) " · bajo" else "",
+                            color = if (product.isLowStock) Amber else Muted,
                             fontSize = 11.sp,
                         )
                     }

@@ -844,7 +844,9 @@ def _install_routes(app: FastAPI) -> None:
         reason = body.reason.strip() or "ajuste"
         with write_transaction(conn):
             _require_employee(conn, body.employeeId)
-            _require_product(conn, body.productId)
+            product = _require_product(conn, body.productId)
+            if product["unlimited_stock"]:
+                raise HTTPException(status_code=400, detail="Este producto tiene inventario sin límite")
             conn.execute(
                 "UPDATE products SET stock_milli = stock_milli + ? WHERE id = ?",
                 (body.deltaMilli, body.productId),

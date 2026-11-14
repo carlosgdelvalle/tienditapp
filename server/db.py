@@ -179,7 +179,8 @@ CREATE TABLE IF NOT EXISTS products (
     price_cents INTEGER NOT NULL,
     stock_milli INTEGER NOT NULL,
     low_stock_milli INTEGER NOT NULL DEFAULT 5000,
-    quick INTEGER NOT NULL DEFAULT 0
+    quick INTEGER NOT NULL DEFAULT 0,
+    unlimited_stock INTEGER NOT NULL DEFAULT 0 CHECK(unlimited_stock IN (0,1))
 );
 
 CREATE TABLE IF NOT EXISTS barcodes (
@@ -332,6 +333,12 @@ def initialize_db(db_path: str | Path) -> None:
     try:
         conn.executescript(SCHEMA)
         with write_transaction(conn):
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(products)")}
+            if "unlimited_stock" not in columns:
+                conn.execute(
+                    "ALTER TABLE products ADD COLUMN unlimited_stock "
+                    "INTEGER NOT NULL DEFAULT 0 CHECK(unlimited_stock IN (0,1))"
+                )
             existing = conn.execute("SELECT COUNT(*) AS n FROM stores").fetchone()["n"]
             if existing:
                 return

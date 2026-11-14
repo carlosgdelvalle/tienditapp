@@ -65,6 +65,7 @@ Protegidos con X-Owner-Pin:
 - Fiado: status credit, cargo en fiado_entries y stock descontado de inmediato.
 - PEY: status pending; el stock se descuenta únicamente cuando apply_payment verifica el pago (webhook firmado o conciliación GET).
 - Cualquier cambio de stock deja un renglón en inventory_movements. El stock negativo está permitido en la demo.
+- Los productos con unlimitedStock=true muestran «Sin límite»: no se descuenta ni repone stock, no generan alertas de existencias bajas y no aceptan ajustes manuales. Se conservan los movimientos de venta y cancelación para auditoría; esos movimientos no representan un saldo finito. La migración deja los productos existentes con unlimitedStock=false.
 - Los pagos extra sobre una venta ya pagada se guardan en payments con applied=0 y una nota; no se descartan.
 
 ## Webhook PEY

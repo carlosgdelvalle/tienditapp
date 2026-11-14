@@ -56,6 +56,7 @@ internal fun readProduct(j: JSONObject) = Product(
     stockMilli = j.optInt("stockMilli"),
     lowStockMilli = j.optInt("lowStockMilli", 5000),
     quick = j.optBoolean("quick"),
+    unlimitedStock = j.optBoolean("unlimitedStock", false),
 )
 
 internal fun readBootstrap(j: JSONObject): Bootstrap {
@@ -375,7 +376,7 @@ class DemoRepository : ShopRepository {
             salesCount = settled.size,
             byEmployee = byEmployee,
             topProducts = top,
-            lowStock = products.filter { it.stockMilli <= it.lowStockMilli }
+            lowStock = products.filter { it.isLowStock }
                 .map { StockItem(it.name, it.stockMilli, it.unit) },
             pending = sales.values.count { it.paymentMethod == PAYMENT_PEY && it.status == "pending" },
             fiadoOutstandingCents = customers.sumOf { it.balanceCents },
@@ -428,7 +429,8 @@ class DemoRepository : ShopRepository {
         saleLines[id] = cart.toList()
         saleEmployees[id] = employeeId
         products = products.map { product ->
-            cart.find { it.productId == product.id }?.let { product.copy(stockMilli = product.stockMilli - it.qtyMilli) } ?: product
+            if (product.unlimitedStock) product else
+                cart.find { it.productId == product.id }?.let { product.copy(stockMilli = product.stockMilli - it.qtyMilli) } ?: product
         }
         if (paymentMethod == PAYMENT_FIADO && customerId != null) {
             customers = customers.map {
@@ -445,6 +447,7 @@ class DemoRepository : ShopRepository {
 
     override suspend fun adjust(employeeId: Int, productId: Int, deltaMilli: Int, reason: String): Product {
         val current = products.firstOrNull { it.id == productId } ?: throw ApiFailure(404, "Producto desconocido")
+        if (current.unlimitedStock) throw ApiFailure(400, "Este producto tiene inventario sin límite")
         val updated = current.copy(stockMilli = current.stockMilli + deltaMilli)
         products = products.map { if (it.id == productId) updated else it }
         return updated

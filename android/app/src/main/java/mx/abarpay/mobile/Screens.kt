@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.sp
 internal fun HomeScreen(s: ShopState, vm: ShopViewModel) {
     val report = s.report
     val products = s.bootstrap?.products.orEmpty()
-    val lowStock = products.count { it.stockMilli <= it.lowStockMilli }
+    val lowStock = products.count { it.isLowStock }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Hola, ${s.employee?.name.orEmpty()}", color = Muted) }
         item { Title(s.bootstrap?.store?.name ?: "Tiendita de la Esquina") }
@@ -129,22 +129,22 @@ internal fun InventoryScreen(s: ShopState, vm: ShopViewModel) {
         }
         if (products.isEmpty()) item { Text("No encontramos productos con ese nombre.") }
         items(products, key = { it.id }) { p ->
-            val low = p.stockMilli <= p.lowStockMilli
+            val low = p.isLowStock
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(p.name, fontWeight = FontWeight.Bold)
                         Text("${money(p.priceCents)} · ${qtyText(1000, p.unit)}", color = Muted, fontSize = 12.sp)
                         Text(
-                            "Stock: ${qtyText(p.stockMilli, p.unit)} · ${p.stockMilli} milli",
+                            "Stock: ${p.stockLabel}",
                             color = if (low) Amber else Muted,
                             fontSize = 12.sp,
                         )
                     }
-                    IconButton(onClick = { vm.adjust(p.id, -1000) }, enabled = !s.busy) {
+                    IconButton(onClick = { vm.adjust(p.id, -1000) }, enabled = !s.busy && !p.unlimitedStock) {
                         Icon(Icons.Outlined.RemoveCircleOutline, "Restar una unidad de ${p.name}")
                     }
-                    IconButton(onClick = { vm.adjust(p.id, 1000) }, enabled = !s.busy) {
+                    IconButton(onClick = { vm.adjust(p.id, 1000) }, enabled = !s.busy && !p.unlimitedStock) {
                         Icon(Icons.Outlined.AddCircleOutline, "Sumar una unidad de ${p.name}")
                     }
                 }

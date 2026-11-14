@@ -19,7 +19,11 @@ data class Product(
     val stockMilli: Int,
     val lowStockMilli: Int = 5000,
     val quick: Boolean = false,
-)
+    val unlimitedStock: Boolean = false,
+) {
+    val isLowStock get() = !unlimitedStock && stockMilli <= lowStockMilli
+    val stockLabel get() = if (unlimitedStock) "Sin límite" else qtyText(stockMilli, unit)
+}
 
 data class Employee(val id: Int, val name: String, val role: String)
 
