@@ -20,6 +20,9 @@ Con MODO_DEMO=true (default) el QR de PEY se crea por $0.01 MXN; las ventas guar
 
 ## Consola
 
+Para alojamiento con disco persistente y migración de la base existente, ver
+[Despliegue en Render](../docs/despliegue-render.md) y `render.yaml`.
+
 Abre http://127.0.0.1:8000/console. El PIN sale de OWNER_PIN (default 1234) y se envía en el header X-Owner-Pin. La página es HTML/CSS/JS sin build y refresca cada 3 segundos. Es una vista de demostración para la dueña, no autenticación de producción.
 
 ## Endpoints

@@ -1,0 +1,37 @@
+# Aplicar después de importar la base existente; ver docs/despliegue-render.md.
+services:
+  - type: web
+    name: abarpay-api
+    runtime: python
+    repo: https://github.com/carlosgdelvalle/tienditapp
+    branch: main
+    region: oregon
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    buildCommand: pip install -r server/requirements.txt
+    startCommand: test -s "$ABARPAY_DB" && exec python -m uvicorn server.main:app --host 0.0.0.0 --port "$PORT" --workers 1 --no-access-log
+    healthCheckPath: /api/health
+    disk:
+      name: abarpay-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.12
+      - key: ABARPAY_DB
+        value: /var/data/abarpay.db
+      - key: ABARPAY_LOAD_DOTENV
+        value: '0'
+      - key: MODO_DEMO
+        value: 'true'
+      - key: PEY_DEMO_CHARGE_CENTS
+        value: '1'
+      - key: ABARPAY_TZ
+        value: America/Mexico_City
+      - key: OWNER_PIN
+        sync: false
+      - key: PEY_API_KEY
+        sync: false
+      - key: PEY_WEBHOOK_SECRET
+        sync: false
