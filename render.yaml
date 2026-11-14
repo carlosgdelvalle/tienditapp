@@ -4,7 +4,7 @@ services:
     name: abarpay-api
     runtime: python
     repo: https://github.com/carlosgdelvalle/tienditapp
-    branch: main
+    branch: cdv/tacos-pastor-sin-limite
     region: oregon
     plan: 0.5c-512mb
     numInstances: 1

@@ -11,7 +11,7 @@ en [la decisión 0005](decisiones/0005-v1-android-backend-consola.md).
 - Consola: <https://abarpay-api.onrender.com/console>
 - [Servicio en Render](https://dashboard.render.com/web/srv-dbsccfdg1s2s73eplcu0).
 - Workspace autorizado: `tea-d8s3sf36sc1c73c0q6m0`.
-- Código del backend desplegado desde `main`: `f0ada025b3d8f3c1c92b601db6288261ae0106d0`.
+- Código del despliegue inicial desde `main`: `f0ada025b3d8f3c1c92b601db6288261ae0106d0`.
 
 La instancia se creó directamente con MCP, Dashboard y API; no está gestionada
 por un Blueprint. `render.yaml` representa su configuración final de referencia.
@@ -22,7 +22,7 @@ Se importó la base local con los 17 productos, 11 ventas, 8 pagos y el historia
 de fiado e inventario. Se comprobó la igualdad del esquema y del contenido de
 todas las tablas antes del arranque y después de un reinicio de la instancia.
 El backend y el túnel locales quedaron detenidos; la base original se conserva
-para recuperación. El APK 1.0.5 apunta a Render; requiere instalar esa versión
+para recuperación. El APK 1.0.6 apunta a Render y admite inventario sin límite; requiere instalar esa versión
 en los teléfonos que todavía tienen la dirección del túnel.
 
 El webhook de la clave activa en PEY apunta a
@@ -31,6 +31,13 @@ durante el cambio de URL y se sincronizó al entorno de Render. La clave SSH usa
 temporalmente para la transferencia se retiró al terminar la verificación.
 La configuración del callback no sustituye una prueba de entrega real: no se
 generaron cobros ni pagos durante la migración.
+
+## Actualización de catálogo · 14-nov-2026
+
+La rama `cdv/tacos-pastor-sin-limite` incorpora Tacos de pastor a $20.00 MXN por
+pieza y el indicador de stock sin límite. La actualización agrega el producto
+una vez a la base existente. El dictado «dos de pastor» produce dos piezas por
+$40.00. Los demás productos conservan su seguimiento de existencias.
 
 ## Recursos
 
