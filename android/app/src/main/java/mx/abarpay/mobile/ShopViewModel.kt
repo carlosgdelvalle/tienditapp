@@ -310,7 +310,8 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 totalCents = if (remote.totalCents > 0) remote.totalCents else current.totalCents,
                 chargedCents = if (remote.chargedCents > 0) remote.chargedCents else current.chargedCents,
             )
-            if (state.value.sale?.id != merged.id || state.value.sale?.settled == true) return
+            if (state.value.busy || state.value.sale?.status == "canceled" ||
+                state.value.sale?.id != merged.id || state.value.sale?.settled == true) return
             if (!state.value.simulated) persistSale(merged)
             val becameSettled = merged.settled
             state.update { it.copy(sale = merged, message = null) }
@@ -328,6 +329,33 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
 
     fun checkNow() {
         viewModelScope.launch { poll() }
+    }
+
+    fun cancelPeySale() = work {
+        val snapshot = state.value
+        val current = snapshot.sale ?: return@work
+        if (!current.canCancelPey) return@work
+        if (!snapshot.simulated && snapshot.server.isBlank()) {
+            message("Conservamos el cobro. Recupera la conexión para cancelarlo.")
+            return@work
+        }
+        try {
+            val result = repo.cancel(current.id)
+            check(result.id == current.id && result.status == "canceled")
+            if (!state.value.simulated) persistSale(result)
+            state.update { it.copy(sale = result, qrHidden = true, message = "Venta cancelada. No se devolvió dinero.") }
+            runCatching { loadSummary() }
+        } catch (e: ApiFailure) {
+            if (e.code != 409) throw e
+            val remote = repo.status(current.id)
+            if (!state.value.simulated) persistSale(remote)
+            state.update { it.copy(sale = remote, message = "El cobro cambió de estado; no se canceló.") }
+            runCatching { loadSummary() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            message("No se confirmó la cancelación. Conservamos el cobro; consulta su estado antes de volver a cobrar.")
+        }
     }
 
     fun simulatePayment() = work {

@@ -573,6 +573,20 @@ private fun LinkDialog(code: String, products: List<Product>, onDismiss: () -> U
 @Composable
 internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
     val sale = s.sale ?: return
+    var confirmCancel by remember(sale.id) { mutableStateOf(false) }
+    if (confirmCancel && sale.canCancelPey) {
+        AlertDialog(
+            onDismissRequest = { if (!s.busy) confirmCancel = false },
+            title = { Text("¿Cancelar este cobro?") },
+            text = { Text("Cancela solo si el cliente no ha pagado. No se devuelve dinero. Un pago posterior se revisará por separado.") },
+            confirmButton = {
+                TextButton(onClick = { confirmCancel = false; vm.cancelPeySale() }, enabled = !s.busy) {
+                    Text("Sí, cancelar cobro")
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("Seguir esperando") } },
+        )
+    }
     val settled = sale.settled
     var now by remember { mutableDoubleStateOf(System.currentTimeMillis() / 1000.0) }
     LaunchedEffect(sale.id, settled) {
@@ -662,7 +676,7 @@ internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
             }
         }
         if (sale.paymentMethod == PAYMENT_PEY) {
-            if (!settled) {
+            if (!settled && sale.status != "canceled") {
                 item {
                     Panel {
                         if (s.simulated) {
@@ -708,6 +722,14 @@ internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
                     color = Muted,
                     fontSize = 13.sp,
                 )
+            }
+        }
+        item {
+            if (sale.canCancelPey) {
+                OutlinedButton(
+                    onClick = { confirmCancel = true }, enabled = !s.busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                ) { Text("Cancelar cobro") }
             }
         }
         item {

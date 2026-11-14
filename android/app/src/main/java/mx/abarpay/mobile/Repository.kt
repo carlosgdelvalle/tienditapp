@@ -28,6 +28,7 @@ interface ShopRepository {
         customerId: Int? = null,
     ): Sale
     suspend fun status(saleId: String): Sale
+    suspend fun cancel(saleId: String): Sale
     suspend fun adjust(employeeId: Int, productId: Int, deltaMilli: Int, reason: String): Product
     suspend fun customers(): List<Customer>
     suspend fun addCustomer(name: String, phone: String?): Customer
@@ -294,6 +295,9 @@ class ApiRepository(private val base: String) : ShopRepository {
     }
 
     override suspend fun status(saleId: String): Sale = readSale(request("/api/sales/" + saleId))
+    override suspend fun cancel(saleId: String): Sale = readSale(
+        request("/api/sales/$saleId/cancel?pendingOnly=true", JSONObject()),
+    )
 
     override suspend fun adjust(employeeId: Int, productId: Int, deltaMilli: Int, reason: String): Product =
         readProduct(request("/api/inventory/adjust", JSONObject()
@@ -444,6 +448,18 @@ class DemoRepository : ShopRepository {
     }
 
     override suspend fun status(saleId: String): Sale = sales[saleId] ?: error("Venta desconocida")
+    override suspend fun cancel(saleId: String): Sale {
+        val sale = sales[saleId] ?: error("Venta desconocida")
+        if (sale.status == "canceled") return sale
+        if (!sale.canCancelPey) throw ApiFailure(409, "El cobro ya no está pendiente")
+        products = products.map { product ->
+            val line = saleLines[saleId]?.find { it.productId == product.id }
+            if (line == null || product.unlimitedStock) product
+            else product.copy(stockMilli = product.stockMilli + line.qtyMilli)
+        }
+        return sale.copy(status = "canceled", qrImage = "", note = "Cancelación SIMULADA. No hubo devolución.")
+            .also { sales[saleId] = it }
+    }
 
     override suspend fun adjust(employeeId: Int, productId: Int, deltaMilli: Int, reason: String): Product {
         val current = products.firstOrNull { it.id == productId } ?: throw ApiFailure(404, "Producto desconocido")
@@ -481,7 +497,7 @@ class DemoRepository : ShopRepository {
     /** SIMULATED confirmation. Never produces a scannable QR or touches PEY. */
     fun simulatePaid(sale: Sale) {
         val current = sales[sale.id] ?: return
-        if (current.paymentMethod != PAYMENT_PEY || current.settled) return
+        if (!current.canCancelPey) return
         sales[sale.id] = current.copy(status = "paid_pey", txId = "SIMULADO-SIN-DINERO")
     }
 }

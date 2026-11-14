@@ -62,6 +62,18 @@ Protegidos con X-Owner-Pin:
 
 ## Reglas de dinero y stock
 
+Android 1.0.7 agrega «Cancelar cobro» en la vista PEY con confirmación. Usa
+`POST /api/sales/{id}/cancel?pendingOnly=true`: primero consulta PEY y después
+comprueba el estado dentro de la transacción. Si ya se pagó, responde 409 y
+conserva pago e inventario. La opción anterior sin ese parámetro sigue disponible
+con su comportamiento de anulación existente.
+
+La cancelación desde el teléfono registra la venta cancelada en Abarpay; no
+revoca el QR bancario ni devuelve dinero. Un pago posterior se registra sin
+aplicar para revisión. Si no llega confirmación de cancelación, el teléfono
+conserva el cobro para consultar el estado. El servidor debe actualizarse antes
+de instalar este APK para disponer de la protección `pendingOnly`.
+
 - Todo el dinero es entero en centavos.
 - Las cantidades son mili-unidades: 1000 = una pieza o un kilo.
 - lineTotalCents = round(unitPriceCents * qtyMilli / 1000), calculado siempre con el precio de SQLite.

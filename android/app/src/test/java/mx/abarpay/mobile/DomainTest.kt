@@ -4,6 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DomainTest {
+    @Test fun onlyUnpaidPeySalesOfferCancellation() {
+        val sale = Sale("s", 2000, 1)
+        listOf("pending", "por_conciliar", "expired").forEach { assertTrue(sale.copy(status = it).canCancelPey) }
+        listOf("paid_pey", "paid_cash", "credit", "canceled", "failed").forEach { assertFalse(sale.copy(status = it).canCancelPey) }
+        assertFalse(sale.copy(paymentMethod = PAYMENT_CASH).canCancelPey)
+    }
+
     @Test fun unlimitedStockIsLabelledAndNeverLow() {
         val unlimited = Product(18, "Tacos de pastor", "pieza", 1000, 0, unlimitedStock = true)
         assertEquals("Sin límite", unlimited.stockLabel)
