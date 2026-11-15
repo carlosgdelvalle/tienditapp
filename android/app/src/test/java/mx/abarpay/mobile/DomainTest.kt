@@ -231,4 +231,29 @@ class DomainTest {
         assertEquals("Lupita · Lupis", Employee(2, "Lupita", "employee", nickname = "Lupis").displayName)
         assertEquals("Lupita", Employee(2, "Lupita", "employee", nickname = "  ").displayName)
     }
+
+    // ------------------------------------------------------------------
+    // Contrato v2 · tickets de soporte (cobros no confirmados)
+    // ------------------------------------------------------------------
+
+    @Test fun ticketIsOnlyOfferedForUnconfirmedPeySales() {
+        val porConciliar = Sale("s1", 1800, 1, status = "por_conciliar", paymentMethod = PAYMENT_PEY)
+        assertTrue(canReportTicket(porConciliar))
+        // Expired y canceled siguen siendo estados normales, sin acción.
+        listOf("pending", "expired", "canceled", "failed", "paid_pey", "paid_cash", "credit").forEach {
+            assertFalse(it, canReportTicket(porConciliar.copy(status = it)))
+        }
+        assertFalse(canReportTicket(porConciliar.copy(paymentMethod = PAYMENT_CASH)))
+        assertFalse(canReportTicket(porConciliar.copy(chargedCents = 1800, status = "paid_pey")))
+    }
+
+    @Test fun ticketMessagesNameTheFolioAndWhetherItWasAlreadyOpen() {
+        val created = SupportTicket(id = "tkt_ab12", saleId = "s1", saleStatus = "por_conciliar")
+        assertEquals("Ticket #tkt_ab12 creado", ticketMessage(created))
+        assertEquals("Ya existe el ticket #tkt_ab12", ticketMessage(created.copy(alreadyOpen = true)))
+        assertTrue(created.open)
+        assertFalse(created.copy(status = "resolved").open)
+        assertNull(SupportTicket().saleId)
+        assertEquals("open", SupportTicket().status)
+    }
 }

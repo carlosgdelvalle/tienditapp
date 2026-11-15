@@ -22,6 +22,8 @@ interface ShopRepository {
     fun actAs(employeeId: Int?)
     suspend fun bootstrap(): Bootstrap
     suspend fun report(): Report
+    /** Crea (o recupera) el ticket de soporte de un cobro que quedó sin confirmar. */
+    suspend fun reportTicket(saleId: String?, note: String?): SupportTicket
     suspend fun profile(): StoreProfile
     suspend fun updateProfile(name: String? = null, businessType: String? = null, ownerName: String? = null): StoreProfile
     suspend fun uploadPhoto(dataUrl: String)
@@ -220,6 +222,21 @@ internal fun readReport(j: JSONObject) = Report(
     demoMode = j.optBoolean("demoMode"),
 )
 
+/** Parsea el ticket de soporte con campos opcionales: ningún dato faltante rompe el teléfono. */
+internal fun readSupportTicket(j: JSONObject) = SupportTicket(
+    id = j.optString("id").ifBlank { j.optString("ticketId") }.trim(),
+    saleId = j.nullableString("saleId"),
+    saleStatus = j.nullableString("saleStatus"),
+    saleTotalCents = j.optLong("saleTotalCents"),
+    chargedCents = j.optLong("chargedCents"),
+    peyTxId = j.nullableString("peyTxId"),
+    note = j.nullableString("note"),
+    status = j.optString("status", "open").ifBlank { "open" },
+    createdAt = j.optDouble("createdAt", 0.0),
+    reportedByName = j.nullableString("reportedByName"),
+    alreadyOpen = j.optBoolean("alreadyOpen", false),
+)
+
 internal fun readSale(j: JSONObject, fallbackTotal: Long = 0): Sale {
     val total = if (j.has("totalCents")) j.optLong("totalCents") else fallbackTotal
     val customer = j.optJSONObject("customer")
@@ -369,6 +386,13 @@ class ApiRepository(private val base: String) : ShopRepository {
     override suspend fun bootstrap() = readBootstrap(request("/api/bootstrap"))
 
     override suspend fun report() = readReport(request("/api/reports/today"))
+
+    override suspend fun reportTicket(saleId: String?, note: String?): SupportTicket {
+        val body = JSONObject()
+        if (!saleId.isNullOrBlank()) body.put("saleId", saleId)
+        if (!note.isNullOrBlank()) body.put("note", note)
+        return readSupportTicket(request("/api/support/tickets", body))
+    }
 
     override suspend fun profile() = readStoreProfile(request("/api/store/profile"))
 
@@ -552,6 +576,8 @@ class DemoRepository : ShopRepository {
     private val sales = mutableMapOf<String, Sale>()
     private val saleLines = mutableMapOf<String, List<CartLine>>()
     private val saleEmployees = mutableMapOf<String, Int>()
+    // Tickets SIMULADOS: un solo ticket abierto por venta, como el servidor real.
+    private val supportTickets = mutableMapOf<String, SupportTicket>()
     private var customers = listOf(
         Customer(1, "Doña Mari (ejemplo)", "555-000-0001", 3500),
         Customer(2, "Cliente de la esquina", null, 0),
@@ -724,6 +750,36 @@ class DemoRepository : ShopRepository {
         )
     }
 
+    override suspend fun reportTicket(saleId: String?, note: String?): SupportTicket {
+        val cleanSale = saleId?.trim()?.takeIf { it.isNotBlank() }
+        val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+        if (cleanSale == null && cleanNote == null) throw ApiFailure(400, "Escribe una nota para el ticket")
+        val sale = cleanSale?.let { id -> sales[id] ?: throw ApiFailure(404, "Venta desconocida") }
+        // Igual que el servidor: si ya hay un ticket abierto para la venta, se devuelve ese.
+        if (cleanSale != null) {
+            supportTickets.values.firstOrNull { it.saleId == cleanSale && it.status == "open" }?.let {
+                return it.copy(alreadyOpen = true)
+            }
+        }
+        val actor = runCatching { actor() }.getOrNull()
+        val ticket = SupportTicket(
+            id = "tkt_" + UUID.randomUUID().toString().replace("-", "").take(12),
+            saleId = cleanSale,
+            saleStatus = sale?.status,
+            saleTotalCents = sale?.totalCents ?: 0,
+            chargedCents = sale?.chargedCents ?: 0,
+            peyTxId = sale?.txId,
+            note = cleanNote,
+            status = "open",
+            createdAt = System.currentTimeMillis() / 1000.0,
+            // Igual que el servidor: el nombre propio de quien reporta (sin apodo).
+            reportedByName = actor?.name ?: store.ownerName,
+            alreadyOpen = false,
+        )
+        supportTickets[ticket.id] = ticket
+        return ticket
+    }
+
     override suspend fun parse(text: String) = demoParse(text, products)
 
     override suspend fun lookup(code: String): Product {
@@ -839,6 +895,13 @@ class DemoRepository : ShopRepository {
         val current = sales[sale.id] ?: return
         if (!current.canCancelPey) return
         sales[sale.id] = current.copy(status = "paid_pey", txId = "SIMULADO-SIN-DINERO")
+    }
+
+    /** SIMULADO: imita un cobro PEY que el servidor dejó «por conciliar» (sin red ni dinero). */
+    fun simulateUnconfirmed(sale: Sale) {
+        val current = sales[sale.id] ?: return
+        if (current.settled || current.status == "canceled") return
+        sales[sale.id] = current.copy(status = "por_conciliar", note = "SIMULADO · el cobro quedó por conciliar")
     }
 }
 

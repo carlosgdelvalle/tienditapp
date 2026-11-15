@@ -92,11 +92,13 @@ private fun OwnerHome(s: ShopState, vm: ShopViewModel, employee: Employee?, open
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Contrato v2 · tickets: los cobros por conciliar dejan de ser una
+                // alarma en el teléfono y viven como rastro en la consola.
                 StatusCard(
-                    label = "Pendientes",
-                    value = (report?.pending ?: 0).toString(),
-                    detail = "Cobros PEY por conciliar",
-                    tag = "card-pendientes",
+                    label = "Cobrado hoy",
+                    value = money(report?.collectedCents ?: 0),
+                    detail = "efectivo + PEY",
+                    tag = "card-cobrado",
                     modifier = Modifier.weight(1f),
                 )
                 StatusCard(

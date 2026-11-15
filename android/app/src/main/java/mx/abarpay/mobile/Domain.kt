@@ -415,3 +415,40 @@ fun recentAdjustments(snapshot: InventorySnapshot?, limit: Int = 3): List<Invent
         .filter { it.lastUpdatedAt != null }
         .sortedByDescending { it.lastUpdatedAt ?: 0.0 }
         .take(limit)
+
+// ---------------------------------------------------------------------------
+// Contrato v2 · tickets de soporte (cobros PEY que quedaron por conciliar)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ticket que el servidor guarda cuando un cobro quedó en el limbo. Todos los
+ * campos son defensivos: si el servidor no manda alguno, el teléfono no truena.
+ * [id] llega como `tkt_<hex>` y es el folio que también se ve en la consola.
+ */
+data class SupportTicket(
+    val id: String = "",
+    val saleId: String? = null,
+    val saleStatus: String? = null,
+    val saleTotalCents: Long = 0,
+    val chargedCents: Long = 0,
+    val peyTxId: String? = null,
+    val note: String? = null,
+    val status: String = "open",
+    val createdAt: Double = 0.0,
+    val reportedByName: String? = null,
+    val alreadyOpen: Boolean = false,
+) {
+    val open get() = status == "open"
+}
+
+/**
+ * El ticket aparece solo en un cobro PEY que quedó «por conciliar» y no está
+ * asentado. Expired/canceled/failed siguen siendo estados normales sin acción.
+ */
+fun canReportTicket(sale: Sale): Boolean =
+    sale.paymentMethod == PAYMENT_PEY && !sale.settled && sale.status == "por_conciliar"
+
+/** Mensaje del teléfono: «Ticket #… creado» o «Ya existe el ticket #…». */
+fun ticketMessage(ticket: SupportTicket): String =
+    if (ticket.alreadyOpen) "Ya existe el ticket #" + ticket.id
+    else "Ticket #" + ticket.id + " creado"

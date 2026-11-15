@@ -43,6 +43,7 @@ data class ShopState(
     val inviteError: String? = null,
     val voice: VoiceResult? = null,
     val inventory: InventorySnapshot? = null,
+    val supportTicket: SupportTicket? = null,
     val linkedEmployeeId: Int? = null,
 )
 
@@ -445,6 +446,22 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // -----------------------------------------------------------------------
+    // Tickets de soporte (cobros PEY que quedaron por conciliar)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Crea el ticket en el servidor (o recupera el que ya estaba abierto para
+     * esa venta). El mensaje distingue «Ticket #… creado» de «Ya existe…».
+     */
+    fun reportTicket(saleId: String?, note: String?) = work {
+        val ticket = repo.reportTicket(
+            saleId = saleId?.trim()?.takeIf { it.isNotBlank() },
+            note = note?.trim()?.takeIf { it.isNotBlank() },
+        )
+        state.update { it.copy(supportTicket = ticket, message = ticketMessage(ticket)) }
+    }
+
+    // -----------------------------------------------------------------------
     // Pestañas y cobro
     // -----------------------------------------------------------------------
 
@@ -694,6 +711,24 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         loadSummary()
     }
 
+    /**
+     * Solo simulación (QA): deja el cobro PEY actual en «por_conciliar» para
+     * probar el botón «Reportar problema» sin red ni dinero. No tiene botón.
+     */
+    internal fun simulateUnconfirmed() = work {
+        check(state.value.simulated) { "La conciliación simulada solo existe sin conexión" }
+        val sale = state.value.sale ?: return@work
+        val demo = repo as? DemoRepository ?: error("La conciliación simulada solo existe en modo simulación")
+        demo.simulateUnconfirmed(sale)
+        val updated = demo.status(sale.id)
+        state.update {
+            it.copy(
+                sale = updated.copy(qrImage = updated.qrImage.ifBlank { sale.qrImage }),
+                message = "Cobro SIMULADO por conciliar. No hubo pago.",
+            )
+        }
+    }
+
     fun hideQr() = work {
         checkNotNull(state.value.sale)
         if (!state.value.simulated) check(prefs.edit().putBoolean("qrHidden", true).commit())
@@ -715,7 +750,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         state.update {
             it.copy(
                 sale = null, cart = emptyList(), customer = null, tab = TAB_SELL,
-                qrHidden = false, message = "Listo para el siguiente cobro.",
+                qrHidden = false, supportTicket = null, message = "Listo para el siguiente cobro.",
             )
         }
         refresh()

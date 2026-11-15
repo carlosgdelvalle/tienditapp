@@ -537,4 +537,103 @@ class RepositoryTest {
         assertEquals("Doña Rosa", item.lastUpdatedByName)
         assertTrue(demo.inventory().totalValueCents > 0)
     }
+
+    // ------------------------------------------------------------------
+    // Contrato v2 · tickets de soporte (cobros no confirmados)
+    // ------------------------------------------------------------------
+
+    @Test fun supportTicketPostsOnlySaleIdAndNote() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"id":"tkt_77aa","saleId":"s1","saleStatus":"por_conciliar","saleTotalCents":1800,"chargedCents":1,"peyTxId":"tx-9","note":"El cliente dice que ya pagó","status":"open","createdAt":1700000000.5,"reportedByName":"Lupita","alreadyOpen":false}"""))
+            val ticket = repo(server).reportTicket("s1", "El cliente dice que ya pagó")
+            assertEquals("tkt_77aa", ticket.id)
+            assertEquals("s1", ticket.saleId)
+            assertEquals("por_conciliar", ticket.saleStatus)
+            assertEquals(1800L, ticket.saleTotalCents)
+            assertEquals(1L, ticket.chargedCents)
+            assertEquals("tx-9", ticket.peyTxId)
+            assertEquals("Lupita", ticket.reportedByName)
+            assertTrue(ticket.open)
+            assertFalse(ticket.alreadyOpen)
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("/api/support/tickets", request.path)
+            val body = JSONObject(request.body.readUtf8())
+            assertEquals(setOf("saleId", "note"), body.keys().asSequence().toSet())
+            assertEquals("s1", body.getString("saleId"))
+            assertEquals("El cliente dice que ya pagó", body.getString("note"))
+        } finally { server.shutdown() }
+    }
+
+    @Test fun alreadyOpenTicketNeedsNoNoteAndIsRecognizable() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"id":"tkt_dup","alreadyOpen":true}"""))
+            val ticket = repo(server).reportTicket("s1", null)
+            assertTrue(ticket.alreadyOpen)
+            assertEquals("tkt_dup", ticket.id)
+            assertEquals("open", ticket.status)
+            assertNull(ticket.note)
+            assertNull(ticket.saleId)
+            val body = JSONObject(server.takeRequest().body.readUtf8())
+            assertEquals(setOf("saleId"), body.keys().asSequence().toSet())
+        } finally { server.shutdown() }
+    }
+
+    @Test fun ticketWithoutSaleSendsOnlyTheNote() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"id":"tkt_nota","note":"No salió el cobro","alreadyOpen":false}"""))
+            val ticket = repo(server).reportTicket(null, "No salió el cobro")
+            assertEquals("tkt_nota", ticket.id)
+            val body = JSONObject(server.takeRequest().body.readUtf8())
+            assertEquals(setOf("note"), body.keys().asSequence().toSet())
+        } finally { server.shutdown() }
+    }
+
+    @Test fun missingTicketFieldsFallBackSafely() {
+        val blank = readSupportTicket(JSONObject("""{}"""))
+        assertEquals("", blank.id)
+        assertEquals(0L, blank.saleTotalCents)
+        assertEquals("open", blank.status)
+        assertFalse(blank.alreadyOpen)
+        assertNull(blank.saleId)
+        assertNull(blank.reportedByName)
+        // El identificador también se acepta como ticketId en respuestas intermedias.
+        assertEquals("tkt_x", readSupportTicket(JSONObject("""{"ticketId":"tkt_x"}""")).id)
+    }
+
+    @Test fun demoTicketIsCreatedOncePerSaleAndKeepsContext() = runBlocking {
+        val demo = DemoRepository()
+        demo.actAs(2)
+        val sale = demo.create(2, listOf(CartLine(1, 1000)), PAYMENT_PEY)
+        val ticket = demo.reportTicket(sale.id, "El cliente dice que ya pagó")
+        assertTrue(ticket.id.startsWith("tkt_"))
+        assertEquals(sale.id, ticket.saleId)
+        assertEquals("pending", ticket.saleStatus)
+        assertEquals(1800L, ticket.saleTotalCents)
+        assertEquals(1L, ticket.chargedCents)
+        assertEquals("Lupita", ticket.reportedByName)
+        assertTrue(ticket.open)
+        assertFalse(ticket.alreadyOpen)
+        val duplicate = demo.reportTicket(sale.id, "otra nota")
+        assertEquals(ticket.id, duplicate.id)
+        assertTrue(duplicate.alreadyOpen)
+        assertEquals("El cliente dice que ya pagó", duplicate.note)
+    }
+
+    @Test fun demoTicketWithoutSaleRequiresNote() = runBlocking {
+        val demo = DemoRepository()
+        val missing = runCatching { demo.reportTicket(null, null) }.exceptionOrNull()
+        assertTrue(missing is ApiFailure)
+        assertEquals(400, (missing as ApiFailure).code)
+        val noteOnly = demo.reportTicket(null, "No salió el cobro")
+        assertTrue(noteOnly.id.startsWith("tkt_"))
+        assertNull(noteOnly.saleId)
+        assertTrue(runCatching { demo.reportTicket("VENTA-QUE-NO-EXISTE", "x") }.exceptionOrNull() is ApiFailure)
+    }
 }

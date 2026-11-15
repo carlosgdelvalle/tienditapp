@@ -574,6 +574,43 @@ private fun LinkDialog(code: String, products: List<Product>, onDismiss: () -> U
 internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
     val sale = s.sale ?: return
     var confirmCancel by remember(sale.id) { mutableStateOf(false) }
+    var reportOpen by remember(sale.id) { mutableStateOf(false) }
+    if (reportOpen) {
+        var note by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { if (!s.busy) reportOpen = false },
+            title = { Text("Reportar problema") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MutedText(
+                        "Cuéntanos qué pasó con este cobro PEY. El ticket queda en el servidor para que el dueño lo revise.",
+                        12,
+                    )
+                    // Ancho fijo: fillMaxWidth directo en el diálogo dispara un ciclo de
+                    // medida en Robolectric y las pruebas Compose nunca quedan ociosas.
+                    OutlinedTextField(
+                        note, { note = it },
+                        Modifier.width(240.dp).testTag("ticket-nota"),
+                        label = { Text("Nota (opcional)") },
+                        enabled = !s.busy,
+                        maxLines = 3,
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        reportOpen = false
+                        vm.reportTicket(sale.id, note)
+                    },
+                    enabled = !s.busy,
+                    modifier = Modifier.testTag("crear-ticket"),
+                ) { Text("Crear ticket") }
+            },
+            dismissButton = { TextButton(onClick = { reportOpen = false }) { Text("Cancelar") } },
+        )
+    }
     if (confirmCancel && sale.canCancelPey) {
         AlertDialog(
             onDismissRequest = { if (!s.busy) confirmCancel = false },
@@ -722,6 +759,15 @@ internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
                     color = Muted,
                     fontSize = 13.sp,
                 )
+            }
+            if (canReportTicket(sale)) {
+                item {
+                    OutlinedButton(
+                        onClick = { reportOpen = true },
+                        enabled = !s.busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("reportar-problema"),
+                    ) { Text("Reportar problema") }
+                }
             }
         }
         item {
