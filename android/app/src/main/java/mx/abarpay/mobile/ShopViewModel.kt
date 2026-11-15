@@ -117,9 +117,16 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         val bootstrap = repo.bootstrap()
         val current = state.value
         // El perfil ligado se refresca desde el servidor para respetar cambios de permisos.
-        val employee = current.employee?.let { selected ->
+        var employee = current.employee?.let { selected ->
             bootstrap.employees.firstOrNull { it.id == selected.id } ?: selected
         } ?: current.linkedEmployeeId?.let { id -> bootstrap.employees.firstOrNull { it.id == id } }
+        // En API el teléfono siempre queda ligado a una persona: tras el onboarding, el dueño
+        // se enlaza automáticamente y el selector «¿Quién cobra hoy?» desaparece.
+        if (!current.simulated && current.onboarded && employee == null) {
+            employee = bootstrap.employees.firstOrNull { it.isOwner }?.also { owner ->
+                ownerPrefs.edit().putInt("employee_id", owner.id).commit()
+            }
+        }
         repo.actAs(employee?.id)
         val isOwner = employee == null || employee.isOwner
         val report = if (canUseReports(employee)) runCatching { repo.report() }.getOrNull() else null
@@ -131,6 +138,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 bootstrap = bootstrap,
                 employee = employee,
+                linkedEmployeeId = employee?.id ?: it.linkedEmployeeId,
                 report = if (canUseReports(employee)) report ?: it.report else null,
                 customers = customers ?: it.customers,
                 profile = if (isOwner) profile ?: it.profile else null,
@@ -260,10 +268,18 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 .putString("owner_goals", goals.joinToString("|"))
                 .commit()
         ) { "No se pudo guardar el onboarding en este teléfono" }
+        // En API el onboarding enlaza al dueño con este teléfono; no vuelve a preguntar «¿Quién cobra hoy?».
+        val owner = if (!state.value.simulated) {
+            state.value.bootstrap?.employees?.firstOrNull { it.isOwner }?.also { linked ->
+                ownerPrefs.edit().putInt("employee_id", linked.id).commit()
+            }
+        } else null
         state.update {
             it.copy(
                 onboarded = true,
                 ownerGoals = goals,
+                linkedEmployeeId = owner?.id ?: it.linkedEmployeeId,
+                employee = owner ?: it.employee,
                 profile = updated,
                 bootstrap = it.bootstrap?.copy(
                     store = it.bootstrap.store.copy(

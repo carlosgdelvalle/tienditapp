@@ -174,7 +174,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                     s.teamOpen -> TeamScreen(s, vm)
                     s.employee == null && !s.onboarded -> OnboardingScreen(s, vm)
                     s.employee == null && s.simulated -> AccessMockups(s, vm::select)
-                    s.employee == null -> People(s, vm)
+                    s.employee == null -> NoProfileScreen(s, vm)
                     s.tab == TAB_HOME -> HomeScreen(s, vm) { settings = true }
                     s.tab == TAB_SELL -> CheckoutScreen(s, vm, scan)
                     s.tab == TAB_FIADO -> FiadoScreen(s, vm)
@@ -212,27 +212,19 @@ private fun tabIcon(label: String): ImageVector = when (label) {
 }
 
 @Composable
-private fun People(s: ShopState, vm: ShopViewModel) {
+private fun NoProfileScreen(s: ShopState, vm: ShopViewModel) {
     androidx.compose.foundation.lazy.LazyColumn(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
     ) {
-        item { Title("¿Quién cobra hoy?") }
+        item { Title("Conecta tu perfil") }
         item {
             Text(
-                "Elige tu perfil de esta tienda. La app recordará al empleado que aceptó una invitación en este teléfono.",
+                "Este teléfono no tiene un perfil enlazado. Si te invitaron, abre el enlace o el QR que te compartieron y la app se abrirá sola para que elijas tu apodo.",
                 color = Muted,
                 fontSize = 13.sp,
             )
         }
-        items(s.bootstrap?.employees.orEmpty().size) { index ->
-            val employee = s.bootstrap!!.employees[index]
-            Action(
-                title = employee.displayName + if (employee.isOwner) " · Dueño" else " · Empleado",
-                icon = Icons.Outlined.People,
-            ) { vm.select(employee) }
-        }
-        if (s.bootstrap?.employees.isNullOrEmpty()) item { MutedText("El servidor no devolvió empleados.") }
         item {
             androidx.compose.material3.OutlinedButton(onClick = vm::refresh, enabled = !s.busy) {
                 Text("Reintentar")
