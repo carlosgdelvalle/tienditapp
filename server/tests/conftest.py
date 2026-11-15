@@ -27,10 +27,115 @@ os.environ.pop("PEY_WEBHOOK_SECRET", None)
 from fastapi.testclient import TestClient  # noqa: E402
 
 from server.config import Settings  # noqa: E402
+from server.db import STORE_ID, initialize_db  # noqa: E402
 from server.main import create_app  # noqa: E402
 from server.tests.fakes import FakePey  # noqa: E402
 
 TEST_SECRET = "whsec_" + base64.b64encode(b"abarpay-test-secret").decode("ascii")
+
+# v2: a brand new database only seeds the owner (id 1). Most v1 tests use the
+# historical demo employees 2 and 3, so the suite seeds them explicitly here.
+TEST_STAFF = (
+    {
+        "id": 2,
+        "name": "Lupita",
+        "nickname": "Lupis",
+        "role": "employee",
+        "can_sell": 1,
+        "can_fiado": 1,
+        "can_inventory": 0,
+    },
+    {
+        "id": 3,
+        "name": "Toño",
+        "nickname": "Toñito",
+        "role": "employee",
+        "can_sell": 1,
+        "can_fiado": 1,
+        "can_inventory": 1,
+    },
+)
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "fresh_seed: usa la base nueva de v2 (solo el dueño), sin sembrar empleados de prueba",
+    )
+
+
+def employee_headers(employee_id: int) -> dict[str, str]:
+    """Simulated identity header used by the Android app after onboarding."""
+
+    return {"X-Employee-Id": str(employee_id)}
+
+
+def create_test_employee(
+    db: sqlite3.Connection,
+    employee_id: int,
+    name: str,
+    *,
+    nickname: str | None = None,
+    role: str = "employee",
+    active: int = 1,
+    can_sell: int = 1,
+    can_fiado: int = 1,
+    can_inventory: int = 0,
+) -> None:
+    """Insert an employee directly for tests that need a specific id."""
+
+    db.execute(
+        """INSERT OR REPLACE INTO employees
+               (id, store_id, name, nickname, role, active,
+                can_sell, can_fiado, can_inventory)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            employee_id,
+            STORE_ID,
+            name,
+            nickname,
+            role,
+            active,
+            can_sell,
+            can_fiado,
+            can_inventory,
+        ),
+    )
+    db.commit()
+
+
+@pytest.fixture
+def staff(request: pytest.FixtureRequest, settings: Settings, db):
+    """Seed the v1 demo employees 2 and 3 when a test needs them.
+
+    v2 seeds a new database with the owner only; the v1 suite and the new
+    permission tests ask for this fixture explicitly. Tests marked with
+    fresh_seed keep the owner-only state to verify the seed itself.
+    """
+
+    initialize_db(settings.db_path)
+    if request.node.get_closest_marker("fresh_seed"):
+        yield
+        return
+    for employee in TEST_STAFF:
+        db.execute(
+            """INSERT OR IGNORE INTO employees
+                   (id, store_id, name, nickname, role, active,
+                    can_sell, can_fiado, can_inventory)
+               VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)""",
+            (
+                employee["id"],
+                STORE_ID,
+                employee["name"],
+                employee["nickname"],
+                employee["role"],
+                employee["can_sell"],
+                employee["can_fiado"],
+                employee["can_inventory"],
+            ),
+        )
+    db.commit()
+    yield
 
 
 @pytest.fixture

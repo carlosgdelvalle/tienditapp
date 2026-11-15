@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from server.tests.conftest import create_cash_sale, create_customer
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_fiado_charge_and_abono(client, db):

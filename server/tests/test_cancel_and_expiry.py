@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import time
 
 from server.tests.conftest import (
@@ -11,6 +13,8 @@ from server.tests.conftest import (
     event_payload,
     post_webhook,
 )
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_cancel_pending_pey_then_late_payment_is_recorded_with_note(client, db):

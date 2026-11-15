@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("staff")
+
 
 def test_inventory_adjustment_creates_movement(client, db):
     response = client.post(

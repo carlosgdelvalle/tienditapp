@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import time
 
 from server.pey import PeyError
@@ -11,6 +13,8 @@ from server.tests.conftest import (
     event_payload,
     post_webhook,
 )
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_pey_pending_then_reconcile_with_fake(client, fake_pey, db):
@@ -187,7 +191,8 @@ def test_live_mode_charges_commercial_total(tmp_path):
         response = local_client.post(
             "/api/sales",
             json={
-                "employeeId": 2,
+                # v2: this database only seeds the owner (id 1).
+                "employeeId": 1,
                 "items": [{"productId": 1, "qtyMilli": 1000}],
                 "paymentMethod": "pey",
             },
@@ -224,7 +229,8 @@ def test_pey_without_configuration_returns_sale_id(client, tmp_path):
         response = local_client.post(
             "/api/sales",
             json={
-                "employeeId": 2,
+                # v2: this database only seeds the owner (id 1).
+                "employeeId": 1,
                 "items": [{"productId": 1, "qtyMilli": 1000}],
                 "paymentMethod": "pey",
             },

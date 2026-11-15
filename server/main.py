@@ -6,9 +6,13 @@ owner demo console at /console. Every request uses its own SQLite connection.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hmac
+import html
 import json
 import logging
+import secrets
 import sqlite3
 import time
 import uuid
@@ -17,24 +21,28 @@ from pathlib import Path
 from typing import Annotated, Any, Iterator, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from .config import Settings
 from .db import (
+    DEFAULT_BUSINESS_TYPE,
+    DEFAULT_OWNER_NAME,
     STORE_ID,
     connect,
     initialize_db,
     store_row,
+    store_settings_row,
     write_transaction,
 )
-from .parser import line_total_cents, parse_text
+from .parser import line_total_cents, parse_count, parse_text
 from .payments import apply_payment, restore_inventory, decrement_inventory
 from .pey import PeyClient, PeyError, PeyTimeout, payload_cents, verify_webhook
 from .reports import build_today_report, fiado_outstanding_cents
 from .serializers import (
     customer_balance_cents,
     customer_to_dict,
+    employee_summary_to_dict,
     employee_to_dict,
     product_to_dict,
     sale_to_dict,
@@ -53,6 +61,23 @@ _PEY_SUCCESS_STATUSES = {
     "approved",
     "received",
 }
+
+# v2: invitations, store photo and simulated identity.
+INVITE_BASE_URL = "https://abarpay-api.onrender.com"
+INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
+STORE_PHOTO_FILENAME = "store-photo.jpg"
+STORE_PHOTO_DATA_PREFIX = "data:image/jpeg;base64,"
+MAX_STORE_PHOTO_BYTES = 5 * 1024 * 1024
+
+OWNER_ONLY_DETAIL = "Solo el dueño puede hacer esto"
+REPORTS_OWNER_ONLY_DETAIL = "Solo el dueño ve reportes"
+INVENTORY_FORBIDDEN_DETAIL = "No tienes permiso para inventario"
+INVALID_EMPLOYEE_DETAIL = "Empleado no válido o inactivo"
+
+ANDROID_PACKAGE_NAME = "mx.abarpay.mobile"
+ANDROID_SHA256_CERT_FINGERPRINT = (
+    "f5219d47c4ac345bb4671d546653038a9ca949018ec47e713d2a6f06a4482618"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +210,46 @@ class LoginIn(BaseModel):
     pin: str
 
 
+class StoreProfileIn(BaseModel):
+    name: str | None = None
+    businessType: str | None = None
+    ownerName: str | None = None
+
+
+class StorePhotoIn(BaseModel):
+    dataUrl: str
+
+
+class EmployeePatchIn(BaseModel):
+    name: str | None = None
+    nickname: str | None = None
+    active: bool | None = None
+    canSell: bool | None = None
+    canFiado: bool | None = None
+    canInventory: bool | None = None
+
+
+class InviteIn(BaseModel):
+    name: str
+    canSell: bool = True
+    canFiado: bool = True
+    canInventory: bool = False
+
+
+class InviteAcceptIn(BaseModel):
+    nickname: str | None = None
+
+
+class InventorySetIn(BaseModel):
+    productId: int
+    qtyMilli: int
+    note: str | None = None
+
+
+class InventoryVoiceIn(BaseModel):
+    text: str
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -245,6 +310,195 @@ def _sale_or_404(conn: sqlite3.Connection, sale_id: str) -> sqlite3.Row:
 def _serialize_sale(conn: sqlite3.Connection, sale_id: str) -> dict[str, Any]:
     row = _sale_or_404(conn, sale_id)
     return sale_to_dict(conn, row)
+
+
+# v2 simulated identity ------------------------------------------------------
+
+
+def _employee_row(
+    conn: sqlite3.Connection, employee_id: int, *, only_active: bool = False
+) -> sqlite3.Row | None:
+    query = "SELECT * FROM employees WHERE id = ? AND store_id = ?"
+    if only_active:
+        query += " AND active = 1"
+    return conn.execute(query, (employee_id, STORE_ID)).fetchone()
+
+
+def _optional_employee(
+    conn: sqlite3.Connection, employee_id: int | None
+) -> sqlite3.Row | None:
+    """Validate the optional X-Employee-Id header.
+
+    No header keeps the open v1 behavior (console and scripts). A header that
+    points to an unknown or inactive employee is rejected.
+    """
+
+    if employee_id is None:
+        return None
+    employee = _employee_row(conn, employee_id, only_active=True)
+    if employee is None:
+        raise HTTPException(status_code=403, detail=INVALID_EMPLOYEE_DETAIL)
+    return employee
+
+
+def _require_owner_employee(
+    conn: sqlite3.Connection, employee_id: int | None
+) -> sqlite3.Row | None:
+    employee = _optional_employee(conn, employee_id)
+    if employee is not None and employee["role"] != "owner":
+        raise HTTPException(status_code=403, detail=OWNER_ONLY_DETAIL)
+    return employee
+
+
+def _require_inventory_employee(
+    conn: sqlite3.Connection, employee_id: int | None
+) -> sqlite3.Row | None:
+    employee = _optional_employee(conn, employee_id)
+    if (
+        employee is not None
+        and employee["role"] != "owner"
+        and not employee["can_inventory"]
+    ):
+        raise HTTPException(status_code=403, detail=INVENTORY_FORBIDDEN_DETAIL)
+    return employee
+
+
+# v2 store profile ----------------------------------------------------------
+
+
+def _store_profile(conn: sqlite3.Connection) -> dict[str, Any]:
+    store = store_row(conn)
+    if store is None:
+        raise HTTPException(status_code=500, detail="Tienda no inicializada")
+    settings_row = store_settings_row(conn)
+    return {
+        "storeId": store["id"],
+        "name": store["name"],
+        "businessType": (
+            settings_row["business_type"]
+            if settings_row is not None
+            else DEFAULT_BUSINESS_TYPE
+        ),
+        "ownerName": (
+            settings_row["owner_name"]
+            if settings_row is not None
+            else DEFAULT_OWNER_NAME
+        ),
+    }
+
+
+# v2 catalog / inventory helpers -------------------------------------------
+
+
+def _catalog_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    return [
+        dict(row)
+        for row in conn.execute(
+            """SELECT id, name, aliases, unit, price_cents
+               FROM products WHERE store_id = ? ORDER BY id""",
+            (STORE_ID,),
+        ).fetchall()
+    ]
+
+
+def _inventory_value_cents(price_cents: int, stock_milli: int) -> int:
+    """round(priceCents * stockMilli / 1000), half up, also for negatives."""
+
+    product = int(price_cents) * int(stock_milli)
+    if product >= 0:
+        return (product + 500) // 1000
+    return -((-product + 500) // 1000)
+
+
+def _inventory_payload(conn: sqlite3.Connection) -> dict[str, Any]:
+    rows = conn.execute(
+        """SELECT p.*,
+                  m.created_at AS last_updated_at,
+                  m.employee_id AS last_updated_by_id,
+                  e.name AS last_updated_by_name,
+                  e.nickname AS last_updated_by_nickname
+           FROM products p
+           LEFT JOIN inventory_movements m ON m.id = (
+               SELECT m2.id FROM inventory_movements m2
+               WHERE m2.product_id = p.id
+               ORDER BY m2.created_at DESC, m2.id DESC LIMIT 1)
+           LEFT JOIN employees e ON e.id = m.employee_id
+           WHERE p.store_id = ?
+           ORDER BY p.id""",
+        (STORE_ID,),
+    ).fetchall()
+    items: list[dict[str, Any]] = []
+    total_value_cents = 0
+    for row in rows:
+        unlimited = bool(row["unlimited_stock"])
+        value_cents = (
+            0
+            if unlimited
+            else _inventory_value_cents(row["price_cents"], row["stock_milli"])
+        )
+        total_value_cents += value_cents
+        items.append(
+            {
+                "productId": row["id"],
+                "name": row["name"],
+                "unit": row["unit"],
+                "priceCents": row["price_cents"],
+                "stockMilli": row["stock_milli"],
+                "unlimitedStock": unlimited,
+                "valueCents": value_cents,
+                "lastUpdatedAt": row["last_updated_at"],
+                "lastUpdatedById": row["last_updated_by_id"],
+                "lastUpdatedByName": row["last_updated_by_name"],
+                "lastUpdatedByNickname": row["last_updated_by_nickname"],
+            }
+        )
+    return {"items": items, "totalValueCents": total_value_cents}
+
+
+# v2 invitations ------------------------------------------------------------
+
+
+def _invite_payload(
+    conn: sqlite3.Connection, invite: sqlite3.Row, employee: sqlite3.Row
+) -> dict[str, Any]:
+    store = store_row(conn)
+    settings_row = store_settings_row(conn)
+    return {
+        "token": invite["token"],
+        "employeeId": employee["id"],
+        "name": employee["name"],
+        "nickname": employee["nickname"],
+        "role": employee["role"],
+        "storeName": store["name"] if store is not None else "",
+        "businessType": (
+            settings_row["business_type"]
+            if settings_row is not None
+            else DEFAULT_BUSINESS_TYPE
+        ),
+        "canSell": bool(employee["can_sell"]),
+        "canFiado": bool(employee["can_fiado"]),
+        "canInventory": bool(employee["can_inventory"]),
+    }
+
+
+def _require_invite(
+    conn: sqlite3.Connection, token: str
+) -> tuple[sqlite3.Row, sqlite3.Row]:
+    invite = conn.execute(
+        "SELECT * FROM invites WHERE token = ?", (token,)
+    ).fetchone()
+    if invite is None:
+        raise HTTPException(status_code=404, detail="Invitación no encontrada")
+    if invite["accepted"]:
+        raise HTTPException(
+            status_code=410, detail="La invitación ya fue aceptada"
+        )
+    if float(invite["expires_at"]) < _now():
+        raise HTTPException(status_code=404, detail="La invitación expiró")
+    employee = _employee_row(conn, int(invite["employee_id"]))
+    if employee is None:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    return invite, employee
 
 
 def _pey_containers(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -449,9 +703,7 @@ def _install_routes(app: FastAPI) -> None:
 
     @api.get("/bootstrap")
     def bootstrap(conn: sqlite3.Connection = Depends(get_db), settings: Settings = Depends(get_settings)):
-        store = store_row(conn)
-        if store is None:
-            raise HTTPException(status_code=500, detail="Tienda no inicializada")
+        profile = _store_profile(conn)
         employees = conn.execute(
             "SELECT * FROM employees WHERE store_id = ? AND active = 1 ORDER BY id",
             (STORE_ID,),
@@ -461,24 +713,317 @@ def _install_routes(app: FastAPI) -> None:
             (STORE_ID,),
         ).fetchall()
         return {
-            "store": store_to_dict(store),
-            "employees": [employee_to_dict(row) for row in employees],
+            "store": {
+                "id": profile["storeId"],
+                "name": profile["name"],
+                "businessType": profile["businessType"],
+                "ownerName": profile["ownerName"],
+            },
+            "employees": [employee_summary_to_dict(row) for row in employees],
             "products": [product_to_dict(row) for row in products],
             "demoMode": settings.modo_demo,
             "ai": "local",
         }
 
+    # v2 store profile -----------------------------------------------------
+
+    @api.get("/store/profile")
+    def get_store_profile(conn: sqlite3.Connection = Depends(get_db)):
+        return _store_profile(conn)
+
+    @api.put("/store/profile")
+    def update_store_profile(
+        body: StoreProfileIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+
+        name = None if body.name is None else body.name.strip()
+        if name is not None and not name:
+            raise HTTPException(
+                status_code=400, detail="El nombre de la tienda no puede estar vacío"
+            )
+        business_type = (
+            None if body.businessType is None else body.businessType.strip()
+        )
+        owner_name = None if body.ownerName is None else body.ownerName.strip()
+        if owner_name is not None and not owner_name:
+            raise HTTPException(
+                status_code=400, detail="El nombre del dueño no puede estar vacío"
+            )
+
+        with write_transaction(conn):
+            # The settings row exists on every initialized database; the
+            # INSERT OR IGNORE keeps this safe on old databases.
+            conn.execute(
+                """INSERT OR IGNORE INTO store_settings
+                       (store_id, business_type, owner_name)
+                   VALUES (?, ?, ?)""",
+                (STORE_ID, DEFAULT_BUSINESS_TYPE, DEFAULT_OWNER_NAME),
+            )
+            if name is not None:
+                conn.execute(
+                    "UPDATE stores SET name = ? WHERE id = ?", (name, STORE_ID)
+                )
+            if business_type is not None:
+                conn.execute(
+                    "UPDATE store_settings SET business_type = ? WHERE store_id = ?",
+                    (business_type, STORE_ID),
+                )
+            if owner_name is not None:
+                conn.execute(
+                    "UPDATE store_settings SET owner_name = ? WHERE store_id = ?",
+                    (owner_name, STORE_ID),
+                )
+        return _store_profile(conn)
+
+    @api.post("/store/photo")
+    def upload_store_photo(
+        body: StorePhotoIn,
+        settings: Settings = Depends(get_settings),
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        data_url = body.dataUrl.strip()
+        if not data_url.startswith(STORE_PHOTO_DATA_PREFIX):
+            raise HTTPException(
+                status_code=400, detail="La foto debe venir como data:image/jpeg;base64,..."
+            )
+        encoded = data_url[len(STORE_PHOTO_DATA_PREFIX) :]
+        try:
+            payload = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError):
+            raise HTTPException(
+                status_code=400, detail="La foto no está en base64 válido"
+            )
+        if not payload:
+            raise HTTPException(status_code=400, detail="La foto está vacía")
+        if len(payload) > MAX_STORE_PHOTO_BYTES:
+            raise HTTPException(
+                status_code=400, detail="La foto no puede pesar más de 5 MB"
+            )
+        photo_path = Path(settings.db_path).parent / STORE_PHOTO_FILENAME
+        photo_path.parent.mkdir(parents=True, exist_ok=True)
+        # Write through a temporary file so a crash never leaves a half photo.
+        temporary = photo_path.with_name(photo_path.name + ".tmp")
+        temporary.write_bytes(payload)
+        temporary.replace(photo_path)
+        return {"ok": True}
+
+    @api.get("/store/photo")
+    def get_store_photo(settings: Settings = Depends(get_settings)):
+        photo_path = Path(settings.db_path).parent / STORE_PHOTO_FILENAME
+        if not photo_path.is_file():
+            raise HTTPException(status_code=404, detail="Sin foto del negocio")
+        return FileResponse(
+            photo_path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    # v2 employees ----------------------------------------------------------
+
+    @api.get("/employees")
+    def list_employees(
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        rows = conn.execute(
+            "SELECT * FROM employees WHERE store_id = ? ORDER BY id", (STORE_ID,)
+        ).fetchall()
+        return {"items": [employee_to_dict(row) for row in rows]}
+
+    @api.patch("/employees/{employee_id}")
+    def patch_employee(
+        employee_id: int,
+        body: EmployeePatchIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        employee = _employee_row(conn, employee_id)
+        if employee is None:
+            raise HTTPException(status_code=404, detail="Empleado no encontrado")
+
+        updates: dict[str, Any] = {}
+        if body.name is not None:
+            name = body.name.strip()
+            if not name:
+                raise HTTPException(
+                    status_code=400, detail="El nombre no puede estar vacío"
+                )
+            updates["name"] = name
+        if body.nickname is not None:
+            nickname = body.nickname.strip()
+            updates["nickname"] = nickname or None
+        if body.active is not None:
+            updates["active"] = 1 if body.active else 0
+        if body.canSell is not None:
+            updates["can_sell"] = 1 if body.canSell else 0
+        if body.canFiado is not None:
+            updates["can_fiado"] = 1 if body.canFiado else 0
+        if body.canInventory is not None:
+            updates["can_inventory"] = 1 if body.canInventory else 0
+
+        if updates:
+            assignments = ", ".join(f"{column} = ?" for column in updates)
+            with write_transaction(conn):
+                conn.execute(
+                    f"UPDATE employees SET {assignments} WHERE id = ? AND store_id = ?",
+                    (*updates.values(), employee_id, STORE_ID),
+                )
+        updated = _employee_row(conn, employee_id)
+        assert updated is not None
+        return employee_to_dict(updated)
+
+    # v2 invitations --------------------------------------------------------
+
+    @api.post("/employees/invites")
+    def create_employee_invite(
+        body: InviteIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(
+                status_code=400, detail="El nombre del empleado es obligatorio"
+            )
+        token = secrets.token_hex(16)
+        now = _now()
+        with write_transaction(conn):
+            cursor = conn.execute(
+                """INSERT INTO employees
+                       (store_id, name, nickname, role, active,
+                        can_sell, can_fiado, can_inventory)
+                   VALUES (?, ?, NULL, 'employee', 0, ?, ?, ?)""",
+                (
+                    STORE_ID,
+                    name,
+                    1 if body.canSell else 0,
+                    1 if body.canFiado else 0,
+                    1 if body.canInventory else 0,
+                ),
+            )
+            employee_id = int(cursor.lastrowid)
+            conn.execute(
+                """INSERT INTO invites
+                       (token, employee_id, created_at, expires_at, accepted)
+                   VALUES (?, ?, ?, ?, 0)""",
+                (token, employee_id, now, now + INVITE_TTL_SECONDS),
+            )
+        return {
+            "token": token,
+            "employeeId": employee_id,
+            "url": f"{INVITE_BASE_URL}/invite/{token}",
+        }
+
+    @api.get("/employees/invites/{token}")
+    def get_employee_invite(token: str, conn: sqlite3.Connection = Depends(get_db)):
+        invite, employee = _require_invite(conn, token)
+        return _invite_payload(conn, invite, employee)
+
+    @api.post("/employees/invites/{token}/accept")
+    def accept_employee_invite(
+        token: str,
+        body: InviteAcceptIn,
+        conn: sqlite3.Connection = Depends(get_db),
+    ):
+        invite, employee = _require_invite(conn, token)
+        nickname = body.nickname.strip() if body.nickname else ""
+        with write_transaction(conn):
+            conn.execute(
+                "UPDATE employees SET active = 1, nickname = ? WHERE id = ? AND store_id = ?",
+                (nickname or None, employee["id"], STORE_ID),
+            )
+            conn.execute(
+                "UPDATE invites SET accepted = 1 WHERE token = ?", (token,)
+            )
+        accepted = _employee_row(conn, int(employee["id"]))
+        assert accepted is not None
+        return employee_to_dict(accepted)
+
+    @api.delete("/employees/invites/{token}")
+    def delete_employee_invite(
+        token: str,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        invite = conn.execute(
+            "SELECT * FROM invites WHERE token = ?", (token,)
+        ).fetchone()
+        if invite is None:
+            raise HTTPException(status_code=404, detail="Invitación no encontrada")
+        if invite["accepted"]:
+            raise HTTPException(
+                status_code=409, detail="La invitación ya fue aceptada"
+            )
+        with write_transaction(conn):
+            conn.execute("DELETE FROM invites WHERE token = ?", (token,))
+            # Only pending (inactive) employees are removed here; accepted
+            # employees keep their history and are deactivated from the app.
+            conn.execute(
+                "DELETE FROM employees WHERE id = ? AND store_id = ? AND active = 0",
+                (invite["employee_id"], STORE_ID),
+            )
+        return {"ok": True}
+
+    # v2 inventory ----------------------------------------------------------
+
+    @api.get("/inventory")
+    def get_inventory(conn: sqlite3.Connection = Depends(get_db)):
+        return _inventory_payload(conn)
+
+    @api.post("/inventory/set")
+    def inventory_set(
+        body: InventorySetIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        with write_transaction(conn):
+            employee = _require_inventory_employee(conn, x_employee_id)
+            product = _require_product(conn, body.productId)
+            if product["unlimited_stock"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Este producto tiene inventario sin límite",
+                )
+            target = int(body.qtyMilli)
+            delta = target - int(product["stock_milli"])
+            note = (body.note or "").strip() or "set"
+            conn.execute(
+                "UPDATE products SET stock_milli = ? WHERE id = ?",
+                (target, product["id"]),
+            )
+            conn.execute(
+                """INSERT INTO inventory_movements
+                       (product_id, delta_milli, reason, sale_id, employee_id, created_at)
+                   VALUES (?, ?, ?, NULL, ?, ?)""",
+                (
+                    product["id"],
+                    delta,
+                    note,
+                    employee["id"] if employee is not None else None,
+                    _now(),
+                ),
+            )
+        return product_to_dict(_require_product(conn, body.productId))
+
+    @api.post("/inventory/voice")
+    def inventory_voice(
+        body: InventoryVoiceIn, conn: sqlite3.Connection = Depends(get_db)
+    ):
+        # SIMULADO: only interprets the phrase; the app confirms and calls /set.
+        return parse_count(body.text, _catalog_rows(conn))
+
     @api.post("/cart/parse")
     def cart_parse(body: CartParseIn, conn: sqlite3.Connection = Depends(get_db)):
-        catalog = [
-            dict(row)
-            for row in conn.execute(
-                """SELECT id, name, aliases, unit, price_cents
-                   FROM products WHERE store_id = ? ORDER BY id""",
-                (STORE_ID,),
-            ).fetchall()
-        ]
-        return parse_text(body.text, catalog)
+        return parse_text(body.text, _catalog_rows(conn))
 
     @api.post("/barcode/lookup")
     def barcode_lookup(body: BarcodeIn, conn: sqlite3.Connection = Depends(get_db)):
@@ -798,7 +1343,11 @@ def _install_routes(app: FastAPI) -> None:
     def reports_today(
         conn: sqlite3.Connection = Depends(get_db),
         settings: Settings = Depends(get_settings),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
     ):
+        employee = _optional_employee(conn, x_employee_id)
+        if employee is not None and employee["role"] != "owner":
+            raise HTTPException(status_code=403, detail=REPORTS_OWNER_ONLY_DETAIL)
         return build_today_report(conn, settings)
 
     @api.get("/fiado/customers")
@@ -853,9 +1402,14 @@ def _install_routes(app: FastAPI) -> None:
         }
 
     @api.post("/inventory/adjust")
-    def inventory_adjust(body: AdjustIn, conn: sqlite3.Connection = Depends(get_db)):
+    def inventory_adjust(
+        body: AdjustIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
         reason = body.reason.strip() or "ajuste"
         with write_transaction(conn):
+            _require_inventory_employee(conn, x_employee_id)
             _require_employee(conn, body.employeeId)
             product = _require_product(conn, body.productId)
             if product["unlimited_stock"]:
@@ -1130,6 +1684,54 @@ def _install_routes(app: FastAPI) -> None:
     @app.get("/console/", include_in_schema=False)
     def console_page_slash():
         return RedirectResponse(url="/console")
+
+    # v2 App Links: the HTTPS invite opens the Android app -------------------
+
+    @app.get("/invite/{token}", include_in_schema=False)
+    def invite_page(token: str):
+        safe_token = html.escape(token)
+        deep_link = "abarpay://empleado/" + safe_token
+        page = "".join(
+            [
+                "<!doctype html>",
+                '<html lang="es">',
+                "<head>",
+                '<meta charset="utf-8">',
+                '<meta name="viewport" content="width=device-width, initial-scale=1">',
+                "<title>Abarpay · Invitación de empleado</title>",
+                "</head>",
+                "<body>",
+                "<h1>Abarpay</h1>",
+                "<p>Te invitaron a unirte al equipo de la tienda.</p>",
+                f'<p><a href="{html.escape(deep_link, quote=True)}">Abrir Abarpay</a></p>',
+                "<p>Si la app no se abre sola, toca el botón.</p>",
+                "<script>window.location.href = "
+                + json.dumps(deep_link)
+                + ";</script>",
+                "</body>",
+                "</html>",
+            ]
+        )
+        return HTMLResponse(
+            content=page, headers={"Cache-Control": "no-store"}
+        )
+
+    @app.get("/.well-known/assetlinks.json", include_in_schema=False)
+    def assetlinks():
+        return JSONResponse(
+            content=[
+                {
+                    "relation": ["delegate_permission/common.handle_all_urls"],
+                    "target": {
+                        "namespace": "android_app",
+                        "package_name": ANDROID_PACKAGE_NAME,
+                        "sha256_cert_fingerprints": [
+                            ANDROID_SHA256_CERT_FINGERPRINT
+                        ],
+                    },
+                }
+            ]
+        )
 
     @app.get("/", include_in_schema=False)
     def root():

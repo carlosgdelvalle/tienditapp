@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("staff")
+
 
 def test_cash_sale_paid_and_stock_decremented(client, db):
     response = client.post(

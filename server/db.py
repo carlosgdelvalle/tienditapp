@@ -18,11 +18,24 @@ from typing import Iterator
 STORE_ID = "tiendita-esquina"
 STORE_NAME = "Tiendita de la Esquina"
 
+# v2 defaults for store_settings. The visible store name lives in stores.name;
+# business_type and owner_name are the onboarding answers.
+DEFAULT_BUSINESS_TYPE = ""
+DEFAULT_OWNER_NAME = "Doña Rosa"
+
+# v2: a brand new database starts with the owner only. Existing databases keep
+# every employee with history; the additive migrations below never delete rows.
 SEED_EMPLOYEES = [
     (1, "Doña Rosa", "owner"),
-    (2, "Lupita", "employee"),
-    (3, "Toño", "employee"),
 ]
+
+# Columns added to employees by v2. Each one is added only when missing.
+EMPLOYEE_MIGRATIONS = (
+    ("nickname", "TEXT"),
+    ("can_sell", "INTEGER NOT NULL DEFAULT 1"),
+    ("can_fiado", "INTEGER NOT NULL DEFAULT 1"),
+    ("can_inventory", "INTEGER NOT NULL DEFAULT 0"),
+)
 
 # id, name, unit, price_cents, stock_milli, low_stock_milli, quick, aliases
 SEED_PRODUCTS = [
@@ -166,8 +179,26 @@ CREATE TABLE IF NOT EXISTS employees (
     id INTEGER PRIMARY KEY,
     store_id TEXT NOT NULL REFERENCES stores(id),
     name TEXT NOT NULL,
+    nickname TEXT,
     role TEXT NOT NULL CHECK(role IN ('owner','employee')),
-    active INTEGER NOT NULL DEFAULT 1
+    active INTEGER NOT NULL DEFAULT 1,
+    can_sell INTEGER NOT NULL DEFAULT 1,
+    can_fiado INTEGER NOT NULL DEFAULT 1,
+    can_inventory INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS invites (
+    token TEXT PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES employees(id),
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    accepted INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS store_settings (
+    store_id TEXT PRIMARY KEY REFERENCES stores(id),
+    business_type TEXT NOT NULL DEFAULT '',
+    owner_name TEXT NOT NULL DEFAULT 'Doña Rosa'
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -339,9 +370,24 @@ def initialize_db(db_path: str | Path) -> None:
                     "ALTER TABLE products ADD COLUMN unlimited_stock "
                     "INTEGER NOT NULL DEFAULT 0 CHECK(unlimited_stock IN (0,1))"
                 )
+            # v2 additive migration for employees: never drops existing rows.
+            employee_columns = {
+                row["name"] for row in conn.execute("PRAGMA table_info(employees)")
+            }
+            for column, ddl in EMPLOYEE_MIGRATIONS:
+                if column not in employee_columns:
+                    conn.execute(f"ALTER TABLE employees ADD COLUMN {column} {ddl}")
             existing = conn.execute("SELECT COUNT(*) AS n FROM stores").fetchone()["n"]
             if not existing:
                 _seed(conn)
+            # One settings row per store; keeps onboarding answers and never
+            # overwrites what the owner already saved.
+            conn.execute(
+                """INSERT OR IGNORE INTO store_settings
+                       (store_id, business_type, owner_name)
+                   SELECT id, ?, ? FROM stores WHERE id = ?""",
+                (DEFAULT_BUSINESS_TYPE, DEFAULT_OWNER_NAME, STORE_ID),
+            )
             # Add the requested demo product once, preserving existing prices,
             # stock balances and sale history on subsequent starts.
             conn.execute(
@@ -407,4 +453,11 @@ def _seed(conn: sqlite3.Connection) -> None:
 def store_row(conn: sqlite3.Connection) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT id, name FROM stores WHERE id = ?", (STORE_ID,)
+    ).fetchone()
+
+
+def store_settings_row(conn: sqlite3.Connection) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT store_id, business_type, owner_name FROM store_settings WHERE store_id = ?",
+        (STORE_ID,),
     ).fetchone()

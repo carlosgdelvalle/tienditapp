@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import time
 
 from server.tests.conftest import (
@@ -11,6 +13,8 @@ from server.tests.conftest import (
     post_webhook,
     sign_webhook,
 )
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_invalid_signature_rejected(client, fake_pey, db):

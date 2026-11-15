@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import pytest
 
+pytestmark = pytest.mark.usefixtures("staff")
+
+
+@pytest.mark.fresh_seed
 def test_health_and_bootstrap(client):
     health = client.get("/api/health")
     assert health.status_code == 200
@@ -16,18 +21,25 @@ def test_health_and_bootstrap(client):
     response = client.get("/api/bootstrap")
     assert response.status_code == 200
     body = response.json()
-    assert body["store"] == {"id": "tiendita-esquina", "name": "Tiendita de la Esquina"}
+    assert body["store"] == {
+        "id": "tiendita-esquina",
+        "name": "Tiendita de la Esquina",
+        "businessType": "",
+        "ownerName": "Doña Rosa",
+    }
     assert body["demoMode"] is True
     assert body["ai"] == "local"
-    assert [employee["name"] for employee in body["employees"]] == [
-        "Doña Rosa",
-        "Lupita",
-        "Toño",
-    ]
-    assert [employee["role"] for employee in body["employees"]] == [
-        "owner",
-        "employee",
-        "employee",
+    # v2: a new database only seeds the owner.
+    assert body["employees"] == [
+        {
+            "id": 1,
+            "name": "Doña Rosa",
+            "nickname": None,
+            "role": "owner",
+            "canSell": True,
+            "canFiado": True,
+            "canInventory": False,
+        }
     ]
 
     products = body["products"]

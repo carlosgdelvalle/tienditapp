@@ -7,6 +7,8 @@ import pytest
 from server.db import SCHEMA, initialize_db
 from server.tests.conftest import create_customer, event_payload, post_webhook
 
+pytestmark = pytest.mark.usefixtures("staff")
+
 
 @pytest.mark.parametrize("method", ["cash", "fiado", "pey"])
 def test_unlimited_sale_and_cancel_preserve_stock_and_audit(client, db, method):

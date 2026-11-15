@@ -14,8 +14,21 @@ def employee_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
         "name": row["name"],
+        "nickname": row["nickname"],
         "role": row["role"],
+        "active": bool(row["active"]),
+        "canSell": bool(row["can_sell"]),
+        "canFiado": bool(row["can_fiado"]),
+        "canInventory": bool(row["can_inventory"]),
     }
+
+
+def employee_summary_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    """Bootstrap shape: active employees without the redundant active flag."""
+
+    data = employee_to_dict(row)
+    data.pop("active")
+    return data
 
 
 def product_to_dict(row: sqlite3.Row) -> dict[str, Any]:

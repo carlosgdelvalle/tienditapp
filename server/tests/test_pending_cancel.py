@@ -1,5 +1,10 @@
 """Unpaid-only cancellation uses FakePey SIMULADO, never real money."""
+
+import pytest
+
 from server.tests.conftest import create_pey_sale, event_payload, post_webhook
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_pending_cancel_is_idempotent_and_late_payment_is_not_applied(client, db):

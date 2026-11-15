@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from server.tests.conftest import (
     create_cash_sale,
     create_customer,
@@ -9,6 +11,8 @@ from server.tests.conftest import (
     event_payload,
     post_webhook,
 )
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_console_page_is_static_and_auto_refreshes(client):

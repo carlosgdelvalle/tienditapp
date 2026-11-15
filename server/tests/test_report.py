@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from server.tests.conftest import (
     create_cash_sale,
     create_customer,
@@ -9,6 +11,8 @@ from server.tests.conftest import (
     event_payload,
     post_webhook,
 )
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_today_report_totals_by_method_employee_and_product(client, fake_pey):

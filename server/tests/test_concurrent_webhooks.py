@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import pytest
+
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from server.tests.conftest import create_pey_sale, event_payload, sign_webhook
+
+pytestmark = pytest.mark.usefixtures("staff")
 
 
 def test_concurrent_cash_sales_do_not_lose_stock(client, db):

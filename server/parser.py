@@ -246,3 +246,267 @@ def parse_text(text: str, catalog: Iterable[dict[str, Any]]) -> dict[str, Any]:
         )
 
     return {"items": items, "unmatched": unmatched, "engine": "local"}
+
+
+# ---------------------------------------------------------------------------
+# Inventory count parsing (v2)
+# ---------------------------------------------------------------------------
+# "coca colas de 600, 4, 5, 6… 12 piezas" -> Coca-Cola 600 ml with 12 pieces.
+# The last explicit number for a product wins, numbers are spoken or written,
+# pieces and kilograms both use qtyMilli (1000 = 1 pieza or 1 kg), and a
+# product mentioned without a quantity comes back with qtyMilli = null so the
+# app can ask for it.
+
+_COUNT_WORD_VALUES: dict[str, Decimal] = {
+    "media docena": Decimal(6),
+    "docena": Decimal(12),
+    "tres cuartos": Decimal("0.75"),
+    "un cuarto": Decimal("0.25"),
+    "cuarto": Decimal("0.25"),
+    "medio": Decimal("0.5"),
+    "media": Decimal("0.5"),
+    "un": Decimal(1),
+    "una": Decimal(1),
+    "uno": Decimal(1),
+    "veinte": Decimal(20),
+}
+
+_COUNT_SMALL_WORDS: dict[int, str] = {
+    2: "dos",
+    3: "tres",
+    4: "cuatro",
+    5: "cinco",
+    6: "seis",
+    7: "siete",
+    8: "ocho",
+    9: "nueve",
+    10: "diez",
+    11: "once",
+    12: "doce",
+    13: "trece",
+    14: "catorce",
+    15: "quince",
+    16: "dieciseis",
+    17: "diecisiete",
+    18: "dieciocho",
+    19: "diecinueve",
+}
+
+for _number, _word in _COUNT_SMALL_WORDS.items():
+    _COUNT_WORD_VALUES[_word] = Decimal(_number)
+
+for _number, _word in (
+    (21, "veintiuno"),
+    (22, "veintidos"),
+    (23, "veintitres"),
+    (24, "veinticuatro"),
+    (25, "veinticinco"),
+    (26, "veintiseis"),
+    (27, "veintisiete"),
+    (28, "veintiocho"),
+    (29, "veintinueve"),
+):
+    _COUNT_WORD_VALUES[_word] = Decimal(_number)
+
+_COUNT_TENS = (
+    (30, "treinta"),
+    (40, "cuarenta"),
+    (50, "cincuenta"),
+    (60, "sesenta"),
+    (70, "setenta"),
+    (80, "ochenta"),
+    (90, "noventa"),
+)
+
+for _tens_number, _tens_word in _COUNT_TENS:
+    _COUNT_WORD_VALUES[_tens_word] = Decimal(_tens_number)
+    for _unit_number in range(1, 10):
+        _COUNT_WORD_VALUES[
+            f"{_tens_word} y {_COUNT_SMALL_WORDS.get(_unit_number, 'uno')}"
+        ] = Decimal(_tens_number + _unit_number)
+
+_COUNT_WORD_VALUES["cien"] = Decimal(100)
+_COUNT_WORD_VALUES["ciento"] = Decimal(100)
+
+_COUNT_NUMBER_ALTERNATION = "|".join(
+    re.escape(word) for word in sorted(_COUNT_WORD_VALUES, key=len, reverse=True)
+)
+_COUNT_NUMBER_RE = re.compile(
+    rf"(?<![a-z0-9])(?P<number>\d+(?:[.,]\d+)?|{_COUNT_NUMBER_ALTERNATION})(?![a-z0-9])",
+    re.IGNORECASE,
+)
+# No leading "^": the regex is matched with a start position on the full text.
+_COUNT_UNIT_AFTER_RE = re.compile(
+    r"\s*(?:de\s+)?(?P<unit>kilos?|kilogramos?|kg|gramos?|grs?|g|"
+    r"piezas?|pzas?|pza|unidades?)\b",
+    re.IGNORECASE,
+)
+_COUNT_UNIT_BEFORE_RE = re.compile(
+    r"(?P<unit>kilos?|kilogramos?|kg|gramos?|grs?|g|piezas?|pzas?|pza|unidades?)"
+    r"\s+(?:(?:y|de)\s+)?$",
+    re.IGNORECASE,
+)
+_COUNT_SIZE_UNIT_RE = re.compile(r"^(?:ml|mililitros?|litros?|l)\b", re.IGNORECASE)
+
+
+def _count_unit_kind(unit: str | None) -> str | None:
+    if not unit:
+        return None
+    normalized = normalize(unit)
+    if normalized in {"kilo", "kilos", "kilogramo", "kilogramos", "kg"}:
+        return "kg"
+    if normalized in {"gramo", "gramos", "g", "gr", "grs"}:
+        return "g"
+    if normalized.startswith(("pieza", "pza", "unidad")):
+        return "pieza"
+    return None
+
+
+def _count_number_value(raw: str) -> Decimal | None:
+    raw = raw.strip()
+    if not raw:
+        return None
+    if raw[0].isdigit():
+        try:
+            return Decimal(raw.replace(",", "."))
+        except InvalidOperation:
+            return None
+    return _COUNT_WORD_VALUES.get(normalize(raw))
+
+
+def _count_qty_milli(value: Decimal, unit_kind: str | None) -> int:
+    if unit_kind == "g":
+        return int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    # One piece and one kilogram both map to 1000 milli.
+    return int((value * 1000).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+def _is_count_size_reference(text: str, start: int, end: int) -> bool:
+    """Skip package sizes such as "de 600" or "600 ml" in "coca colas de 600"."""
+
+    before = text[:start].rstrip()
+    after = text[end:].lstrip()
+    if _COUNT_SIZE_UNIT_RE.match(after):
+        return True
+    if re.search(r"\bde$", before) and not _COUNT_UNIT_AFTER_RE.match(after):
+        return (
+            after == ""
+            or after[0] in ",;.…"
+            or after.startswith(("y ", "..."))
+        )
+    return False
+
+
+def _count_product_mentions(
+    text: str, aliases: list[tuple[str, dict[str, Any]]]
+) -> list[dict[str, Any]]:
+    occupied = [False] * len(text)
+    mentions: list[dict[str, Any]] = []
+    for alias, product in aliases:
+        # Plural aliases: "coca cola" also matches "coca colas" in a count.
+        pattern = re.compile(
+            rf"(?<![a-z0-9]){re.escape(alias)}(?:es|s)?(?![a-z0-9])"
+        )
+        for match in pattern.finditer(text):
+            if any(occupied[match.start() : match.end()]):
+                continue
+            for index in range(match.start(), match.end()):
+                occupied[index] = True
+            mentions.append(
+                {"product": product, "start": match.start(), "end": match.end()}
+            )
+    mentions.sort(key=lambda item: item["start"])
+    return mentions
+
+
+def _count_unit_after(text: str, position: int) -> str | None:
+    match = _COUNT_UNIT_AFTER_RE.match(text, position)
+    if match is None:
+        return None
+    return _count_unit_kind(match.group("unit"))
+
+
+def _count_unit_before(text: str, position: int) -> str | None:
+    match = _COUNT_UNIT_BEFORE_RE.search(text[:position])
+    if match is None:
+        return None
+    return _count_unit_kind(match.group("unit"))
+
+
+def parse_count(text: str, catalog: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """Parse an inventory count phrase against the catalog.
+
+    Returns {"items": [{productId, name, qtyMilli, unit}], "note": str | None}.
+    qtyMilli is null when the phrase names a product without a quantity.
+    """
+
+    normalized = normalize(text or "")
+    aliases = _catalog_alias_index(catalog)
+    mentions = _count_product_mentions(normalized, aliases)
+
+    assigned: dict[int, list[dict[str, Any]]] = {}
+    for match in _COUNT_NUMBER_RE.finditer(normalized):
+        value = _count_number_value(match.group("number"))
+        if value is None or value <= 0:
+            continue
+        if _is_count_size_reference(normalized, match.start(), match.end()):
+            continue
+        best_index: int | None = None
+        best_distance: int | None = None
+        for index, mention in enumerate(mentions):
+            if match.end() <= mention["start"]:
+                distance = mention["start"] - match.end()
+            elif match.start() >= mention["end"]:
+                distance = match.start() - mention["end"]
+            else:
+                distance = 0
+            if best_distance is None or distance < best_distance:
+                best_index = index
+                best_distance = distance
+            elif distance == best_distance and mention["start"] >= match.end():
+                # Tie: a number right before a product belongs to that product
+                # ("tres cocas dos sabritas" -> 3 cocas, 2 sabritas).
+                if best_index is None or mentions[best_index]["start"] < match.end():
+                    best_index = index
+        if best_index is not None:
+            assigned.setdefault(best_index, []).append(
+                {"value": value, "end": match.end()}
+            )
+
+    grouped: dict[int, dict[str, Any]] = {}
+    order: list[int] = []
+    for index, mention in enumerate(mentions):
+        product = mention["product"]
+        product_id = int(product["id"])
+        if product_id not in grouped:
+            grouped[product_id] = {"product": product, "qtyMilli": None}
+            order.append(product_id)
+        # The last explicit number for this mention wins.
+        for token in assigned.get(index, []):
+            unit_kind = _count_unit_after(normalized, token["end"])
+            if unit_kind is None:
+                unit_kind = _count_unit_before(normalized, token["end"])
+            grouped[product_id]["qtyMilli"] = _count_qty_milli(
+                token["value"], unit_kind
+            )
+
+    items: list[dict[str, Any]] = []
+    for product_id in order:
+        product = grouped[product_id]["product"]
+        items.append(
+            {
+                "productId": product_id,
+                "name": product.get("name", ""),
+                "qtyMilli": grouped[product_id]["qtyMilli"],
+                "unit": product.get("unit") or "pieza",
+            }
+        )
+
+    missing = [item["name"] for item in items if item["qtyMilli"] is None]
+    if not items:
+        note: str | None = "No reconocí ningún producto. Intenta de nuevo."
+    elif missing:
+        note = "Falta la cantidad de " + ", ".join(missing) + ". Confirma la cantidad."
+    else:
+        note = None
+    return {"items": items, "note": note}
