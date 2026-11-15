@@ -1,0 +1,517 @@
+codigo,nombre,profeco_id,producto_profeco,presentacion_profeco,marca,similitud,estado,precio_referencia_profeco,fecha_precio
+0021136414547,Topochico Sangria 600 ml,QQP-03363,Refresco,Botella 600 Ml.,Coca Cola,0.286,requiere_revision,22.0,2026/03/13
+0036731106018,Gatorade Sabor Naranja,QQP-00419,Bebidas Hidratantes,Botella 600 Ml. Naranja,Gatorade,0.333,requiere_revision,24.0,2026/03/13
+0036731106063,gatorade rojo 600,QQP-00419,Bebidas Hidratantes,Botella 600 Ml. Naranja,Gatorade,0.286,requiere_revision,24.0,2026/03/13
+0070200000223,Aceite capullo procardio,QQP-00016,Aceite,Botella 845 Ml. Canola,Capullo,0.333,requiere_revision,51.95,2026/03/13
+0071200001319,Salsa picante,QQP-03546,Salsa Picante y Similares,Botella 120 Ml.,El Yucateco,0.333,requiere_revision,20.5,2026/03/12
+0096619417575,Leche light ultrapasteurizada,QQP-02242,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Kirkland,0.286,requiere_revision,31.0,2026/03/02
+0097339000061,Salsa picante,QQP-03556,Salsa Picante y Similares,Botella 370 Ml. Etiqueta Amarilla,Valentina,0.25,requiere_revision,16.5,2026/03/13
+0097339000214,Valentina Salsa Picante,QQP-03554,Salsa Picante y Similares,Botella 350 Ml. Etiqueta Amarilla,Valentina,0.375,requiere_revision,16.0,2026/03/13
+0101100004209,Atún en agua,QQP-00287,Atún,Lata 140 Gr. en Hojuelas en Agua,Great Value,0.286,requiere_revision,19.0,2026/03/13
+0122455358885,Fuze Tea con Té Negro sabor Limón,QQP-03884,Té Preparado,Botella 600 Ml. Té. Verde. Sabor Limón,Fuze Tea,0.444,requiere_revision,17.0,2026/03/13
+0658480001262,Tostadas horneadas de maiz,QQP-03859,Tostadas de Maíz,Caja 216 Gr. Clásicas. Horneadas Sin Grasa. Maíz Blanco,Saníssimo,0.3,requiere_revision,35.0,2026/03/13
+0661440000014,Azúcar Morena,QQP-00342,Azúcar,Bolsa Plástico 1 Kg. Estándar o Morena,Zulka,0.25,requiere_revision,20.9,2026/03/13
+0735257002469,Gelatina sabor limón,QQP-01614,Gelatina en Polvo,Bolsa 120 Gr. Limón,D´gari,0.286,requiere_revision,14.6,2026/03/13
+0735257002650,Gelatina sabor Chocolate,QQP-01611,Gelatina en Polvo,Bolsa 120 Gr. Leche. Chocolate,D´gari,0.25,requiere_revision,13.0,2026/03/13
+0735257003404,Gelatina en polvo Maracuya,QQP-01614,Gelatina en Polvo,Bolsa 120 Gr. Limón,D´gari,0.25,requiere_revision,14.6,2026/03/13
+0735257005576,Polvo para preparar gelatina con agua sabor flotante limón,QQP-01614,Gelatina en Polvo,Bolsa 120 Gr. Limón,D´gari,0.3,requiere_revision,14.6,2026/03/13
+0758104000159,Bonafont 1.5 l,QQP-00077,Agua Sin Gas,Botella 1.5 Lt.,Bonafont,0.375,requiere_revision,14.0,2026/03/13
+0758104001712,Bonafont el agua ligera,QQP-00084,Agua Sin Gas,Botella 600 Ml.,Bonafont,0.286,requiere_revision,8.3,2026/03/13
+0758104100422,BONAFONT Natural 1 L,QQP-00072,Agua Sin Gas,Botella 1 Lt.,Bonafont,0.25,requiere_revision,10.5,2026/03/13
+15010407,Yoghurt griego natural sin azúcar,QQP-04110,Yoghurt,Bote 1 Kg. Natural. Bajo en Grasa. 0% Azúcar Añadida. Griego,Yoplait,0.308,requiere_revision,95.5,2026/03/13
+15010407,Yoghurt griego natural sin azúcar,QQP-04123,Yoghurt,Bote de 1 Kg. Natural. Bajo en Grasa. Griego,Yoplait,0.273,requiere_revision,101.5,2026/03/13
+18821178,Aceite 100% Canola,QQP-00015,Aceite,Botella 840 Ml. Canola,Capullo,0.333,requiere_revision,57.5,2026/03/13
+2146546060707,Galletas Gamesa Barras de coco clásicas,QQP-01552,Galletas Dulces,Caja 468 Gr. Barras de Coco,Gamesa,0.5,requiere_revision,64.5,2026/03/13
+2548055900046,Alpura Semi,QQP-02261,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Semi,Alpura,0.25,requiere_revision,35.25,2026/03/13
+4005808680252,NIVEA Regeneración Intensiva 72h| PIEL ÁSPERA Y EXTRA SECA con Dexpantenol 400 ml,QQP-01089,Crema Líquida,Botella 400 Ml. Soft Milk. Piel Seca,Nivea,0.333,requiere_revision,110.0,2026/03/13
+4005808680252,NIVEA Regeneración Intensiva 72h| PIEL ÁSPERA Y EXTRA SECA con Dexpantenol 400 ml,QQP-01084,Crema Líquida,Botella 400 Ml. Express Hidration. Piel Normal,Nivea,0.25,requiere_revision,113.0,2026/03/13
+5507455900046,Alpura Semi,QQP-02261,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Semi,Alpura,0.25,requiere_revision,35.25,2026/03/13
+6201055317875,Fuze Tea con Té Negro sabor Durazno,QQP-03884,Té Preparado,Botella 600 Ml. Té. Verde. Sabor Limón,Fuze Tea,0.3,requiere_revision,17.0,2026/03/13
+75000608,Cloralex El rendidor,QQP-00445,Blanqueador,Botella 500 Ml. el Rendidor,Cloralex,0.4,requiere_revision,11.0,2026/03/13
+7500435126113,Downy Intense Floral,QQP-03675,Suavizante P/ropa,Botella 1.4 Lt. Acondicionador de Telas. Intense Floral,Downy,0.273,requiere_revision,63.9,2026/03/13
+7500462225964,Chia Wand's,QQP-00913,Chía,Envase 220 Gr. Semilla,Wand´s,0.429,requiere_revision,43.0,2026/03/13
+7500462225971,Quinoa Wand's,QQP-00913,Chía,Envase 220 Gr. Semilla,Wand´s,0.25,requiere_revision,43.0,2026/03/13
+7500463096723,semilla de girasol pelada,QQP-03597,Semilla de Girasol,Bote 300 Gr. Pelada,Wand´s,0.375,requiere_revision,47.0,2026/03/13
+7500478048113,galletas flor de naranjo gamesa,QQP-01562,Galletas Populares,Bolsa 500 Gr. Animalitos,Gamesa,0.25,requiere_revision,58.2,2026/03/13
+7500525497710,azúcar refinada bol precissimo,QQP-00375,Azúcar,Bolsa Plástico 900 Gr. Refinada,Precíssimo,0.429,requiere_revision,49.37,2026/03/13
+7500525497710,azúcar refinada bol precissimo,QQP-00371,Azúcar,Bolsa Plástico 900 Gr. Estándar,Precíssimo,0.25,requiere_revision,23.9,2026/03/13
+7500525500038,Atún en agua con aceite,QQP-00283,Atún,Lata 140 Gr. Desmenuzado en Agua con Aceite,Valley Foods,0.375,requiere_revision,10.3,2026/03/13
+7500525500038,Atún en agua con aceite,QQP-00291,Atún,Lata 140 Gr. en Hojuelas en Agua con Aceite,Valley Foods,0.375,requiere_revision,19.92,2026/03/13
+7500525500038,Atún en agua con aceite,QQP-00282,Atún,Lata 140 Gr. Desmenuzado en Agua,Valley Foods,0.25,requiere_revision,10.3,2026/03/13
+7500525500038,Atún en agua con aceite,QQP-00289,Atún,Lata 140 Gr. en Hojuelas en Agua,Valley Foods,0.25,requiere_revision,19.92,2026/03/13
+7500525500076,Atún en agua,QQP-00282,Atún,Lata 140 Gr. Desmenuzado en Agua,Valley Foods,0.286,requiere_revision,10.3,2026/03/13
+7500525500076,Atún en agua,QQP-00289,Atún,Lata 140 Gr. en Hojuelas en Agua,Valley Foods,0.286,requiere_revision,19.92,2026/03/13
+7500525500076,Atún en agua,QQP-00283,Atún,Lata 140 Gr. Desmenuzado en Agua con Aceite,Valley Foods,0.25,requiere_revision,10.3,2026/03/13
+7500525500076,Atún en agua,QQP-00291,Atún,Lata 140 Gr. en Hojuelas en Agua con Aceite,Valley Foods,0.25,requiere_revision,19.92,2026/03/13
+7500525874474,Leche entera,QQP-02236,Leche Ultrapasteurizada,Bolsa 1 Lt. Entera,Valley Foods,0.286,requiere_revision,14.9,2026/03/13
+75007614,Coca cola,QQP-03363,Refresco,Botella 600 Ml.,Coca Cola,0.4,requiere_revision,22.0,2026/03/13
+75007614,Coca cola,QQP-03370,Refresco,Botella 600 Ml. Sin Azúcar,Coca Cola,0.286,requiere_revision,18.0,2026/02/13
+7500810000960,Barritas Piña,QQP-01549,Galletas Dulces,Caja 268 Gr. Barritas con Relleno con Piña,Marinela,0.25,requiere_revision,33.9,2026/03/13
+7500810015810,Panqué con Nuez Pan dulce,QQP-02974,Pastelillos y Pan Dulce Empaquetado,Paquete 280 Gr. Panqué Nuez,Bimbo,0.444,requiere_revision,51.0,2026/03/13
+7500810015810,Panqué con Nuez Pan dulce,QQP-02975,Pastelillos y Pan Dulce Empaquetado,Paquete 280 Gr. Panqué con Pasas,Bimbo,0.3,requiere_revision,51.0,2026/03/13
+7500810016787,Pan Tostado Brioche,QQP-02769,Pan de Caja,Paquete 210 Gr. Tostado. Clásico,Bimbo,0.286,requiere_revision,38.0,2026/03/13
+7500810029183,Pan Blanco,QQP-02778,Pan de Caja,Paquete Grande 620 Gr. Rebanado Blanco,Bimbo,0.286,requiere_revision,53.0,2026/03/13
+7500810029183,Pan Blanco,QQP-02779,Pan de Caja,Paquete Grande 620 Gr. Rebanado Blanco. Rinde,Bimbo,0.25,requiere_revision,41.0,2026/03/13
+7500810050989,Chip's Fuego,QQP-02864,Papas Fritas y Similares,Bolsa 160 Gr. Chip´s. Papas Fritas. Fuego Chile y Limón Ardiente,Barcel,0.25,requiere_revision,58.0,2026/03/13
+7501000111800,Pan Tostado Clásico,QQP-02769,Pan de Caja,Paquete 210 Gr. Tostado. Clásico,Bimbo,0.5,requiere_revision,38.0,2026/03/13
+7501000111800,Pan Tostado Clásico,QQP-01377,Empanizadores,Bolsa 210 Gr. Pan Molido. Clásico,Bimbo,0.25,requiere_revision,31.5,2026/03/13
+7501000111855,Pan Molido Clásico,QQP-01377,Empanizadores,Bolsa 210 Gr. Pan Molido. Clásico,Bimbo,0.429,requiere_revision,31.5,2026/03/13
+7501000111855,Pan Molido Clásico,QQP-02769,Pan de Caja,Paquete 210 Gr. Tostado. Clásico,Bimbo,0.286,requiere_revision,38.0,2026/03/13
+7501000122332,Pan de molde blanco,QQP-02783,Pan de Caja,Paquete Grande 640 Gr. Rebanado Blanco,Bimbo,0.25,requiere_revision,33.5,2026/03/09
+7501000309726,Roles De Canela Con Pasas Bimbo 300GR,QQP-02981,Pastelillos y Pan Dulce Empaquetado,Paquete con 6 Roles de Canela. con Pasas (365 Gr.),Bimbo,0.333,requiere_revision,50.0,2026/03/13
+7501000627646,Galletas maria gamesa,QQP-01566,Galletas Populares,Paquete 144 Gr. Marias,Gamesa,0.286,requiere_revision,21.0,2026/03/13
+7501000658923,Galletas Marias 170 GRS,QQP-01567,Galletas Populares,Paquete 170 Gr. Marias,Gamesa,0.429,requiere_revision,19.0,2026/03/13
+7501000664221,Galletas Saladitas,QQP-01576,Galletas Saladas,Paquete 186 Gr. Saladitas,Gamesa,0.333,requiere_revision,25.0,2026/03/13
+7501002201554,Caperucita queso panela,QQP-03294,Queso Panela,Paquete 400 Gr.,Caperucita,0.6,requiere_revision,104.5,2026/03/13
+7501002201554,Caperucita queso panela,QQP-03258,Queso Manchego,Paquete 400 Gr.,Caperucita,0.333,requiere_revision,130.0,2026/03/13
+7501002202261,queso tipo manchego,QQP-03258,Queso Manchego,Paquete 400 Gr.,Caperucita,0.333,requiere_revision,130.0,2026/03/13
+7501002202292,Queso Panela Caperucita,QQP-03294,Queso Panela,Paquete 400 Gr.,Caperucita,0.6,requiere_revision,104.5,2026/03/13
+7501002202292,Queso Panela Caperucita,QQP-03258,Queso Manchego,Paquete 400 Gr.,Caperucita,0.333,requiere_revision,130.0,2026/03/13
+7501002202452,Queso Manchego rebanado premium,QQP-03266,Queso Manchego,Paquete 400 Gr. Rebanado,Zwan. Premium,0.571,requiere_revision,104.0,2026/03/13
+7501002202452,Queso Manchego rebanado premium,QQP-03261,Queso Manchego,Paquete 400 Gr.,Zwan. Premium,0.429,requiere_revision,126.0,2026/03/11
+7501002202452,Queso Manchego rebanado premium,QQP-03298,Queso Panela,Paquete 400 Gr.,Zwan. Premium,0.25,requiere_revision,90.0,2026/03/13
+7501002202476,Queso Manchego Rebanado,QQP-03258,Queso Manchego,Paquete 400 Gr.,Caperucita,0.333,requiere_revision,130.0,2026/03/13
+7501002203640,Queso panela deslactosado,QQP-03294,Queso Panela,Paquete 400 Gr.,Caperucita,0.333,requiere_revision,104.5,2026/03/13
+7501003105486,Atun en Agua Aleta Amarilla,QQP-00263,Atún,Lata 130 Gr. Aleta Amarilla en Hojuelas en Agua,Herdez,0.5,requiere_revision,19.0,2026/03/13
+7501003105486,Atun en Agua Aleta Amarilla,QQP-00264,Atún,Lata 130 Gr. Aleta Amarilla en Hojuelas en Agua con Aceite,Herdez,0.444,requiere_revision,19.0,2026/03/13
+7501003115386,Fideo Mediano,QQP-02969,Pasta para Sopa,Paquete 220 Gr. Fideo Mediano,Yemina,0.286,requiere_revision,5.58,2026/03/12
+7501003124456,Elote con poblano Herdez,QQP-01370,Elote,Lata 220 Gr. en Grano,Herdez,0.333,requiere_revision,12.9,2026/03/13
+7501003184030,Carlota miel,QQP-02512,Miel de Abeja,Frasco 500 Gr.,Carlota,0.333,requiere_revision,95.0,2026/02/13
+7501003184030,Carlota miel,QQP-02513,Miel de Abeja,Frasco 500 Gr. Natural,Carlota,0.286,requiere_revision,95.0,2026/03/13
+7501003393050,Búfalo clasica,QQP-03548,Salsa Picante y Similares,Botella 150 Gr. Clásica,Búfalo,0.286,requiere_revision,15.0,2026/03/13
+7501003789792,Atun en Agua,QQP-00263,Atún,Lata 130 Gr. Aleta Amarilla en Hojuelas en Agua,Herdez,0.25,requiere_revision,19.0,2026/03/13
+7501005102667,Soya + jugo de naranja,QQP-02038,Jugo de Fruta,Caja 946 Ml. Soya con Naranja,Ades,0.429,requiere_revision,30.5,2026/03/13
+7501005102698,Soya con jugo de fruta,QQP-02038,Jugo de Fruta,Caja 946 Ml. Soya con Naranja,Ades,0.429,requiere_revision,30.5,2026/03/13
+7501005109086,Ades con Jugo de Soya,QQP-02038,Jugo de Fruta,Caja 946 Ml. Soya con Naranja,Ades,0.429,requiere_revision,30.5,2026/03/13
+7501005110426,Fécula de maíz,QQP-01700,Harina de Maíz,Caja 425 Gr. Fécula. Natural,Maizena,0.286,requiere_revision,63.9,2026/03/13
+7501005180832,Caldo de pollo,QQP-01035,Concentrado de Pollo,Frasco 450 Gr. Caldo,Knorr,0.286,requiere_revision,95.0,2026/03/13
+7501006584332,Salsa de tomate Catsup,QQP-03540,Salsa Catsup,Botella 370 Gr. Plástico,Del Monte,0.25,requiere_revision,21.5,2026/03/13
+7501008042137,Corn flakes empanizador granulado,QQP-01378,Empanizadores,Caja 350 Gr. Granulado. Crunchy. Corn Flakes,Kellogg´s,0.3,requiere_revision,53.0,2026/03/13
+7501010409096,Sal Yodada Fluorurada,QQP-03487,Sal Molida de Mesa,Bote 1 Kg. Yodada Fluorurada,Great Value,0.3,requiere_revision,25.0,2026/03/13
+7501011133938,Papas Sabritas Limon,QQP-02869,Papas Fritas y Similares,Bolsa 170 Gr. Fritos. Sal y Limón,Sabritas,0.333,requiere_revision,42.0,2026/03/13
+7501011181755,Be Light Limón,QQP-00082,Agua Sin Gas,Botella 1.5 Lt. Limon,Be-light,0.333,requiere_revision,18.0,2026/03/13
+7501013106930,Jugo de Naranja Sin Pulpa,QQP-02039,Jugo de Fruta,Caja 960 Ml. Naranja,Jumex,0.25,requiere_revision,30.0,2026/03/13
+7501013106947,Jugo de naranja,QQP-02039,Jugo de Fruta,Caja 960 Ml. Naranja,Jumex,0.333,requiere_revision,30.0,2026/03/13
+7501013106954,Jugo Verde Jumex,QQP-02039,Jugo de Fruta,Caja 960 Ml. Naranja,Jumex,0.286,requiere_revision,30.0,2026/03/13
+7501013610017,Mantequilla Con Sal,QQP-02419,Mantequilla,Barra 90 Gr. Sin Sal,Gloria,0.286,requiere_revision,29.9,2026/03/13
+7501013610024,Mantequilla Gloria sin sal,QQP-02419,Mantequilla,Barra 90 Gr. Sin Sal,Gloria,0.571,requiere_revision,29.9,2026/03/13
+7501013610161,Mantequilla Sin Sal,QQP-02415,Mantequilla,Barra 225 Gr. Sin Sal,Gloria,0.429,requiere_revision,68.9,2026/03/13
+7501017003068,Vinagre blanco La Costeña,QQP-04098,Vinagre,Botella 1.05 Lt. Blanco. Alcohol Cana,La Costeña,0.375,requiere_revision,15.0,2026/03/13
+7501017003334,Piña en almíbar rebanadas,QQP-03044,Piña en Almíbar,Lata 800 Gr. Rebanada,La Costeña,0.286,requiere_revision,76.0,2026/03/13
+7501017003334,Piña en almíbar rebanadas,QQP-03046,Piña en Almíbar,Lata 800 Gr. Trocitos,La Costeña,0.286,requiere_revision,72.0,2026/03/13
+7501017003358,Coctél de Furtas en Almíbar la Costeña,QQP-00958,Coctel de Frutas en Almíbar,Lata 850 Gr.,La Costeña,0.429,requiere_revision,80.0,2026/03/13
+7501017003396,Piña en Almíbar Trocitos,QQP-03046,Piña en Almíbar,Lata 800 Gr. Trocitos,La Costeña,0.5,requiere_revision,72.0,2026/03/13
+7501017003396,Piña en Almíbar Trocitos,QQP-03044,Piña en Almíbar,Lata 800 Gr. Rebanada,La Costeña,0.286,requiere_revision,76.0,2026/03/13
+7501017003488,Peras en Almíbar la Costeña,QQP-01350,Duraznos en Almíbar,Lata 820 Gr. Mitades,La Costeña,0.286,requiere_revision,60.0,2026/03/13
+7501017004270,Frijoles Bayos Refritos,QQP-01537,Frijoles,Lata 580 Gr. Refritos. Negro,La Costeña,0.286,requiere_revision,17.9,2026/03/13
+7501017005369,La costeña Mole,QQP-02535,Mole Rojo en Pasta,Vaso 235 Gr.,La Costeña,0.286,requiere_revision,45.0,2026/03/13
+7501017005765,Jalapeños en escabeche La Costeña,QQP-00863,Chiles,Lata 220 Gr. Jalapeños Rajas,La Costeña,0.286,requiere_revision,20.0,2026/03/13
+7501017040506,Mayonesa La Costeña con jugo de limón,QQP-02469,Mayonesa,Frasco 385 Gr. con Jugo de Limones,La Costeña,0.375,requiere_revision,39.9,2026/03/13
+7501017043712,Salsa Catsup,QQP-03538,Salsa Catsup,Botella 320 Gr. Plástico,La Costeña,0.333,requiere_revision,18.0,2026/03/13
+7501017044245,Mermelada de fresa,QQP-02489,Mermelada,Frasco 440 Gr. Fresa,La Costeña,0.333,requiere_revision,36.5,2026/03/13
+7501017051366,salsa catsup,QQP-03536,Salsa Catsup,Botella 220 Gr. Plástico,La Costeña,0.333,requiere_revision,18.5,2026/03/13
+7501017051496,Chiles toreados La Costeña,QQP-00860,Chiles,Lata 220 Gr. Chipotles Adobados,La Costeña,0.286,requiere_revision,29.9,2026/03/13
+7501017051496,Chiles toreados La Costeña,QQP-00861,Chiles,Lata 220 Gr. Jalapeño. Enteros,La Costeña,0.286,requiere_revision,14.75,2026/03/13
+7501017051496,Chiles toreados La Costeña,QQP-00863,Chiles,Lata 220 Gr. Jalapeños Rajas,La Costeña,0.286,requiere_revision,20.0,2026/03/13
+7501017051496,Chiles toreados La Costeña,QQP-00865,Chiles,Lata 220 Gr. Serrano. Enteros,La Costeña,0.286,requiere_revision,18.0,2026/03/13
+7501017660391,Salsa picante de chile jalapeño,QQP-03546,Salsa Picante y Similares,Botella 120 Ml.,El Yucateco,0.25,requiere_revision,20.5,2026/03/12
+7501018310028,La Moderna Fideo 1,QQP-02947,Pasta para Sopa,Paquete 200 Gr. Fideo 1,La Moderna,0.429,requiere_revision,6.88,2026/03/12
+7501018310028,La Moderna Fideo 1,QQP-02945,Pasta para Sopa,Paquete 200 Gr. Fideo 0,La Moderna,0.25,requiere_revision,9.9,2026/03/11
+7501018310028,La Moderna Fideo 1,QQP-02948,Pasta para Sopa,Paquete 200 Gr. Fideo 2,La Moderna,0.25,requiere_revision,11.5,2026/03/13
+7501018310097,La Moderna pasta de Macarrón,QQP-02963,Pasta para Sopa,Paquete 200 Gr. Spaghetti,La Moderna,0.286,requiere_revision,10.0,2026/03/13
+7501018310097,La Moderna pasta de Macarrón,QQP-02938,Pasta para Sopa,Paquete 200 Gr. Codo 2,La Moderna,0.25,requiere_revision,8.0,2026/03/11
+7501018310097,La Moderna pasta de Macarrón,QQP-02945,Pasta para Sopa,Paquete 200 Gr. Fideo 0,La Moderna,0.25,requiere_revision,9.9,2026/03/11
+7501018310097,La Moderna pasta de Macarrón,QQP-02947,Pasta para Sopa,Paquete 200 Gr. Fideo 1,La Moderna,0.25,requiere_revision,6.88,2026/03/12
+7501018310097,La Moderna pasta de Macarrón,QQP-02948,Pasta para Sopa,Paquete 200 Gr. Fideo 2,La Moderna,0.25,requiere_revision,11.5,2026/03/13
+7501018310103,spaghetti la moderna,QQP-02963,Pasta para Sopa,Paquete 200 Gr. Spaghetti,La Moderna,0.333,requiere_revision,10.0,2026/03/13
+7501018310523,Pasta de codo,QQP-02938,Pasta para Sopa,Paquete 200 Gr. Codo 2,La Moderna,0.286,requiere_revision,8.0,2026/03/11
+7501018310554,Sopa caracol 1,QQP-02947,Pasta para Sopa,Paquete 200 Gr. Fideo 1,La Moderna,0.25,requiere_revision,6.88,2026/03/12
+7501018312138,La Moderna Spaghetti con salsa de tomate,QQP-02963,Pasta para Sopa,Paquete 200 Gr. Spaghetti,La Moderna,0.25,requiere_revision,10.0,2026/03/13
+7501020512267,Queso tipo manchego rebanado con leche,QQP-03264,Queso Manchego,Paquete 400 Gr. Rebanado,Lala,0.375,requiere_revision,110.0,2026/03/13
+7501020512267,Queso tipo manchego rebanado con leche,QQP-03259,Queso Manchego,Paquete 400 Gr.,Lala,0.25,requiere_revision,110.0,2026/03/13
+7501020512281,Queso Chihuahua LALA,QQP-03235,Queso Chihuahua,Paquete 400 Gr.,Lala,0.6,requiere_revision,108.5,2026/03/13
+7501020512281,Queso Chihuahua LALA,QQP-03259,Queso Manchego,Paquete 400 Gr.,Lala,0.333,requiere_revision,110.0,2026/03/13
+7501020512281,Queso Chihuahua LALA,QQP-03283,Queso Oaxaca,Paquete 400 Gr.,Lala,0.333,requiere_revision,94.0,2026/03/13
+7501020512281,Queso Chihuahua LALA,QQP-03297,Queso Panela,Paquete 400 Gr.,Lala,0.333,requiere_revision,82.0,2026/03/13
+7501020512281,Queso Chihuahua LALA,QQP-03264,Queso Manchego,Paquete 400 Gr. Rebanado,Lala,0.286,requiere_revision,110.0,2026/03/13
+7501020514537,Queso Panela reducido en grasa,QQP-03297,Queso Panela,Paquete 400 Gr.,Lala,0.286,requiere_revision,82.0,2026/03/13
+7501020514933,Queso Oaxaca Light,QQP-03283,Queso Oaxaca,Paquete 400 Gr.,Lala,0.333,requiere_revision,94.0,2026/03/13
+7501020515343,Leche Lala entera,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.5,requiere_revision,32.0,2026/03/13
+7501020515343,Leche Lala entera,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.5,requiere_revision,30.0,2026/03/13
+7501020515343,Leche Lala entera,QQP-02232,Leche Pasteurizada,Caja 1 Lt. Semidescremada. Deslactosada,Lala,0.25,requiere_revision,32.15,2026/03/13
+7501020515398,Leche Lala Deslactosada,QQP-02232,Leche Pasteurizada,Caja 1 Lt. Semidescremada. Deslactosada,Lala,0.429,requiere_revision,32.15,2026/03/13
+7501020515398,Leche Lala Deslactosada,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.286,requiere_revision,32.0,2026/03/13
+7501020515398,Leche Lala Deslactosada,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.286,requiere_revision,30.0,2026/03/13
+7501020515879,LALA Deslactosada light,QQP-02232,Leche Pasteurizada,Caja 1 Lt. Semidescremada. Deslactosada,Lala,0.25,requiere_revision,32.15,2026/03/13
+7501020520088,leche entera 100% Leche de vaca,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.25,requiere_revision,32.0,2026/03/13
+7501020520088,leche entera 100% Leche de vaca,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.25,requiere_revision,30.0,2026/03/13
+7501020520101,Baja en Grasa Leche de vaca,QQP-02230,Leche Pasteurizada,Caja 1 Lt. Parcialmente Descremada. Baja en Grasa. Light,Lala,0.273,requiere_revision,31.5,2026/03/13
+7501020520101,Baja en Grasa Leche de vaca,QQP-02260,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Light. Baja en Grasa,Lala,0.273,requiere_revision,35.0,2026/03/13
+7501020526066,LALA entera,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.333,requiere_revision,32.0,2026/03/13
+7501020526066,LALA entera,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.333,requiere_revision,30.0,2026/03/13
+7501020530285,leche entera,QQP-02229,Leche Pasteurizada,Caja 1 Lt. Entera,Monarca,0.333,requiere_revision,27.25,2026/03/06
+7501020536874,leche Monarca descremada,QQP-02229,Leche Pasteurizada,Caja 1 Lt. Entera,Monarca,0.286,requiere_revision,27.25,2026/03/06
+7501020537383,Queso procesado americano,QQP-03230,Queso Americano,Paquete 144 Gr. 8 Rebanadas,Lala,0.25,requiere_revision,35.0,2026/03/13
+7501020537390,Queso Manchego LALA,QQP-03230,Queso Americano,Paquete 144 Gr. 8 Rebanadas,Lala,0.25,requiere_revision,35.0,2026/03/13
+7501020537543,Queso tipo americano light 8 rebanadas,QQP-03230,Queso Americano,Paquete 144 Gr. 8 Rebanadas,Lala,0.444,requiere_revision,35.0,2026/03/13
+7501020537970,Mantequilla Sin Sal,QQP-02421,Mantequilla,Barra 90 Gr. Sin Sal,Lala,0.429,requiere_revision,24.9,2026/03/13
+7501020539325,Yoghurt Lala Light sabor fresa,QQP-04126,Yoghurt,Envase 220 Gr. Bebible. Fresa,Lala,0.375,requiere_revision,14.0,2026/03/13
+7501020539615,Borden Leche Light,QQP-02238,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Borden,0.286,requiere_revision,31.0,2026/03/13
+7501020539622,Leche deslactosada Borden,QQP-02238,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Borden,0.286,requiere_revision,31.0,2026/03/13
+7501020539653,Leche Lala frutas sabor mango,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.25,requiere_revision,32.0,2026/03/13
+7501020539653,Leche Lala frutas sabor mango,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.25,requiere_revision,30.0,2026/03/13
+7501020539714,Leche entera Borden,QQP-02238,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Borden,0.5,requiere_revision,31.0,2026/03/13
+7501020546897,Manchego rebanado,QQP-03264,Queso Manchego,Paquete 400 Gr. Rebanado,Lala,0.333,requiere_revision,110.0,2026/03/13
+7501020548549,Leche Lala sin lactosa reducida en grasa,QQP-02264,Leche Ultrapasteurizada,Caja 1 Lt. Semidescremada. Reducida en Grasa,Lala,0.4,requiere_revision,35.0,2026/03/13
+7501020548648,Leche fibra deslactosada LALA,QQP-02232,Leche Pasteurizada,Caja 1 Lt. Semidescremada. Deslactosada,Lala,0.375,requiere_revision,32.15,2026/03/13
+7501020548648,Leche fibra deslactosada LALA,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.25,requiere_revision,32.0,2026/03/13
+7501020548648,Leche fibra deslactosada LALA,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.25,requiere_revision,30.0,2026/03/13
+7501020550955,leche Lala sin lactosa light,QQP-02230,Leche Pasteurizada,Caja 1 Lt. Parcialmente Descremada. Baja en Grasa. Light,Lala,0.25,requiere_revision,31.5,2026/03/13
+7501020550955,leche Lala sin lactosa light,QQP-02260,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Light. Baja en Grasa,Lala,0.25,requiere_revision,35.0,2026/03/13
+7501020555301,Leche Entera Lala 100 sin Lactosa,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.333,requiere_revision,32.0,2026/03/13
+7501020555301,Leche Entera Lala 100 sin Lactosa,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.333,requiere_revision,30.0,2026/03/13
+7501020560688,Lala Organica Deslactosada,QQP-02232,Leche Pasteurizada,Caja 1 Lt. Semidescremada. Deslactosada,Lala,0.25,requiere_revision,32.15,2026/03/13
+7501020560909,Griego natural endulzado,QQP-04117,Yoghurt,Bote 900 Gr. Natural Endulzado. Griego,Lala,0.375,requiere_revision,80.0,2026/03/13
+7501020561142,Yoghurt bebible con durazno,QQP-04126,Yoghurt,Envase 220 Gr. Bebible. Fresa,Lala,0.25,requiere_revision,14.0,2026/03/13
+7501020561159,Lala fresa - Yoghurt bebible con fresa,QQP-04126,Yoghurt,Envase 220 Gr. Bebible. Fresa,Lala,0.571,requiere_revision,14.0,2026/03/13
+7501020561937,crema reducida en grasa,QQP-01063,Crema,Bote 417 Gr. Reducida en Grasa,Lala,0.429,requiere_revision,46.9,2026/03/13
+7501020563702,ZERO yoghurt natural endulzado,QQP-04117,Yoghurt,Bote 900 Gr. Natural Endulzado. Griego,Lala,0.333,requiere_revision,80.0,2026/03/13
+7501020563771,Yoghurt Lala natural endulzado,QQP-04117,Yoghurt,Bote 900 Gr. Natural Endulzado. Griego,Lala,0.5,requiere_revision,80.0,2026/03/13
+7501020563771,Yoghurt Lala natural endulzado,QQP-04114,Yoghurt,Bote 900 Gr. Fresa,Lala,0.25,requiere_revision,40.0,2026/03/13
+7501020564082,Imitación queso americano,QQP-03227,Queso Americano,Paquete 140 Gr. 8 Rebanadas. Imitación Queso Americano,Nutri,0.375,requiere_revision,22.9,2026/03/13
+7501020565263,Queso Panela Reducido en Grasa,QQP-03293,Queso Panela,Bote 400 Gr.,Los Volcanes,0.25,requiere_revision,86.0,2026/03/13
+7501020565911,Lala deslactosada,QQP-02232,Leche Pasteurizada,Caja 1 Lt. Semidescremada. Deslactosada,Lala,0.286,requiere_revision,32.15,2026/03/13
+7501020565928,Leche descremada deslactosada,QQP-02232,Leche Pasteurizada,Caja 1 Lt. Semidescremada. Deslactosada,Lala,0.25,requiere_revision,32.15,2026/03/13
+7501020565935,Leche entera ultrapasteurizada adicionada con vitaminas A y D,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.333,requiere_revision,30.0,2026/03/13
+7501020566031,Lala entera,QQP-02228,Leche Pasteurizada,Caja 1 Lt. Entera,Lala,0.333,requiere_revision,32.0,2026/03/13
+7501020566031,Lala entera,QQP-02243,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Lala,0.333,requiere_revision,30.0,2026/03/13
+7501020569407,yogurt bebible sabor fresa,QQP-04126,Yoghurt,Envase 220 Gr. Bebible. Fresa,Lala,0.25,requiere_revision,14.0,2026/03/13
+7501023318040,Chiles Chipotles Adobados,QQP-00857,Chiles,Lata 215 Gr. Chipotles Adobados,San Marcos,0.429,requiere_revision,32.9,2026/03/13
+7501023318507,Chipotles San Marcos,QQP-00857,Chiles,Lata 215 Gr. Chipotles Adobados,San Marcos,0.429,requiere_revision,32.9,2026/03/13
+7501023318507,Chipotles San Marcos,QQP-00858,Chiles,Lata 215 Gr. Jalapeños Rajas,San Marcos,0.25,requiere_revision,17.0,2026/03/13
+7501023318507,Chipotles San Marcos,QQP-00859,Chiles,Lata 215 Gr. Jalapeños en Escabeche,San Marcos,0.25,requiere_revision,15.0,2026/03/13
+7501026005671,Jabón Rosa,QQP-01844,Jabón de Pasta,Barra 400 Gr. con Envoltura. (Rosa),Zote,0.25,requiere_revision,24.9,2026/03/13
+7501030418559,polvorones marinela,QQP-01559,Galletas Dulces,Paquete 310 Gr. Polvorones,Marinela,0.333,requiere_revision,30.0,2026/03/13
+7501030491057,Triki-Trakes,QQP-01555,Galletas Dulces,Paquete 170 Gr. Triki Trakes,Marinela,0.286,requiere_revision,34.0,2026/03/13
+7501031310098,pepsi 3,QQP-03357,Refresco,Botella 3 Lt. No Retornable,Pepsi,0.333,requiere_revision,49.0,2026/03/13
+7501031311309,Pepsi,QQP-03373,Refresco,Lata 355 Ml.,Pepsi,0.25,requiere_revision,19.0,2026/03/13
+7501032398354,Danone con Fresa,QQP-04121,Yoghurt,Bote 900 Gr. Sabor Fresa. Sin Trozos,Danone,0.25,requiere_revision,43.5,2026/03/13
+7501032398408,Danone Yoghurt de Durazno sin trozos,QQP-04121,Yoghurt,Bote 900 Gr. Sabor Fresa. Sin Trozos,Danone,0.444,requiere_revision,43.5,2026/03/13
+7501032398408,Danone Yoghurt de Durazno sin trozos,QQP-04116,Yoghurt,Bote 900 Gr. Frutas Selectas. con Trozos de Fresa,Danone,0.273,requiere_revision,50.0,2026/03/13
+7501032398514,Danone fresa y mora,QQP-04125,Yoghurt,Envase 220 Gr. Bebible. Fresa,Danone,0.25,requiere_revision,14.5,2026/03/13
+7501032398576,Danone Fresa,QQP-04125,Yoghurt,Envase 220 Gr. Bebible. Fresa,Danone,0.286,requiere_revision,14.5,2026/03/13
+7501032600181,Mantequilla Sin Sal,QQP-02418,Mantequilla,Barra 90 Gr. Sin Sal,Chipilo,0.429,requiere_revision,26.5,2026/03/13
+7501035025929,Salsa picante De la Viuda,QQP-03549,Salsa Picante y Similares,Botella 150 Ml.,De la Viuda,0.5,requiere_revision,28.5,2026/03/13
+7501035907508,Speed stick fresh 60g,QQP-01236,Desodorante,Barra 60 Gr. Fresh. para Caballero,Speed Stick,0.333,requiere_revision,71.9,2026/03/13
+7501039120477,Aceite de soya Nutrioli,QQP-00030,Aceite,Botella 946 Ml. Soya,Nutrioli,0.6,requiere_revision,42.0,2026/03/13
+7501039121610,Aceite de soya,QQP-00017,Aceite,Botella 850 Ml. Soya,Nutrioli,0.4,requiere_revision,43.5,2026/03/13
+7501039126745,Aceite Nutrioli DHA,QQP-00017,Aceite,Botella 850 Ml. Soya,Nutrioli,0.333,requiere_revision,43.5,2026/03/13
+7501040000300,Jamón de Pavo San Rafael,QQP-01938,Jamón,Paquete 300 Gr. de Pavo Real,San Rafael,0.571,requiere_revision,134.0,2026/03/13
+7501040000300,Jamón de Pavo San Rafael,QQP-01939,Jamón,Paquete 300 Gr. de Pierna Real,San Rafael,0.375,requiere_revision,101.0,2026/03/13
+7501040005831,Jamón de pavo virginia,QQP-01937,Jamón,Paquete 290 Gr. de Pavo. Virginia,Fud,0.5,requiere_revision,60.0,2026/03/13
+7501040005831,Jamón de pavo virginia,QQP-01936,Jamón,Paquete 290 Gr. de Pavo y Cerdo. Virginia,Fud,0.429,requiere_revision,58.5,2026/03/13
+7501040006401,Jamon de Pavo Virginia,QQP-01937,Jamón,Paquete 290 Gr. de Pavo. Virginia,Fud,0.5,requiere_revision,60.0,2026/03/13
+7501040006401,Jamon de Pavo Virginia,QQP-01936,Jamón,Paquete 290 Gr. de Pavo y Cerdo. Virginia,Fud,0.429,requiere_revision,58.5,2026/03/13
+7501040007736,San Rafael,QQP-03521,Salchicha,Paquete 500 Gr. de Pavo,San Rafael,0.333,requiere_revision,61.9,2026/03/13
+7501040007736,San Rafael,QQP-03522,Salchicha,Paquete 500 Gr. de Pavo. Botanera,San Rafael,0.286,requiere_revision,126.5,2026/03/13
+7501040009839,Salchichas con pavo Fud,QQP-03515,Salchicha,Paquete 500 Gr. con Pavo,Fud,0.333,requiere_revision,54.5,2026/03/13
+7501040009839,Salchichas con pavo Fud,QQP-03518,Salchicha,Paquete 500 Gr. con Pavo. Cocktail,Fud,0.286,requiere_revision,86.9,2026/03/13
+7501040009839,Salchichas con pavo Fud,QQP-03520,Salchicha,Paquete 500 Gr. con Pavo. para Hot Dog.,Fud,0.25,requiere_revision,50.0,2026/03/13
+7501040080012,Queso estilo Panela La Villita,QQP-03299,Queso Panela,Paquete 400 Gr. (2 Pack),La Villita,0.375,requiere_revision,75.0,2026/03/13
+7501040080012,Queso estilo Panela La Villita,QQP-03282,Queso Oaxaca,Paquete 400 Gr.,La Villita,0.286,requiere_revision,101.5,2026/03/13
+7501040080012,Queso estilo Panela La Villita,QQP-03263,Queso Manchego,Paquete 400 Gr. Rebanado,La Villita,0.25,requiere_revision,106.25,2026/03/13
+7501040080340,Queso tipo Manchego Noche Buena,QQP-03260,Queso Manchego,Paquete 400 Gr.,Noche Buena,0.571,requiere_revision,115.0,2026/03/13
+7501040080340,Queso tipo Manchego Noche Buena,QQP-03265,Queso Manchego,Paquete 400 Gr. Rebanado,Noche Buena,0.5,requiere_revision,110.0,2026/03/13
+7501040080340,Queso tipo Manchego Noche Buena,QQP-03267,Queso Manchego,Paquete 400 Gr. Triangular,Noche Buena,0.5,requiere_revision,136.0,2026/03/13
+7501040081101,Queso estilo panela La villita,QQP-03299,Queso Panela,Paquete 400 Gr. (2 Pack),La Villita,0.375,requiere_revision,75.0,2026/03/13
+7501040081101,Queso estilo panela La villita,QQP-03282,Queso Oaxaca,Paquete 400 Gr.,La Villita,0.286,requiere_revision,101.5,2026/03/13
+7501040081101,Queso estilo panela La villita,QQP-03263,Queso Manchego,Paquete 400 Gr. Rebanado,La Villita,0.25,requiere_revision,106.25,2026/03/13
+7501040081422,Queso tipo Manchego rebanado,QQP-03263,Queso Manchego,Paquete 400 Gr. Rebanado,La Villita,0.429,requiere_revision,106.25,2026/03/13
+7501040081477,Queso Americano La Villita,QQP-03232,Queso Americano,Paquete 175 Gr. 10 Rebanadas. Imitación Queso Americano,La Villita,0.375,requiere_revision,30.0,2026/03/13
+7501040082139,Margarina con sal La Villita,QQP-02453,Margarina,Barra 90 Gr. Sin Sal,La Villita,0.429,requiere_revision,14.9,2026/03/13
+7501040082146,Margarina sin sal La villita,QQP-02453,Margarina,Barra 90 Gr. Sin Sal,La Villita,0.571,requiere_revision,14.9,2026/03/13
+7501040083136,Queso manchego rebanadas rectangulares,QQP-03263,Queso Manchego,Paquete 400 Gr. Rebanado,La Villita,0.25,requiere_revision,106.25,2026/03/13
+7501040083501,Queso Mozzarella Rebanado Fud,QQP-03223,Queso Americano,Paquete 140 Gr.,Fud,0.286,requiere_revision,34.5,2026/03/13
+7501040083518,Queso Gouda rebanado fud,QQP-03223,Queso Americano,Paquete 140 Gr.,Fud,0.286,requiere_revision,34.5,2026/03/13
+7501040083624,Queso Panela Reducido En Grasa,QQP-03296,Queso Panela,Paquete 400 Gr.,Fud,0.286,requiere_revision,94.9,2026/03/13
+7501040083709,Queso panela en bloque,QQP-03296,Queso Panela,Paquete 400 Gr.,Fud,0.333,requiere_revision,94.9,2026/03/13
+7501040090011,Yoplait yoghurt natural con endulzantes y probióticos,QQP-04137,Yoghurt,Vaso 145 Gr. Natural. Bajo en Grasa. Griego,Yoplait,0.273,requiere_revision,18.0,2026/03/13
+7501040090158,Yoplait Yoghurt con Frutas Rojas,QQP-04109,Yoghurt,Bote 1 Kg. Fresa,Yoplait,0.25,requiere_revision,50.0,2026/03/13
+7501040091476,Yoghurt Griego Sabor Natural,QQP-04123,Yoghurt,Bote de 1 Kg. Natural. Bajo en Grasa. Griego,Yoplait,0.333,requiere_revision,101.5,2026/03/13
+7501040091476,Yoghurt Griego Sabor Natural,QQP-04110,Yoghurt,Bote 1 Kg. Natural. Bajo en Grasa. 0% Azúcar Añadida. Griego,Yoplait,0.25,requiere_revision,95.5,2026/03/13
+7501040093920,Yoplait Deslactosado Fresa,QQP-04128,Yoghurt,Envase 242 Gr. Bebible. Fresa,Yoplait,0.25,requiere_revision,13.5,2026/03/13
+7501040095535,Yoplait Griego Natural,QQP-04137,Yoghurt,Vaso 145 Gr. Natural. Bajo en Grasa. Griego,Yoplait,0.333,requiere_revision,18.0,2026/03/13
+7501040095535,Yoplait Griego Natural,QQP-04136,Yoghurt,Vaso 145 Gr. Natural. Bajo en Grasa. 0% Azúcar Añadida. Griego,Yoplait,0.25,requiere_revision,19.0,2026/03/13
+7501041415837,Atún aleta amarilla en hojuelas en agua,QQP-00275,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua,Tuny,0.556,requiere_revision,18.0,2026/03/13
+7501041415837,Atún aleta amarilla en hojuelas en agua,QQP-00276,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua con Aceite,Tuny,0.5,requiere_revision,18.0,2026/03/13
+7501041415851,Lomo de Atún aleta amarilla solido en agua,QQP-00275,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua,Tuny,0.364,requiere_revision,18.0,2026/03/13
+7501041415851,Lomo de Atún aleta amarilla solido en agua,QQP-00276,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua con Aceite,Tuny,0.333,requiere_revision,18.0,2026/03/13
+7501041415868,Lomo de atún aleta amarilla solido en aceite,QQP-00276,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua con Aceite,Tuny,0.333,requiere_revision,18.0,2026/03/13
+7501041415868,Lomo de atún aleta amarilla solido en aceite,QQP-00275,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua,Tuny,0.25,requiere_revision,18.0,2026/03/13
+7501041419071,Atún Aleta Amarilla en Aceite Tuny Standard,QQP-00276,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua con Aceite,Tuny,0.455,requiere_revision,18.0,2026/03/13
+7501041419071,Atún Aleta Amarilla en Aceite Tuny Standard,QQP-00275,Atún,Lata 140 Gr. (Clásico). Aleta Amarilla en Hojuelas en Agua,Tuny,0.364,requiere_revision,18.0,2026/03/13
+7501045401362,Dolores Premium Lomo sólido de atún aleta amarilla en aceite,QQP-00279,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua con Aceite,Dolores,0.417,requiere_revision,20.5,2026/03/13
+7501045401362,Dolores Premium Lomo sólido de atún aleta amarilla en aceite,QQP-00278,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua,Dolores,0.333,requiere_revision,20.75,2026/03/13
+7501045401423,Atún aleta amarilla en hojuelas en agua con aceite,QQP-00279,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua con Aceite,Dolores,0.667,requiere_revision,20.5,2026/03/13
+7501045401423,Atún aleta amarilla en hojuelas en agua con aceite,QQP-00278,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua,Dolores,0.556,requiere_revision,20.75,2026/03/13
+7501045401829,Ensalada de Atun Con Verduras,QQP-00255,Atún,Bolsa 110 Gr. Ensalada,Dolores,0.333,requiere_revision,18.0,2026/03/13
+7501045402406,Atun aleta amarilla solido en aceite de oliva,QQP-00279,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua con Aceite,Dolores,0.364,requiere_revision,20.5,2026/03/13
+7501045402406,Atun aleta amarilla solido en aceite de oliva,QQP-00278,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua,Dolores,0.273,requiere_revision,20.75,2026/03/13
+7501045403007,Atún aleta amarilla en agua,QQP-00278,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua,Dolores,0.5,requiere_revision,20.75,2026/03/13
+7501045403007,Atún aleta amarilla en agua,QQP-00279,Atún,Lata 140 Gr. Aleta Amarilla en Hojuelas en Agua con Aceite,Dolores,0.444,requiere_revision,20.5,2026/03/13
+7501045403403,Atún Dolores en Agua Extra Proteína en Sobre 74g,QQP-00256,Atún,Bolsa 74 Gr. Aleta Amarilla en Trozos en Agua,Dolores,0.25,requiere_revision,18.9,2026/03/13
+7501045403915,Atún en agua,QQP-00273,Atún,Lata 133 Gr. Aleta Amarilla en Hojuelas en Agua,Dolores,0.25,requiere_revision,19.19,2026/03/12
+7501045404288,Atún en hojuelas en agua con aceite,QQP-00272,Atún,Lata 130 Gr. en Hojuelas en Agua con Aceite,Mazatún,0.571,requiere_revision,17.9,2026/03/13
+7501045404288,Atún en hojuelas en agua con aceite,QQP-00271,Atún,Lata 130 Gr. en Hojuelas en Agua,Mazatún,0.429,requiere_revision,17.9,2026/03/13
+7501047200628,Alubia chica La Merced,QQP-00152,Alubia,Bolsa 500 Gr. Chica,La Merced,0.6,requiere_revision,25.5,2026/03/13
+7501047200734,Haba Pelada La Merced,QQP-01686,Haba,Bolsa 500 Gr. Pelada,La Merced,0.6,requiere_revision,69.0,2026/03/13
+7501047203445,Frijol negro Quéretaro La Merced,QQP-01522,Frijol,Bolsa 907 Gr. Negro. Querétaro,La Merced,0.667,requiere_revision,30.0,2026/03/13
+7501047203445,Frijol negro Quéretaro La Merced,QQP-01526,Frijol,Bolsa 907 Gr. Pinto,La Merced,0.286,requiere_revision,30.0,2026/03/13
+7501047700807,Arroz super extra La Merced,QQP-00223,Arroz,Bolsa 907 Gr. Super Extra,La Merced,0.667,requiere_revision,20.0,2026/03/13
+7501047902522,"Floretes de Brócoli, La Huerta",QQP-01451,Floretes de Brócoli,Bolsa 500 Gr. Hortalizas Congeladas,La Huerta,0.429,requiere_revision,50.25,2026/03/13
+7501047902577,"Elote en Grano, La Huerta",QQP-01665,Granos de Elote,Bolsa 500 Gr. Hortalizas Congeladas,La Huerta,0.25,requiere_revision,56.9,2026/03/13
+7501047903000,Combinado Primavera,QQP-01007,Combinado Primavera,Bolsa 500 Gr. Hortalizas Congeladas,La Huerta,0.286,requiere_revision,49.0,2026/03/13
+7501047903017,Mezcla California,QQP-02500,Mezcla California,Bolsa 500 Gr. Hortalizas Congeladas,La Huerta,0.286,requiere_revision,42.0,2026/03/13
+7501047903093,Mezcla Campesina,QQP-02501,Mezcla Campesina,Bolsa 500 Gr. Hortalizas Congeladas,La Huerta,0.286,requiere_revision,46.0,2026/03/13
+7501047903116,Guarnicion de Verduras,QQP-01682,Guarnición de Verduras,Bolsa 500 Gr. Hortalizas Congeladas,La Huerta,0.286,requiere_revision,35.0,2026/03/13
+7501048100170,Aceite de maíz Cristal,QQP-00005,Aceite,Botella 1 Lt. Vegetal,Cristal,0.333,requiere_revision,39.5,2026/03/13
+7501048102501,Aceite Kártamus,QQP-00027,Aceite,Botella 900 Ml. Vegetal,Kartamus,0.4,requiere_revision,32.9,2026/03/13
+7501048103010,Aceite puro de canola,QQP-00028,Aceite,Botella 946 Ml. Canola,Canoil,0.333,requiere_revision,39.5,2026/03/13
+7501052420165,Frijoles Negros Refritos,QQP-01534,Frijoles,Bolsa 430 Gr. Refritos. Bayos,La Sierra,0.286,requiere_revision,15.0,2026/03/13
+7501052420196,Frijoles Bayos refritos,QQP-01532,Frijoles,Bolsa 400 Gr. Refritos. Bayos,La Sierra,0.5,requiere_revision,17.425,2026/03/13
+7501052421186,Frijoles Bayos Refritos,QQP-01532,Frijoles,Bolsa 400 Gr. Refritos. Bayos,La Sierra,0.5,requiere_revision,17.425,2026/03/13
+7501052421193,Frijoles Peruanos Refritos,QQP-01532,Frijoles,Bolsa 400 Gr. Refritos. Bayos,La Sierra,0.286,requiere_revision,17.425,2026/03/13
+7501052421254,Frijoles Peruanos Refritos,QQP-01534,Frijoles,Bolsa 430 Gr. Refritos. Bayos,La Sierra,0.286,requiere_revision,15.0,2026/03/13
+7501052421278,Frijoles bayos son grasa,QQP-01534,Frijoles,Bolsa 430 Gr. Refritos. Bayos,La Sierra,0.25,requiere_revision,15.0,2026/03/13
+7501052421407,la Sierra Bayos Con Chipotle,QQP-01534,Frijoles,Bolsa 430 Gr. Refritos. Bayos,La Sierra,0.286,requiere_revision,15.0,2026/03/13
+7501052424538,Frijoles Bayos refritos,QQP-01534,Frijoles,Bolsa 430 Gr. Refritos. Bayos,La Sierra,0.5,requiere_revision,15.0,2026/03/13
+7501052472102,Salsa Catsup,QQP-03539,Salsa Catsup,Botella 340 Gr.,Clemente Jacques,0.333,requiere_revision,14.75,2026/03/13
+7501052472447,Salsa Cátsup,QQP-03537,Salsa Catsup,Botella 320 Gr.,Clemente Jacques,0.333,requiere_revision,17.95,2026/03/13
+7501052473406,Chiles jalapeños molidos,QQP-00862,Chiles,Lata 220 Gr. Jalapeños Rajas,Clemente Jacques,0.25,requiere_revision,16.0,2026/03/13
+7501052473406,Chiles jalapeños molidos,QQP-00864,Chiles,Lata 220 Gr. Jalapeños en Escabeche,Clemente Jacques,0.25,requiere_revision,13.0,2026/03/13
+7501052474076,Clemente Jacques Mermelada de Fresa,QQP-02491,Mermelada,Frasco 470 Gr. Fresa,Clemente Jacques,0.571,requiere_revision,41.75,2026/03/13
+7501052474243,Clemente Jacques Mermelada de Zarzamora,QQP-02491,Mermelada,Frasco 470 Gr. Fresa,Clemente Jacques,0.375,requiere_revision,41.75,2026/03/13
+7501052476018,Rajas Clemente Jacques,QQP-00869,Chiles,Lata 380 Gr. Jalapeños Rajas,Clemente Jacques,0.429,requiere_revision,22.5,2026/03/13
+7501052476100,Nachos de chiles jalapeños en escabeche,QQP-00864,Chiles,Lata 220 Gr. Jalapeños en Escabeche,Clemente Jacques,0.375,requiere_revision,13.0,2026/03/13
+7501052476209,Chiles jalapeños en escabeche,QQP-00864,Chiles,Lata 220 Gr. Jalapeños en Escabeche,Clemente Jacques,0.429,requiere_revision,13.0,2026/03/13
+7501052476209,Chiles jalapeños en escabeche,QQP-00862,Chiles,Lata 220 Gr. Jalapeños Rajas,Clemente Jacques,0.25,requiere_revision,16.0,2026/03/13
+7501052477008,Cóctel de frutas,QQP-00957,Coctel de Frutas en Almíbar,Lata 850 Gr.,Clemente Jacques,0.286,requiere_revision,57.9,2026/03/13
+7501052477107,Mitades de Duraznos en Almíbar,QQP-01349,Duraznos en Almíbar,Lata 820 Gr. Mitades,Clemente Jacques,0.429,requiere_revision,52.5,2026/03/13
+7501052477206,Rebanadas de piña en almíbar,QQP-03045,Piña en Almíbar,Lata 800 Gr. Trocitos,Clemente Jacques,0.25,requiere_revision,59.45,2026/03/13
+7501052477213,Trozos de Piña en Almíbar,QQP-03045,Piña en Almíbar,Lata 800 Gr. Trocitos,Clemente Jacques,0.25,requiere_revision,59.45,2026/03/13
+7501052478319,Chipotles Clemente Jacques,QQP-03550,Salsa Picante y Similares,Botella 220 Gr. Chipotles Adobados Molidos,Clemente Jacques,0.3,requiere_revision,32.0,2026/03/13
+7501052478319,Chipotles Clemente Jacques,QQP-01369,Elote,Lata 220 Gr. en Grano,Clemente Jacques,0.286,requiere_revision,11.0,2026/03/13
+7501052478319,Chipotles Clemente Jacques,QQP-03551,Salsa Picante y Similares,Botella 220 Gr. Chipotles Dulces. Adobados Molidos,Clemente Jacques,0.273,requiere_revision,29.5,2026/03/13
+7501052478319,Chipotles Clemente Jacques,QQP-00862,Chiles,Lata 220 Gr. Jalapeños Rajas,Clemente Jacques,0.25,requiere_revision,16.0,2026/03/13
+7501052478319,Chipotles Clemente Jacques,QQP-00864,Chiles,Lata 220 Gr. Jalapeños en Escabeche,Clemente Jacques,0.25,requiere_revision,13.0,2026/03/13
+7501054503095,Crema Nivea 100 ml,QQP-01091,Crema Sólida,Envase 100 Ml.,Nivea,0.667,requiere_revision,64.0,2026/03/13
+7501055300075,Coca-Cola,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.4,requiere_revision,23.0,2026/03/13
+7501055304721,Agua Ciel,QQP-00078,Agua Sin Gas,Botella 1.5 Lt.,Ciel,0.286,requiere_revision,15.0,2026/03/13
+7501055304745,Coca cola,QQP-03362,Refresco,Botella 3 Lt. Zero,Coca Cola,0.333,requiere_revision,40.0,2026/03/13
+7501055304813,fresca 3 Lt,QQP-03362,Refresco,Botella 3 Lt. Zero,Coca Cola,0.286,requiere_revision,40.0,2026/03/13
+7501055305339,Coca Cola Light 600,QQP-03363,Refresco,Botella 600 Ml.,Coca Cola,0.5,requiere_revision,22.0,2026/03/13
+7501055305339,Coca Cola Light 600,QQP-03370,Refresco,Botella 600 Ml. Sin Azúcar,Coca Cola,0.375,requiere_revision,18.0,2026/02/13
+7501055307906,Agua purificada Ciel,QQP-00085,Agua Sin Gas,Botella 600 Ml.,Ciel,0.286,requiere_revision,8.0,2026/03/13
+7501055313532,Coca-Cola,QQP-03327,Refresco,Botella 1.75 Lt. No Retornable,Coca Cola,0.25,requiere_revision,38.0,2026/03/13
+7501055320639,Coca cola 600 sin azucar,QQP-03370,Refresco,Botella 600 Ml. Sin Azúcar,Coca Cola,0.714,requiere_revision,18.0,2026/02/13
+7501055320639,Coca cola 600 sin azucar,QQP-03363,Refresco,Botella 600 Ml.,Coca Cola,0.429,requiere_revision,22.0,2026/03/13
+7501055332175,Coca Cola,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.4,requiere_revision,23.0,2026/03/13
+7501055341344,Coca-Cola,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.4,requiere_revision,23.0,2026/03/13
+7501055349005,Leche deslactosada light,QQP-02255,Leche Ultrapasteurizada,Caja 1 Lt. Light,Santa Clara,0.25,requiere_revision,36.5,2026/03/13
+7501055350995,Leche Santa Clara light,QQP-02255,Leche Ultrapasteurizada,Caja 1 Lt. Light,Santa Clara,0.571,requiere_revision,36.5,2026/03/13
+7501055350995,Leche Santa Clara light,QQP-02250,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Santa Clara,0.375,requiere_revision,35.0,2026/03/13
+7501055361540,Coca Cola Sabor Original,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.333,requiere_revision,23.0,2026/03/13
+7501055361557,Coca-Cola SA 355,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.5,requiere_revision,23.0,2026/03/13
+7501055365395,Coca-Cola light lata,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.333,requiere_revision,23.0,2026/03/13
+7501055379484,Valle Fizz Naranjada 600,QQP-00096,Agua con Gas,Botella 600 Ml. Limon-ada. Fizz,Del Valle,0.3,requiere_revision,17.9,2026/03/13
+7501055379484,Valle Fizz Naranjada 600,QQP-00097,Agua con Gas,Botella 600 Ml. Naranj-ada Fizz,Del Valle,0.3,requiere_revision,17.9,2026/03/13
+7501055383610,Coca-Cola League of Legens,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.25,requiere_revision,23.0,2026/03/13
+7501055386147,Oreo Coca-Cola,QQP-03372,Refresco,Lata 355 Ml.,Coca Cola,0.333,requiere_revision,23.0,2026/03/13
+7501055900015,Leche Alpura semi,QQP-02261,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Semi,Alpura,0.375,requiere_revision,35.25,2026/03/13
+7501055900046,Alpura semi,QQP-02261,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Semi,Alpura,0.25,requiere_revision,35.25,2026/03/13
+7501055900800,Alpura light,QQP-02259,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Light,Alpura,0.25,requiere_revision,34.5,2026/03/13
+7501055901425,leche deslactosada,QQP-02231,Leche Pasteurizada,Caja 1 Lt. Parcialmente Descremada. Deslactosada,Alpura,0.25,requiere_revision,30.0,2026/03/13
+7501055912476,Yogurt Alpura Vaso Zarzamora,QQP-04134,Yoghurt,Vaso 125 Gr. Fresa,Alpura,0.25,requiere_revision,8.0,2026/03/13
+7501055914630,Yoghurt Alpura Bebible Fresa y Zarzamora,QQP-04124,Yoghurt,Envase 220 Gr. Bebible. Fresa,Alpura,0.5,requiere_revision,13.5,2026/03/13
+7501055914814,Yoghurt Alpura Bebible Piña Coco,QQP-04124,Yoghurt,Envase 220 Gr. Bebible. Fresa,Alpura,0.333,requiere_revision,13.5,2026/03/13
+7501055914845,Alpura Lala fresa,QQP-04124,Yoghurt,Envase 220 Gr. Bebible. Fresa,Alpura,0.25,requiere_revision,13.5,2026/03/13
+7501055914852,Yoghurt Alpura mango 220,QQP-04124,Yoghurt,Envase 220 Gr. Bebible. Fresa,Alpura,0.375,requiere_revision,13.5,2026/03/13
+7501055916016,crema alpura,QQP-01064,Crema,Bote 426 Ml.,Alpura,0.4,requiere_revision,40.9,2026/03/13
+7501055916016,crema alpura,QQP-01065,Crema,Bote 426 Ml. Reducida en Grasa,Alpura,0.286,requiere_revision,47.25,2026/03/13
+7501055917150,Leche Uht Deslactosada Alpura Cafe Mokaccino 1 lt,QQP-02231,Leche Pasteurizada,Caja 1 Lt. Parcialmente Descremada. Deslactosada,Alpura,0.455,requiere_revision,30.0,2026/03/13
+7501055917150,Leche Uht Deslactosada Alpura Cafe Mokaccino 1 lt,QQP-02259,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Light,Alpura,0.333,requiere_revision,34.5,2026/03/13
+7501055917150,Leche Uht Deslactosada Alpura Cafe Mokaccino 1 lt,QQP-02261,Leche Ultrapasteurizada,Caja 1 Lt. Parcialmente Descremada. Semi,Alpura,0.333,requiere_revision,35.25,2026/03/13
+7501057720253,Zwan Premium Salchicha de pavo,QQP-03513,Salchicha,Paquete 500 Gr. Vienesa,Zwan,0.286,requiere_revision,60.9,2026/03/13
+7501057720345,Zwan Salchicha vienesa,QQP-03513,Salchicha,Paquete 500 Gr. Vienesa,Zwan,0.6,requiere_revision,60.9,2026/03/13
+7501057720550,Salchicha Con Pechuga De Pavo Bienestar,QQP-03517,Salchicha,Paquete 500 Gr. con Pavo,Zwan. Premium,0.25,requiere_revision,52.9,2026/03/13
+7501058628503,Soya tradicional sazonador,QQP-03559,Salsa de Soya,Botella 140 Ml. Tradicional,Maggi,0.286,requiere_revision,23.0,2026/03/13
+7501058640765,Alimento en polvo para preparar bebida fortificada sabor chocolate,QQP-03173,Polvo P/preparar Bebidas Sabor Chocolate,Lata 400 Gr.,Nesquik,0.273,requiere_revision,68.0,2026/03/13
+7501059204102,Maggi Inglesa,QQP-03543,Salsa Inglesa,Botella 100 Ml.,Maggi,0.4,requiere_revision,34.49,2026/03/13
+7501062700141,Rajas verdes La Morena,QQP-00855,Chiles,Lata 210 Gr. Jalapeños Rajas,La Morena,0.286,requiere_revision,19.0,2026/03/13
+7501062700332,Rodajas de Chiles Jalapeños,QQP-00855,Chiles,Lata 210 Gr. Jalapeños Rajas,La Morena,0.286,requiere_revision,19.0,2026/03/13
+7501062700332,Rodajas de Chiles Jalapeños,QQP-00856,Chiles,Lata 210 Gr. Jalapeños en Escabeche,La Morena,0.286,requiere_revision,14.0,2026/03/13
+7501062700622,Chipotles La Morena,QQP-00854,Chiles,Lata 210 Gr. Chipotles Adobados,La Morena,0.333,requiere_revision,36.0,2026/03/13
+7501069210018,Harina de trigo integral,QQP-01712,Harina de Trigo,Paquete 1 Kg. Integral,Tres Estrellas,0.429,requiere_revision,20.9,2026/03/13
+7501069210032,Harina de trigo,QQP-01712,Harina de Trigo,Paquete 1 Kg. Integral,Tres Estrellas,0.286,requiere_revision,20.9,2026/03/13
+7501069210759,Harina de arroz,QQP-01699,Harina de Arroz,Caja 500 Gr.,Tres Estrellas,0.333,requiere_revision,25.0,2026/03/13
+7501069213958,Hot Cakes,QQP-01693,Harina Hot Cakes,Caja 800 Gr. Tradicionales,Tres Estrellas,0.25,requiere_revision,31.0,2026/03/13
+7501071300790,Frijol Flor de Mayo,QQP-01495,Frijol,Bolsa 900 Gr. Flor de Mayo,Verde Valle,0.429,requiere_revision,59.0,2026/03/13
+7501071301001,Alubia Verde Valle,QQP-00153,Alubia,Bolsa 500 Gr. Chica,Verde Valle,0.5,requiere_revision,35.5,2026/03/13
+7501071301001,Alubia Verde Valle,QQP-01581,Garbanzo,Bolsa 500 Gr.,Verde Valle,0.333,requiere_revision,39.5,2026/03/13
+7501071301001,Alubia Verde Valle,QQP-02286,Lenteja,Bolsa 500 Gr.,Verde Valle,0.333,requiere_revision,30.5,2026/03/13
+7501071301001,Alubia Verde Valle,QQP-01688,Haba,Bolsa 500 Gr. Pelada,Verde Valle,0.286,requiere_revision,80.0,2026/03/13
+7501071301001,Alubia Verde Valle,QQP-02478,Maíz Palomero,Bolsa 500 Gr.,Verde Valle,0.286,requiere_revision,25.0,2026/03/13
+7501071301049,Frijol Peruano,QQP-01510,Frijol,Bolsa 900 Gr. Peruano,Verde Valle,0.333,requiere_revision,62.0,2026/03/13
+7501071301117,Garbanzo Verde Valle,QQP-01581,Garbanzo,Bolsa 500 Gr.,Verde Valle,0.6,requiere_revision,39.5,2026/03/13
+7501071301117,Garbanzo Verde Valle,QQP-02286,Lenteja,Bolsa 500 Gr.,Verde Valle,0.333,requiere_revision,30.5,2026/03/13
+7501071301117,Garbanzo Verde Valle,QQP-00153,Alubia,Bolsa 500 Gr. Chica,Verde Valle,0.286,requiere_revision,35.5,2026/03/13
+7501071301117,Garbanzo Verde Valle,QQP-01688,Haba,Bolsa 500 Gr. Pelada,Verde Valle,0.286,requiere_revision,80.0,2026/03/13
+7501071301117,Garbanzo Verde Valle,QQP-02478,Maíz Palomero,Bolsa 500 Gr.,Verde Valle,0.286,requiere_revision,25.0,2026/03/13
+7501071301155,Lentejas Verde Valle,QQP-01581,Garbanzo,Bolsa 500 Gr.,Verde Valle,0.333,requiere_revision,39.5,2026/03/13
+7501071301155,Lentejas Verde Valle,QQP-02286,Lenteja,Bolsa 500 Gr.,Verde Valle,0.333,requiere_revision,30.5,2026/03/13
+7501071301155,Lentejas Verde Valle,QQP-00153,Alubia,Bolsa 500 Gr. Chica,Verde Valle,0.286,requiere_revision,35.5,2026/03/13
+7501071301155,Lentejas Verde Valle,QQP-01688,Haba,Bolsa 500 Gr. Pelada,Verde Valle,0.286,requiere_revision,80.0,2026/03/13
+7501071301155,Lentejas Verde Valle,QQP-02478,Maíz Palomero,Bolsa 500 Gr.,Verde Valle,0.286,requiere_revision,25.0,2026/03/13
+7501071301179,Maíz Palomero Verde Valle,QQP-02478,Maíz Palomero,Bolsa 500 Gr.,Verde Valle,0.667,requiere_revision,25.0,2026/03/13
+7501071301179,Maíz Palomero Verde Valle,QQP-01581,Garbanzo,Bolsa 500 Gr.,Verde Valle,0.286,requiere_revision,39.5,2026/03/13
+7501071301179,Maíz Palomero Verde Valle,QQP-02286,Lenteja,Bolsa 500 Gr.,Verde Valle,0.286,requiere_revision,30.5,2026/03/13
+7501071301179,Maíz Palomero Verde Valle,QQP-00153,Alubia,Bolsa 500 Gr. Chica,Verde Valle,0.25,requiere_revision,35.5,2026/03/13
+7501071301179,Maíz Palomero Verde Valle,QQP-01688,Haba,Bolsa 500 Gr. Pelada,Verde Valle,0.25,requiere_revision,80.0,2026/03/13
+7501071301452,Arroz blanco entero Verde Valle,QQP-00194,Arroz,Bolsa 1 Kg. Super Extra,Verde Valle,0.333,requiere_revision,35.0,2026/03/13
+7501071301490,Frijol Negro,QQP-01485,Frijol,Bolsa 1 Kg. Negro,Verde Valle,0.333,requiere_revision,47.0,2026/03/13
+7501071301490,Frijol Negro,QQP-01486,Frijol,Bolsa 1 Kg. Negro. Jamapa,Verde Valle,0.286,requiere_revision,64.5,2026/03/13
+7501071301742,Frijol Negro Verde Valle,QQP-01485,Frijol,Bolsa 1 Kg. Negro,Verde Valle,0.667,requiere_revision,47.0,2026/03/13
+7501071301742,Frijol Negro Verde Valle,QQP-01486,Frijol,Bolsa 1 Kg. Negro. Jamapa,Verde Valle,0.571,requiere_revision,64.5,2026/03/13
+7501071301742,Frijol Negro Verde Valle,QQP-01488,Frijol,Bolsa 1 Kg. Pinto,Verde Valle,0.429,requiere_revision,39.0,2026/03/13
+7501071303319,Arroz Verde Valle,QQP-00214,Arroz,Bolsa 900 Gr. Super Extra,Verde Valle,0.429,requiere_revision,32.7,2026/03/13
+7501071303319,Arroz Verde Valle,QQP-01505,Frijol,Bolsa 900 Gr. Negro,Verde Valle,0.286,requiere_revision,43.9,2026/03/13
+7501071303319,Arroz Verde Valle,QQP-01510,Frijol,Bolsa 900 Gr. Peruano,Verde Valle,0.286,requiere_revision,62.0,2026/03/13
+7501071303319,Arroz Verde Valle,QQP-01516,Frijol,Bolsa 900 Gr. Pinto,Verde Valle,0.286,requiere_revision,46.7,2026/03/13
+7501071303319,Arroz Verde Valle,QQP-01495,Frijol,Bolsa 900 Gr. Flor de Mayo,Verde Valle,0.25,requiere_revision,59.0,2026/03/13
+7501071303319,Arroz Verde Valle,QQP-01506,Frijol,Bolsa 900 Gr. Negro. Jamapa,Verde Valle,0.25,requiere_revision,67.5,2026/03/13
+7501071307768,Frijoles Refritos Con Chorizo,QQP-01535,Frijoles,Bolsa 430 Gr. Refritos. Negros,Isadora,0.286,requiere_revision,18.25,2026/03/13
+7501071307782,Frijoles refritos Bayos Isadora,QQP-01535,Frijoles,Bolsa 430 Gr. Refritos. Negros,Isadora,0.429,requiere_revision,18.25,2026/03/13
+7501071308581,Isadora frijoles refritos (purée de haricots rouges),QQP-01533,Frijoles,Bolsa 400 Gr. Refritos. Negros,Isadora,0.333,requiere_revision,18.8,2026/03/13
+7501071308598,Frijoles refritos bayos,QQP-01533,Frijoles,Bolsa 400 Gr. Refritos. Negros,Isadora,0.286,requiere_revision,18.8,2026/03/13
+7501071308604,Frijoles negros refritos,QQP-01535,Frijoles,Bolsa 430 Gr. Refritos. Negros,Isadora,0.5,requiere_revision,18.25,2026/03/13
+7501073800908,Agua mineral de Manantial Peñafiel,QQP-00094,Agua con Gas,Botella 2 Lt.,Peñafiel,0.286,requiere_revision,29.0,2026/03/13
+7501077400302,Harina de maíz nixtamalizado tamal,QQP-01702,Harina de Maíz,Paquete 1 Kg.,Maseca,0.286,requiere_revision,21.45,2026/03/13
+7501077400708,Harina de maíz para preparar masa,QQP-01702,Harina de Maíz,Paquete 1 Kg.,Maseca,0.286,requiere_revision,21.45,2026/03/13
+7501077513941,Queso manchego rebanadas,QQP-03260,Queso Manchego,Paquete 400 Gr.,Noche Buena,0.286,requiere_revision,115.0,2026/03/13
+7501077513941,Queso manchego rebanadas,QQP-03265,Queso Manchego,Paquete 400 Gr. Rebanado,Noche Buena,0.25,requiere_revision,110.0,2026/03/13
+7501077513941,Queso manchego rebanadas,QQP-03267,Queso Manchego,Paquete 400 Gr. Triangular,Noche Buena,0.25,requiere_revision,136.0,2026/03/13
+7501079011735,Italpasta Pasta con Verduras serpentina,QQP-02962,Pasta para Sopa,Paquete 200 Gr. Spaghetti,Italpasta,0.25,requiere_revision,10.0,2026/03/13
+7501079300822,arroz San blas,QQP-01713,Harina de Trigo,Paquete 1 Kg. Ó 1.1 Kg.,San Blas,0.25,requiere_revision,15.0,2026/03/13
+7501079334018,Harina de Trigo,QQP-01713,Harina de Trigo,Paquete 1 Kg. Ó 1.1 Kg.,San Blas,0.286,requiere_revision,15.0,2026/03/13
+7501079341023,Harina de trigo integral,QQP-01713,Harina de Trigo,Paquete 1 Kg. Ó 1.1 Kg.,San Blas,0.25,requiere_revision,15.0,2026/03/13
+7501079702848,Tomates Molidos Condimentados,QQP-03219,Puré de Tomate,Caja 1 Kg. Tomates Molidos Condimentados,Del Fuerte,0.333,requiere_revision,33.0,2026/03/13
+7501079709601,Tomates molidos condimentados,QQP-03219,Puré de Tomate,Caja 1 Kg. Tomates Molidos Condimentados,Del Fuerte,0.333,requiere_revision,33.0,2026/03/13
+7501086801046,Agua de litro epura,QQP-00074,Agua Sin Gas,Botella 1 Lt.,Epura,0.286,requiere_revision,13.5,2026/03/13
+7501096810328,Crema vegetal batido typo chantilly,QQP-01072,Crema Batida,Bote 500 Ml. Vegetal,Chantilly,0.333,requiere_revision,29.2,2026/03/13
+7501096810342,Crema vegetal batida typo chantilly,QQP-01071,Crema Batida,Bote 1 Lt. Vegetal,Chantilly,0.5,requiere_revision,52.25,2026/03/13
+7501111032025,Margarina Eugenia Yurécuaro Sin Sal,QQP-02448,Margarina,Barra 500 Gr.,Yurécuaro,0.25,requiere_revision,64.5,2026/03/13
+7501111105033,Arroz Grueso Super extra SOS,QQP-00197,Arroz,Bolsa 1 Kg. Super Extra. Integral,Sos,0.5,requiere_revision,34.0,2026/03/13
+7501111105033,Arroz Grueso Super extra SOS,QQP-00196,Arroz,Bolsa 1 Kg. Super Extra. Grano Largo,Sos,0.444,requiere_revision,28.5,2026/03/12
+7501147510450,Kir Salchicha de pavo,QQP-03504,Salchicha,1 Kg. Granel. de Pavo,Kir,0.5,requiere_revision,99.9,2026/03/13
+7501147510450,Kir Salchicha de pavo,QQP-03494,Salchicha,1 Kg. Granel. Frankfurt,Kir,0.286,requiere_revision,106.8,2026/03/13
+7501147510450,Kir Salchicha de pavo,QQP-01914,Jamón,1 Kg. Granel. de Pavo. Virginia,Kir,0.25,requiere_revision,231.0,2026/03/13
+7501147511570,Salchicha Kir,QQP-03516,Salchicha,Paquete 500 Gr. con Pavo,Kir,0.4,requiere_revision,45.0,2026/03/13
+7501158400306,Leche de vaca semidescremada ultrapasteurizada,QQP-02262,Leche Ultrapasteurizada,Caja 1 Lt. Semidescremada,San Marcos,0.375,requiere_revision,35.9,2026/03/13
+7501158414471,Leche San Marcos,QQP-02249,Leche Ultrapasteurizada,Caja 1 Lt. Entera,San Marcos,0.429,requiere_revision,35.9,2026/03/13
+7501158414471,Leche San Marcos,QQP-02262,Leche Ultrapasteurizada,Caja 1 Lt. Semidescremada,San Marcos,0.429,requiere_revision,35.9,2026/03/13
+7501158414488,Leche Semidescremada San Marcos,QQP-02262,Leche Ultrapasteurizada,Caja 1 Lt. Semidescremada,San Marcos,0.571,requiere_revision,35.9,2026/03/13
+7501158414488,Leche Semidescremada San Marcos,QQP-02249,Leche Ultrapasteurizada,Caja 1 Lt. Entera,San Marcos,0.375,requiere_revision,35.9,2026/03/13
+7501158414495,Leche baja en grasa San Marcos,QQP-02249,Leche Ultrapasteurizada,Caja 1 Lt. Entera,San Marcos,0.333,requiere_revision,35.9,2026/03/13
+7501158414495,Leche baja en grasa San Marcos,QQP-02262,Leche Ultrapasteurizada,Caja 1 Lt. Semidescremada,San Marcos,0.333,requiere_revision,35.9,2026/03/13
+7501158414518,Leche Deslactosada light San Marcos,QQP-02249,Leche Ultrapasteurizada,Caja 1 Lt. Entera,San Marcos,0.333,requiere_revision,35.9,2026/03/13
+7501158414518,Leche Deslactosada light San Marcos,QQP-02262,Leche Ultrapasteurizada,Caja 1 Lt. Semidescremada,San Marcos,0.333,requiere_revision,35.9,2026/03/13
+7501182300375,ROS salchichas con pavo,QQP-03505,Salchicha,1 Kg. Granel. de Pavo,Ros,0.286,requiere_revision,84.45,2026/03/11
+7501198350418,Dr Pepper 600 ML,QQP-03371,Refresco,Botella 600 Ml. Zero Azúcar,Dr. Pepper,0.571,requiere_revision,21.5,2026/03/13
+7501200482137,Pronto sabor limón,QQP-01616,Gelatina en Polvo,Caja 84 Gr. Agua. Limón,Pronto,0.286,requiere_revision,18.0,2026/03/13
+7501200483110,Harina preparada Pronto para hot cakes ligeros,QQP-01692,Harina Hot Cakes,Caja 800 Gr. Tradicionales,Pronto,0.444,requiere_revision,64.9,2026/03/13
+7501200483134,Harina para preparar hot cakes,QQP-01692,Harina Hot Cakes,Caja 800 Gr. Tradicionales,Pronto,0.375,requiere_revision,64.9,2026/03/13
+7501209701123,Leche entera 3% grasa,QQP-02227,Leche Pasteurizada,Botella 3.785 Lt. Entera,Sello Rojo,0.333,requiere_revision,84.5,2026/03/13
+7501209701383,Sello Rojo Deslactosada 0% grasa,QQP-02257,Leche Ultrapasteurizada,Caja 1 Lt. Light. Deslactosada,Sello Rojo,0.3,requiere_revision,29.75,2026/03/13
+7501209703080,leche light 1% grasa,QQP-02256,Leche Ultrapasteurizada,Caja 1 Lt. Light,Sello Rojo,0.375,requiere_revision,30.75,2026/03/13
+7501209703080,leche light 1% grasa,QQP-02257,Leche Ultrapasteurizada,Caja 1 Lt. Light. Deslactosada,Sello Rojo,0.333,requiere_revision,29.75,2026/03/13
+7501209703110,Leche Entera 3 % Grasa Pasteurizada,QQP-02226,Leche Pasteurizada,Botella 1 Lt. Entera,Sello Rojo,0.333,requiere_revision,30.9,2026/03/13
+7501209704193,Sello Rojo 3% grasa Entera,QQP-02226,Leche Pasteurizada,Botella 1 Lt. Entera,Sello Rojo,0.333,requiere_revision,30.9,2026/03/13
+7501209704193,Sello Rojo 3% grasa Entera,QQP-02252,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Sello Rojo,0.333,requiere_revision,28.0,2026/03/13
+7501209704490,Sello Rojo Leche Light,QQP-02256,Leche Ultrapasteurizada,Caja 1 Lt. Light,Sello Rojo,0.571,requiere_revision,30.75,2026/03/13
+7501209704490,Sello Rojo Leche Light,QQP-02257,Leche Ultrapasteurizada,Caja 1 Lt. Light. Deslactosada,Sello Rojo,0.5,requiere_revision,29.75,2026/03/13
+7501209704490,Sello Rojo Leche Light,QQP-02226,Leche Pasteurizada,Botella 1 Lt. Entera,Sello Rojo,0.375,requiere_revision,30.9,2026/03/13
+7501209704490,Sello Rojo Leche Light,QQP-02252,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Sello Rojo,0.375,requiere_revision,28.0,2026/03/13
+7501209704759,Sello Rojo 1% grasa Light Deslactosada,QQP-02257,Leche Ultrapasteurizada,Caja 1 Lt. Light. Deslactosada,Sello Rojo,0.556,requiere_revision,29.75,2026/03/13
+7501209704759,Sello Rojo 1% grasa Light Deslactosada,QQP-02256,Leche Ultrapasteurizada,Caja 1 Lt. Light,Sello Rojo,0.444,requiere_revision,30.75,2026/03/13
+7501209704759,Sello Rojo 1% grasa Light Deslactosada,QQP-02226,Leche Pasteurizada,Botella 1 Lt. Entera,Sello Rojo,0.3,requiere_revision,30.9,2026/03/13
+7501209704759,Sello Rojo 1% grasa Light Deslactosada,QQP-02252,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Sello Rojo,0.3,requiere_revision,28.0,2026/03/13
+7501214100218,Arroz San José Grano Grueso,QQP-00226,Arroz,Caja 750 Gr. Super Extra,San Jose,0.333,requiere_revision,35.95,2026/03/13
+7501253655175,Arroz super extra grano largo,QQP-00216,Arroz,Bolsa 900 Gr. Super Extra. Grano Largo,Chedraui,0.625,requiere_revision,17.0,2026/03/13
+7501293500282,Hígado Rebanado De Res,QQP-00730,Carne Res,Paquete 500 Gr. Hígado Rebanado,Sukarne,0.429,requiere_revision,37.0,2026/03/13
+7501295600126,Leche Santa Clara Entera,QQP-02250,Leche Ultrapasteurizada,Caja 1 Lt. Entera,Santa Clara,0.571,requiere_revision,35.0,2026/03/13
+7501295600126,Leche Santa Clara Entera,QQP-02255,Leche Ultrapasteurizada,Caja 1 Lt. Light,Santa Clara,0.375,requiere_revision,36.5,2026/03/13
+7501295600140,Leche Light,QQP-02255,Leche Ultrapasteurizada,Caja 1 Lt. Light,Santa Clara,0.286,requiere_revision,36.5,2026/03/13
+7501303907209,Doble crema,QQP-03244,Queso Doble Crema,1 Kg. Granel,Chilchota,0.286,requiere_revision,160.0,2026/03/11
+7501303996159,Doble crema Lagunero,QQP-03244,Queso Doble Crema,1 Kg. Granel,Chilchota,0.25,requiere_revision,160.0,2026/03/11
+7501404603116,Harina de trigo,QQP-01710,Harina de Trigo,Paquete 1 Kg.,Selecta,0.4,requiere_revision,20.0,2026/03/13
+7501404603123,Harina de trigo selecta,QQP-01710,Harina de Trigo,Paquete 1 Kg.,Selecta,0.6,requiere_revision,20.0,2026/03/13
+7501404621301,Harina de Trigo Integral Selecta,QQP-01710,Harina de Trigo,Paquete 1 Kg.,Selecta,0.5,requiere_revision,20.0,2026/03/13
+7501491060007,Grasa comestible (manteca),QQP-01673,Grasa Comestible,Paquete 1 Kg.,Primor,0.333,requiere_revision,66.495,2026/03/10
+7501609001380,Jamón de pavo receta familiar,QQP-01932,Jamón,Paquete 250 Gr. de Pavo. Virginia,Capistrano,0.25,requiere_revision,54.0,2026/03/13
+7501669801265,Queso Oaxaca reducido en grasa,QQP-03280,Queso Oaxaca,Paquete 400 Gr.,Esmeralda,0.286,requiere_revision,102.0,2026/03/13
+7501669802323,Queso Manchego Rebanado Esmeralda,QQP-03280,Queso Oaxaca,Paquete 400 Gr.,Esmeralda,0.286,requiere_revision,102.0,2026/03/13
+7501669802323,Queso Manchego Rebanado Esmeralda,QQP-03295,Queso Panela,Paquete 400 Gr.,Esmeralda,0.286,requiere_revision,91.9,2026/03/13
+7501669803245,Queso Manchego Esmeralda,QQP-03280,Queso Oaxaca,Paquete 400 Gr.,Esmeralda,0.333,requiere_revision,102.0,2026/03/13
+7501669803245,Queso Manchego Esmeralda,QQP-03295,Queso Panela,Paquete 400 Gr.,Esmeralda,0.333,requiere_revision,91.9,2026/03/13
+7501669804167,Queso Chihuahua Esmeralda,QQP-03280,Queso Oaxaca,Paquete 400 Gr.,Esmeralda,0.333,requiere_revision,102.0,2026/03/13
+7501669804167,Queso Chihuahua Esmeralda,QQP-03295,Queso Panela,Paquete 400 Gr.,Esmeralda,0.333,requiere_revision,91.9,2026/03/13
+7501669880109,Queso tipo Americano Esmeralda,QQP-03225,Queso Americano,Paquete 140 Gr. 8 Rebanadas,Esmeralda,0.375,requiere_revision,31.9,2026/03/11
+7501669886125,Queso Crema en rebanadas Esmeralda,QQP-03225,Queso Americano,Paquete 140 Gr. 8 Rebanadas,Esmeralda,0.375,requiere_revision,31.9,2026/03/11
+7501669898289,Queso panela light,QQP-03295,Queso Panela,Paquete 400 Gr.,Esmeralda,0.333,requiere_revision,91.9,2026/03/13
+7501761804232,Granola - Miel y Almendras,QQP-01663,Granola,Bolsa 360 Gr. Arándanos y Almendras,Quaker,0.286,requiere_revision,76.0,2026/03/13
+7501761810202,barras de avena rellen sabor a fresa,QQP-00393,Barras de Avena,Caja 240 Gr. 8 Piezas. Rellenas con Fresa,Quaker,0.333,requiere_revision,60.0,2026/03/13
+7501761830187,Granola Quaker,QQP-01663,Granola,Bolsa 360 Gr. Arándanos y Almendras,Quaker,0.333,requiere_revision,76.0,2026/03/13
+7501761830194,Arandanos y almendras,QQP-01663,Granola,Bolsa 360 Gr. Arándanos y Almendras,Quaker,0.333,requiere_revision,76.0,2026/03/13
+7501761876369,Barras Quaker rellenas con manzanas,QQP-00393,Barras de Avena,Caja 240 Gr. 8 Piezas. Rellenas con Fresa,Quaker,0.333,requiere_revision,60.0,2026/03/13
+7501791609869,Aceite de canola Great Value,QQP-00029,Aceite,Botella 946 Ml. Soya,Great Value,0.429,requiere_revision,37.0,2026/03/13
+7501791609876,Aceite de soya Great Value,QQP-00029,Aceite,Botella 946 Ml. Soya,Great Value,0.667,requiere_revision,37.0,2026/03/13
+7501791623353,Azucar Refinada,QQP-00359,Azúcar,Bolsa Plástico 2 Kg. Refinada,Great Value,0.286,requiere_revision,83.5,2026/03/13
+7501791624527,Frijol Pinto,QQP-01513,Frijol,Bolsa 900 Gr. Pinto,Great Value,0.333,requiere_revision,25.0,2026/03/13
+7501791625623,Azúcar estándar Aurrera,QQP-00347,Azúcar,Bolsa Plástico 2 Kg. Estándar,Aurrera,0.5,requiere_revision,48.0,2026/03/13
+7501791638623,Arroz super extra,QQP-00203,Arroz,Bolsa 900 Gr. Extra,Aurrera,0.333,requiere_revision,15.0,2026/03/13
+7501791638630,Arroz super extra grano largo Great Value,QQP-00209,Arroz,Bolsa 900 Gr. Super Extra,Great Value,0.556,requiere_revision,17.0,2026/03/13
+7501791644051,Harina de trigo,QQP-01706,Harina de Trigo,Paquete 1 Kg.,Great Value,0.333,requiere_revision,16.0,2026/03/13
+7502223770959,Aceite de Canola,QQP-00016,Aceite,Botella 845 Ml. Canola,Capullo,0.4,requiere_revision,51.95,2026/03/13
+7502223774025,Grasa comestible,QQP-01671,Grasa Comestible,Paquete 1 Kg.,Inca,0.4,requiere_revision,86.0,2026/03/13
+7502223776036,Crema de cacahuate Aladino cremosa,QQP-01098,Crema de Cacahuate,Frasco 425 Gr. Cremosa,Aladino,0.571,requiere_revision,70.0,2026/03/13
+7502223776142,Crema de cacahuate Aladino,QQP-01098,Crema de Cacahuate,Frasco 425 Gr. Cremosa,Aladino,0.429,requiere_revision,70.0,2026/03/13
+7502251520014,harina de trigo Sol de Oro Extrafina,QQP-01711,Harina de Trigo,Paquete 1 Kg.,Sol de Oro,0.571,requiere_revision,20.0,2026/02/24
+7502268541651,Electrolit Uva,QQP-03684,Sueros Orales,Botella 625 Ml. Sabor Uva,Electrolit,0.333,requiere_revision,21.9,2026/03/13
+7502271916361,chocolate sabor a carajillo con alcohol,QQP-00895,Chocolate,Tubo 180 Gr. Chocolates Semiamargos con Relleno Sabor a Carajillo con Alcohol,Turin,0.3,requiere_revision,188.0,2026/02/12
+7503016372145,Sardina en salsa de tomate,QQP-03580,Sardina,Lata 425 Gr. en Tomate,Fresh Label,0.286,requiere_revision,32.9,2026/03/13
+7503031287028,Cajeta quemada,QQP-00559,Cajeta,Botella 333 Gr. de Leche. Quemada,Coronado,0.333,requiere_revision,66.95,2026/03/13
+7503034673132,pan molido cero cero,QQP-01377,Empanizadores,Bolsa 210 Gr. Pan Molido. Clásico,Bimbo,0.25,requiere_revision,31.5,2026/03/13
+7503044354007,Salsa picante de la viuda,QQP-03549,Salsa Picante y Similares,Botella 150 Ml.,De la Viuda,0.5,requiere_revision,28.5,2026/03/13
+75031596,Pacifico Cerveza,QQP-00828,Cerveza,Paquete con 6 Latas de 355 Ml.,Pacífico,0.333,requiere_revision,121.0,2026/03/13
+7506306305748,Soya + jugo de manzana,QQP-02038,Jugo de Fruta,Caja 946 Ml. Soya con Naranja,Ades,0.25,requiere_revision,30.5,2026/03/13
+7506425626175,Jabon antibacterial Escudo,QQP-01863,Jabón de Tocador,Barra 150 Gr. Antibacterial. (Rosa),Escudo,0.375,requiere_revision,13.7,2026/03/13
+7506425626175,Jabon antibacterial Escudo,QQP-01864,Jabón de Tocador,Barra 150 Gr. Antibacterial. Protección Neutra,Escudo,0.333,requiere_revision,11.63,2026/03/12
+7506443105911,Yoghurt griego Oikos natural sin azúcar,QQP-04120,Yoghurt,Bote 900 Gr. Natural. Deslactosado. Sin Azúcar Añadida. Griego,Oikos,0.545,requiere_revision,95.0,2026/03/13
+7506443105911,Yoghurt griego Oikos natural sin azúcar,QQP-04118,Yoghurt,Bote 900 Gr. Natural con Endulzantes. Griego,Oikos,0.4,requiere_revision,85.0,2026/03/13
+7506443105935,Oikos griego,QQP-04118,Yoghurt,Bote 900 Gr. Natural con Endulzantes. Griego,Oikos,0.25,requiere_revision,85.0,2026/03/13
+7506495019211,Atún en agua,QQP-00287,Atún,Lata 140 Gr. en Hojuelas en Agua,Great Value,0.286,requiere_revision,19.0,2026/03/13
+75069230,Lala griego,QQP-04132,Yoghurt,Vaso 120 Gr. Natural Endulzado. Griego,Lala,0.25,requiere_revision,13.5,2026/03/13
+75076818,Rexona clinical Desodorante,QQP-01241,Desodorante,Caja con Barra 58 Gr. Clinical. Clasic. para Dama,Rexona,0.375,requiere_revision,119.5,2026/03/13
+75076818,Rexona clinical Desodorante,QQP-01240,Desodorante,Caja con Barra 58 Gr. Clinical Men. Clean. para Caballero,Rexona,0.333,requiere_revision,121.0,2026/03/13
+7509546016306,Suavitel Fresca Primavera,QQP-03679,Suavizante P/ropa,Botella 850 Ml. Cuidado Superior. Fresca Primavera,Suavitel,0.3,requiere_revision,37.0,2026/03/13
+7509546072081,Suavitel Fresca Primavera,QQP-03673,Suavizante P/ropa,Bolsa 1.3 Lt. (Ahorrapack). Cuidado Superior. Fresca Primavera,Suavitel,0.25,requiere_revision,65.0,2026/03/13
+7509546680262,Suavitel Fresca Primavera,QQP-03678,Suavizante P/ropa,Botella 740ml. Cuidado Superior. Fresca Primavera,Suavitel,0.333,requiere_revision,24.9,2026/03/13
+7622210270689,Queso Crema Philadelphia Chipotle,QQP-03243,Queso Crema,Envase 150 Gr. Untable,Philadelphia,0.375,requiere_revision,39.0,2026/03/13
+7622210288431,Rebanadas de queso Philadelphia original,QQP-03228,Queso Americano,Paquete 144 Gr.,Philadelphia,0.286,requiere_revision,38.0,2026/03/13
+7622210561534,Queso crema Philadelphia original,QQP-03241,Queso Crema,Caja 200 Gr. Untable,Philadelphia,0.429,requiere_revision,53.5,2026/03/13
+7622210688842,Polvo para preparar bebida Clight sabor a manzana,QQP-03166,Polvo P/preparar Bebidas,Sobre 7 Gr. Naranja,Clight,0.273,requiere_revision,6.5,2026/03/13
+7622210827951,Ritz mini rollos,QQP-01568,Galletas Saladas,Caja 308 Gr. 8 Mini Rollos. Ritz,Nabisco,0.333,requiere_revision,30.0,2026/03/13
+7622300338893,Queso Crema Philadelphia Original,QQP-03243,Queso Crema,Envase 150 Gr. Untable,Philadelphia,0.375,requiere_revision,39.0,2026/03/13
+8076809513029,Barilla Fideo No. 0,QQP-02954,Pasta para Sopa,Paquete 200 Gr. Fideo No. 2,Barilla,0.333,requiere_revision,12.5,2026/03/13
+8410010802006,Aceite de Oliva oil,QQP-00037,Aceite de Oliva,Botella 750 Ml. Extra Virgen,Carbonell,0.25,requiere_revision,229.5,2026/03/13
+8412300817028,Espuma para afeitar,QQP-01386,Espuma de Afeitar,Bote 200 Ml. Sensitive,Nivea Men,0.25,requiere_revision,88.0,2026/03/13

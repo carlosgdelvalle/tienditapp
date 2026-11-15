@@ -1,0 +1,27 @@
+[
+  {
+    "archivo": "01-2026_Q1.csv",
+    "sha256": "355564ebf705be2154d1cbc77a4b502ae4e85a05cdf8c5741376bc706bee08a5",
+    "filas": 496726
+  },
+  {
+    "archivo": "01-2026_Q2.csv",
+    "sha256": "a717076b6b1bbe39e871db38d7d93f06e0195757bf61ba85cecdc3b12a6a9ae7",
+    "filas": 630371
+  },
+  {
+    "archivo": "02-2026_Q1.csv",
+    "sha256": "582506a6e4aea7873b9ad0e1678f63ae80fca0eb80b3d1d9c7dca18925205111",
+    "filas": 496645
+  },
+  {
+    "archivo": "02-2026_Q2.csv",
+    "sha256": "1cfba0230b881583e5ca067fdecd33dd57516f0172eba5718d55fe054d61579f",
+    "filas": 547811
+  },
+  {
+    "archivo": "03-2026_Q1.csv",
+    "sha256": "04da80ad6e4741e7821a0f41a28105820767331f669bee950157ab53ac617ad4",
+    "filas": 558146
+  }
+]

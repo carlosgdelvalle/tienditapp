@@ -1,0 +1,11 @@
+codigo,nombre_existente,en_catalogo_mx,nombre_catalogo_mx,accion,tipo_codigo,precio_demo_centavos
+7500000000001,Coca-Cola 600 ml,False,,agregado_local,demo_sintetico,1800
+7500000000002,Sabritas sal 45 g,False,,agregado_local,demo_sintetico,2200
+7500000000003,Pan Bimbo grande,False,,agregado_local,demo_sintetico,4800
+7500000000004,Huevo (kg),False,,agregado_local,demo_sintetico,4500
+7500000000005,Leche Lala 1 L,False,,agregado_local,demo_sintetico,3100
+7891000248362,Kitkat,True,Kit Kat Chocolate,conservado,codigo_existente_no_certificado,2500
+7501011110335,Fritos 60g,True,Fritos Limón y sal,conservado,codigo_existente_no_certificado,2000
+7500810050880,Pinguinos Hersheys,True,pinguinos - hersheys colors and creme,conservado,codigo_existente_no_certificado,2800
+7500810054888,Pay frutos rojos,False,,agregado_local,codigo_existente_no_certificado,2300
+7500478026562,Florentinas,True,Florentinas fresa,conservado,codigo_existente_no_certificado,1800

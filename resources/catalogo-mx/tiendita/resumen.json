@@ -1,0 +1,48 @@
+{
+  "catalogo": {
+    "entrada": 24893,
+    "decisiones": {
+      "incluir": 9421,
+      "excluir": 917,
+      "revisar": 14555
+    },
+    "familias_incluidas": {
+      "Pan, galletas y tortillas": 1075,
+      "Botanas": 1025,
+      "Abarrotes y conservas": 3234,
+      "Lácteos y huevo": 1787,
+      "Bebidas sin alcohol": 813,
+      "Dulces y chocolates": 799,
+      "Embutidos": 376,
+      "Limpieza": 46,
+      "Higiene básica": 143,
+      "Helados": 68,
+      "Mascotas": 44,
+      "Inventario previo": 10,
+      "Básicos domésticos": 1
+    },
+    "precios_observados_incluidos": 16,
+    "sinteticos_conservados": 5
+  },
+  "profeco": {
+    "entrada": 4148,
+    "decisiones": {
+      "excluir": 2419,
+      "revisar": 639,
+      "incluir": 1090
+    },
+    "familias_incluidas": {
+      "Lácteos y huevo": 192,
+      "Higiene básica": 224,
+      "Abarrotes y conservas": 374,
+      "Bebidas sin alcohol": 59,
+      "Limpieza": 60,
+      "Botanas": 35,
+      "Básicos domésticos": 9,
+      "Dulces y chocolates": 30,
+      "Pan, galletas y tortillas": 75,
+      "Helados": 3,
+      "Embutidos": 29
+    }
+  }
+}

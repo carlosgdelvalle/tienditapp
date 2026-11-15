@@ -1,0 +1,72 @@
+[
+  {
+    "codigo": "7500000000001",
+    "product_id": 1,
+    "nombre": "Coca-Cola 600 ml",
+    "unidad": "pieza",
+    "precio_demo_centavos": 1800
+  },
+  {
+    "codigo": "7500000000002",
+    "product_id": 2,
+    "nombre": "Sabritas sal 45 g",
+    "unidad": "pieza",
+    "precio_demo_centavos": 2200
+  },
+  {
+    "codigo": "7500000000003",
+    "product_id": 3,
+    "nombre": "Pan Bimbo grande",
+    "unidad": "pieza",
+    "precio_demo_centavos": 4800
+  },
+  {
+    "codigo": "7500000000004",
+    "product_id": 4,
+    "nombre": "Huevo (kg)",
+    "unidad": "kg",
+    "precio_demo_centavos": 4500
+  },
+  {
+    "codigo": "7500000000005",
+    "product_id": 5,
+    "nombre": "Leche Lala 1 L",
+    "unidad": "pieza",
+    "precio_demo_centavos": 3100
+  },
+  {
+    "codigo": "7891000248362",
+    "product_id": 13,
+    "nombre": "Kitkat",
+    "unidad": "pieza",
+    "precio_demo_centavos": 2500
+  },
+  {
+    "codigo": "7501011110335",
+    "product_id": 14,
+    "nombre": "Fritos 60g",
+    "unidad": "pieza",
+    "precio_demo_centavos": 2000
+  },
+  {
+    "codigo": "7500810050880",
+    "product_id": 15,
+    "nombre": "Pinguinos Hersheys",
+    "unidad": "pieza",
+    "precio_demo_centavos": 2800
+  },
+  {
+    "codigo": "7500810054888",
+    "product_id": 16,
+    "nombre": "Pay frutos rojos",
+    "unidad": "pieza",
+    "precio_demo_centavos": 2300
+  },
+  {
+    "codigo": "7500478026562",
+    "product_id": 17,
+    "nombre": "Florentinas",
+    "unidad": "pieza",
+    "precio_demo_centavos": 1800
+  }
+]
