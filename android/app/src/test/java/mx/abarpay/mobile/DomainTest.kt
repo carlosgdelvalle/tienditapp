@@ -147,6 +147,9 @@ class DomainTest {
         assertFalse(canUseTabs(Employee(2, "Lupita", "employee"), "Reportes"))
         assertFalse(canUseTabs(Employee(5, "Beto", "employee", canSell = false), "Cobrar"))
         assertTrue(canUseTabs(Employee(2, "Lupita", "employee", canInventory = true), "Inventario"))
+        // El dueño siempre puede inventario aunque su bandera venga en false (regla del contrato v2).
+        assertTrue(canUseTabs(Employee(1, "Rosa", "owner", canInventory = false), "Inventario"))
+        assertTrue(canUseInventory(Employee(1, "Rosa", "owner", canInventory = false)))
     }
 
     @Test fun fiadoChipNeedsPermission() {

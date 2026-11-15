@@ -167,7 +167,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 | PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
 | Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`. El portal de PEY apunta al host de Render; la entrega real del webhook queda por ejercitar con otro pago |
 | Render | Servicio `abarpay-api` (Python, Oregon), disco persistente de 1 GB en `/var/data`; `/api/health`, `/api/bootstrap` y `/console` HTTP 200; 18 productos; persistencia verificada tras reinicio |
-| Release APK | [`dist/Abarpay-Android-1.1.0.apk`](dist/Abarpay-Android-1.1.0.apk); 34 MB; SHA-256 `f300baace8810a603a77e92d61ba8f728491c9ea78a7fac541555deeeae7f7c2`; firma v2 verificada |
+| Release APK | [`dist/Abarpay-Android-1.1.0.apk`](dist/Abarpay-Android-1.1.0.apk); 34 MB; SHA-256 `288a12a68081619475765ad2b9e01e87167694d657979ffd038fb5a3319cd208`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
 ## Limitaciones y decisiones abiertas

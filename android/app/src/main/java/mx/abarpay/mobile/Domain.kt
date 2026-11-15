@@ -338,11 +338,11 @@ data class InventoryItem(
 
 data class InventorySnapshot(val items: List<InventoryItem> = emptyList(), val totalValueCents: Long = 0)
 
-/** Pestañas visibles según rol y permisos. Sin perfil se muestran todas. */
+/** Pestañas visibles según rol y permisos. El dueño siempre puede vender e inventario. Sin perfil se muestran todas. */
 fun tabsFor(employee: Employee?): List<String> = tabsFor(
     role = employee?.role ?: "owner",
-    canSell = employee?.canSell ?: true,
-    canInventory = employee?.canInventory ?: true,
+    canSell = (employee?.canSell ?: true) || employee?.role == "owner",
+    canInventory = (employee?.canInventory ?: true) || employee?.role == "owner",
 )
 
 fun tabsFor(role: String, canSell: Boolean, canInventory: Boolean): List<String> = buildList {
@@ -358,7 +358,7 @@ fun canUseTabs(employee: Employee?, tab: String): Boolean = tab in tabsFor(emplo
 fun canChoosePaymentMethod(employee: Employee?, method: String): Boolean =
     method != PAYMENT_FIADO || employee == null || employee.canFiado
 
-fun canUseInventory(employee: Employee?): Boolean = employee == null || employee.canInventory
+fun canUseInventory(employee: Employee?): Boolean = employee == null || employee.canInventory || employee.role == "owner"
 
 fun canUseReports(employee: Employee?): Boolean = employee == null || employee.role == "owner"
 
