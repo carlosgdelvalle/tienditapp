@@ -103,11 +103,12 @@ internal fun Action(
     icon: ImageVector,
     subtitle: String? = null,
     primary: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (primary) Violet else Color.White,

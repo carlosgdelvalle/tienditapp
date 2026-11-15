@@ -351,7 +351,7 @@ private fun PaymentSheet(
                 FilterChip(
                     selected = s.paymentMethod == PAYMENT_FIADO,
                     onClick = { vm.setPaymentMethod(PAYMENT_FIADO) },
-                    enabled = !s.busy,
+                    enabled = !s.busy && canChoosePaymentMethod(s.employee, PAYMENT_FIADO),
                     modifier = Modifier.testTag("pago-fiado"),
                     label = { Text("Fiado") },
                     leadingIcon = { Icon(Icons.Outlined.AccountBalanceWallet, null, Modifier.size(16.dp)) },

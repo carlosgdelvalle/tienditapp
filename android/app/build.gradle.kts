@@ -19,8 +19,8 @@ android {
         applicationId = "mx.abarpay.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.7"
+        versionCode = 11
+        versionName = "1.1.0"
         // Servidor HTTPS estable de Render para la demo.
         buildConfigField("String", "DEMO_SERVER", "\"https://abarpay-api.onrender.com\"")
     }
@@ -49,6 +49,12 @@ android {
         }
     }
 }
+// Robolectric + Compose comparten registros estáticos entre clases de prueba y dejan
+// actividades de pruebas anteriores visibles; una JVM por clase mantiene la suite estable.
+tasks.withType<Test>().configureEach {
+    forkEvery = 1
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.06.01")
     implementation(composeBom)
@@ -65,6 +71,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    // QR de invitaciones generado en el teléfono (core puro, sin servicios de Google).
+    implementation("com.google.zxing:core:3.5.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("androidx.compose.ui:ui-test-junit4")

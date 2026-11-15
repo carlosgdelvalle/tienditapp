@@ -42,8 +42,12 @@ class MobileFlowTest {
 
     @get:Rule(order = 0) val cleanSession = object : ExternalResource() {
         override fun before() {
-            RuntimeEnvironment.getApplication()
-                .getSharedPreferences("development_session", 0).edit().clear().commit()
+            val app = RuntimeEnvironment.getApplication()
+            app.getSharedPreferences("development_session", 0).edit().clear().commit()
+            // Los flujos v1 sin red arrancan con el onboarding del dueño ya hecho.
+            app.getSharedPreferences("abarpay_owner", 0).edit().clear()
+                .putBoolean("onboarded_owner", true)
+                .commit()
         }
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()

@@ -15,8 +15,32 @@ import java.util.concurrent.TimeUnit
 class ApiFailure(val code: Int, message: String) : Exception(message)
 
 interface ShopRepository {
+    /**
+     * Identidad simulada: el servidor valida X-Employee-Id y aplica rol/permisos.
+     * Null conserva el comportamiento abierto v1 (antes de elegir perfil).
+     */
+    fun actAs(employeeId: Int?)
     suspend fun bootstrap(): Bootstrap
     suspend fun report(): Report
+    suspend fun profile(): StoreProfile
+    suspend fun updateProfile(name: String? = null, businessType: String? = null, ownerName: String? = null): StoreProfile
+    suspend fun uploadPhoto(dataUrl: String)
+    suspend fun employees(): List<Employee>
+    suspend fun patchEmployee(
+        id: Int,
+        name: String? = null,
+        nickname: String? = null,
+        active: Boolean? = null,
+        canSell: Boolean? = null,
+        canFiado: Boolean? = null,
+        canInventory: Boolean? = null,
+    ): Employee
+    suspend fun createInvite(name: String, canSell: Boolean, canFiado: Boolean, canInventory: Boolean): Invite
+    suspend fun inviteInfo(token: String): InviteInfo
+    suspend fun acceptInvite(token: String, nickname: String): Employee
+    suspend fun inventory(): InventorySnapshot
+    suspend fun inventorySet(productId: Int, qtyMilli: Int, note: String? = null): Product
+    suspend fun inventoryVoice(text: String): VoiceResult
     suspend fun parse(text: String): ParseResult
     suspend fun lookup(code: String): Product
     suspend fun link(code: String, productId: Int): Product
@@ -60,18 +84,90 @@ internal fun readProduct(j: JSONObject) = Product(
     unlimitedStock = j.optBoolean("unlimitedStock", false),
 )
 
+
+internal fun readEmployee(j: JSONObject) = Employee(
+    id = j.optInt("id"),
+    name = j.optString("name"),
+    role = j.optString("role", "employee").ifBlank { "employee" },
+    nickname = j.nullableString("nickname"),
+    active = j.optBoolean("active", true),
+    canSell = j.optBoolean("canSell", true),
+    canFiado = j.optBoolean("canFiado", true),
+    canInventory = j.optBoolean("canInventory", false),
+)
+
+internal fun readStoreProfile(j: JSONObject) = StoreProfile(
+    storeId = j.optString("storeId").ifBlank { j.optString("id") },
+    name = j.optString("name"),
+    businessType = j.optString("businessType"),
+    ownerName = j.optString("ownerName"),
+)
+
+internal fun readInvite(j: JSONObject) = Invite(
+    token = j.optString("token"),
+    employeeId = j.optInt("employeeId"),
+    url = j.optString("url"),
+)
+
+internal fun readInviteInfo(j: JSONObject): InviteInfo {
+    val permissions = j.optJSONObject("permissions")
+    fun flag(key: String, fallback: Boolean) = when {
+        j.has(key) -> j.optBoolean(key)
+        permissions?.has(key) == true -> permissions.optBoolean(key)
+        else -> fallback
+    }
+    return InviteInfo(
+        token = j.optString("token"),
+        employeeId = j.optInt("employeeId"),
+        name = j.optString("name"),
+        storeName = j.optString("storeName"),
+        businessType = j.optString("businessType"),
+        canSell = flag("canSell", true),
+        canFiado = flag("canFiado", true),
+        canInventory = flag("canInventory", false),
+    )
+}
+
+internal fun readVoiceLine(j: JSONObject) = VoiceLine(
+    productId = j.optInt("productId"),
+    name = j.optString("name"),
+    qtyMilli = if (j.has("qtyMilli") && !j.isNull("qtyMilli")) j.optInt("qtyMilli") else null,
+    unit = j.optString("unit", "pieza").ifBlank { "pieza" },
+)
+
+internal fun readVoice(j: JSONObject) = VoiceResult(
+    items = j.optJSONArray("items")?.objects()?.map(::readVoiceLine).orEmpty(),
+    note = j.nullableString("note"),
+)
+
+internal fun readInventoryItem(j: JSONObject) = InventoryItem(
+    productId = j.optInt("productId"),
+    name = j.optString("name"),
+    unit = j.optString("unit", "pieza").ifBlank { "pieza" },
+    stockMilli = j.optInt("stockMilli"),
+    unlimitedStock = j.optBoolean("unlimitedStock", false),
+    lastUpdatedAt = if (j.has("lastUpdatedAt") && !j.isNull("lastUpdatedAt")) j.optDouble("lastUpdatedAt") else null,
+    lastUpdatedByName = j.nullableString("lastUpdatedByName"),
+    lastUpdatedByNickname = j.nullableString("lastUpdatedByNickname"),
+)
+
+internal fun readInventory(j: JSONObject) = InventorySnapshot(
+    items = j.optJSONArray("items")?.objects()?.map(::readInventoryItem).orEmpty(),
+    totalValueCents = j.optLong("totalValueCents"),
+)
+
 internal fun readBootstrap(j: JSONObject): Bootstrap {
     val storeJson = j.optJSONObject("store")
     val store = Store(
         id = storeJson?.optString("id").orEmpty(),
         name = storeJson?.optString("name")?.takeIf { it.isNotBlank() } ?: j.optString("store"),
+        businessType = storeJson?.optString("businessType").orEmpty(),
+        ownerName = storeJson?.optString("ownerName").orEmpty(),
     )
     return Bootstrap(
         store = store,
         products = j.optJSONArray("products")?.objects()?.map(::readProduct).orEmpty(),
-        employees = j.optJSONArray("employees")?.objects()?.map {
-            Employee(it.optInt("id"), it.optString("name"), it.optString("role", "employee"))
-        }.orEmpty(),
+        employees = j.optJSONArray("employees")?.objects()?.map(::readEmployee).orEmpty(),
         demoMode = j.optBoolean("demoMode"),
         ai = j.optString("ai", "local"),
     )
@@ -225,17 +321,25 @@ class ApiRepository(private val base: String) : ShopRepository {
         .callTimeout(35, TimeUnit.SECONDS)
         .build()
 
-    private suspend fun exchange(path: String, body: JSONObject? = null): Pair<Int, JSONObject> =
+    private var acting: Int? = null
+
+    override fun actAs(employeeId: Int?) { acting = employeeId }
+
+    private suspend fun exchange(path: String, body: JSONObject? = null, method: String? = null): Pair<Int, JSONObject> =
         withContext(Dispatchers.IO) {
             val builder = Request.Builder().url(base + path).header("Accept", "application/json")
+            // Identidad simulada: después de elegir perfil el servidor valida rol y permisos.
+            acting?.let { builder.header("X-Employee-Id", it.toString()) }
             if (body != null) {
                 val payload = body.toString().toByteArray(Charsets.UTF_8)
-                builder.post(object : RequestBody() {
+                builder.method(method ?: "POST", object : RequestBody() {
                     override fun contentType() = "application/json; charset=utf-8".toMediaType()
                     override fun contentLength() = payload.size.toLong()
                     override fun isOneShot() = true // Also blocks status-based follow-ups such as 503 Retry-After: 0.
                     override fun writeTo(sink: BufferedSink) { sink.write(payload) }
                 })
+            } else if (method != null) {
+                builder.method(method, null)
             }
             client.newCall(builder.build()).execute().use { response ->
                 val source = response.body?.source()
@@ -256,8 +360,8 @@ class ApiRepository(private val base: String) : ShopRepository {
         else "El servidor respondió $code. Revisa los datos y la conexión.")
     }
 
-    private suspend fun request(path: String, body: JSONObject? = null): JSONObject {
-        val (code, json) = exchange(path, body)
+    private suspend fun request(path: String, body: JSONObject? = null, method: String? = null): JSONObject {
+        val (code, json) = exchange(path, body, method)
         if (code !in 200..299) throw failure(code, json)
         return json
     }
@@ -265,6 +369,66 @@ class ApiRepository(private val base: String) : ShopRepository {
     override suspend fun bootstrap() = readBootstrap(request("/api/bootstrap"))
 
     override suspend fun report() = readReport(request("/api/reports/today"))
+
+    override suspend fun profile() = readStoreProfile(request("/api/store/profile"))
+
+    override suspend fun updateProfile(name: String?, businessType: String?, ownerName: String?): StoreProfile {
+        val body = JSONObject()
+        if (name != null) body.put("name", name)
+        if (businessType != null) body.put("businessType", businessType)
+        if (ownerName != null) body.put("ownerName", ownerName)
+        return readStoreProfile(request("/api/store/profile", body, "PUT"))
+    }
+
+    override suspend fun uploadPhoto(dataUrl: String) {
+        request("/api/store/photo", JSONObject().put("dataUrl", dataUrl))
+    }
+
+    override suspend fun employees(): List<Employee> =
+        request("/api/employees").optJSONArray("items")?.objects()?.map(::readEmployee).orEmpty()
+
+    override suspend fun patchEmployee(
+        id: Int,
+        name: String?,
+        nickname: String?,
+        active: Boolean?,
+        canSell: Boolean?,
+        canFiado: Boolean?,
+        canInventory: Boolean?,
+    ): Employee {
+        val body = JSONObject()
+        if (name != null) body.put("name", name)
+        if (nickname != null) body.put("nickname", nickname)
+        if (active != null) body.put("active", active)
+        if (canSell != null) body.put("canSell", canSell)
+        if (canFiado != null) body.put("canFiado", canFiado)
+        if (canInventory != null) body.put("canInventory", canInventory)
+        return readEmployee(request("/api/employees/$id", body, "PATCH"))
+    }
+
+    override suspend fun createInvite(name: String, canSell: Boolean, canFiado: Boolean, canInventory: Boolean): Invite =
+        readInvite(request("/api/employees/invites", JSONObject()
+            .put("name", name)
+            .put("canSell", canSell)
+            .put("canFiado", canFiado)
+            .put("canInventory", canInventory)))
+
+    override suspend fun inviteInfo(token: String) =
+        readInviteInfo(request("/api/employees/invites/" + token))
+
+    override suspend fun acceptInvite(token: String, nickname: String): Employee =
+        readEmployee(request("/api/employees/invites/$token/accept", JSONObject().put("nickname", nickname)))
+
+    override suspend fun inventory() = readInventory(request("/api/inventory"))
+
+    override suspend fun inventorySet(productId: Int, qtyMilli: Int, note: String?): Product {
+        val body = JSONObject().put("productId", productId).put("qtyMilli", qtyMilli)
+        if (!note.isNullOrBlank()) body.put("note", note)
+        return readProduct(request("/api/inventory/set", body))
+    }
+
+    override suspend fun inventoryVoice(text: String): VoiceResult =
+        readVoice(request("/api/inventory/voice", JSONObject().put("text", text)))
 
     override suspend fun parse(text: String): ParseResult =
         readParse(request("/api/cart/parse", JSONObject().put("text", text)))
@@ -333,13 +497,54 @@ class ApiRepository(private val base: String) : ShopRepository {
 // ---------------------------------------------------------------------------
 
 class DemoRepository : ShopRepository {
-    private val store = Store("tiendita-esquina", "Tiendita de la Esquina")
-    private val employees = listOf(
-        Employee(1, "Doña Rosa", "owner"),
-        Employee(2, "Lupita", "employee"),
-        Employee(3, "Toño", "employee"),
+    private var store = Store("tiendita-esquina", "Tiendita de la Esquina", "Tiendita", "Doña Rosa")
+    private var profile = StoreProfile("tiendita-esquina", "Tiendita de la Esquina", "Tiendita", "Doña Rosa")
+    private var acting: Int? = null
+    private var photoDataUrl: String? = null
+
+    // Personas ficticias con permisos distintos para probar el contrato v2 sin red.
+    private val team = mutableListOf(
+        Employee(1, "Doña Rosa", "owner", canInventory = true),
+        Employee(2, "Lupita", "employee", nickname = "Lupis", canInventory = true),
+        Employee(3, "Toño", "employee", canSell = false, canFiado = false, canInventory = false),
+        Employee(4, "Invitada pendiente", "employee", active = false, canInventory = true),
+        Employee(5, "Beto", "employee", canSell = true, canFiado = false, canInventory = false),
     )
+    private val invites = mutableMapOf("INVITACION-DEMO" to 4)
+    private val acceptedTokens = mutableSetOf<String>()
+    private val lastUpdate = mutableMapOf<Int, Movement>()
     private var products = demoSeed()
+
+    private data class Movement(val at: Double, val name: String, val nickname: String?)
+
+    override fun actAs(employeeId: Int?) { acting = employeeId }
+
+    private fun actor(): Employee? {
+        val id = acting ?: return null
+        return team.firstOrNull { it.id == id } ?: throw ApiFailure(403, "Este perfil ya no tiene acceso")
+    }
+
+    private fun ownerActor(): Employee {
+        val actor = actor() ?: return team.first { it.isOwner }
+        if (!actor.isOwner) throw ApiFailure(403, "Solo el dueño ve el equipo")
+        return actor
+    }
+
+    private fun requireInventoryPermission() {
+        val actor = actor() ?: return
+        if (!actor.isOwner && !actor.canInventory) {
+            throw ApiFailure(403, "Tu perfil no puede editar el inventario")
+        }
+    }
+
+    private fun recordMovement(productId: Int, fallbackName: String = "Doña Rosa") {
+        val actor = runCatching { actor() }.getOrNull()
+        lastUpdate[productId] = Movement(
+            at = System.currentTimeMillis() / 1000.0,
+            name = actor?.name ?: fallbackName,
+            nickname = actor?.nickname,
+        )
+    }
     private val barcodes = mutableMapOf(
         "7500000000001" to 1, "7500000000002" to 2, "7500000000003" to 3,
         "7500000000004" to 4, "7500000000005" to 5,
@@ -356,9 +561,140 @@ class DemoRepository : ShopRepository {
     )
     private var nextEntry = 2
 
-    override suspend fun bootstrap() = Bootstrap(store, products.toList(), employees, true, "demo")
+    override suspend fun bootstrap() = Bootstrap(store, products.toList(), team.filter { it.active }, true, "demo")
+
+    override suspend fun profile(): StoreProfile = profile
+
+    override suspend fun updateProfile(name: String?, businessType: String?, ownerName: String?): StoreProfile {
+        profile = profile.copy(
+            name = name?.takeIf { it.isNotBlank() } ?: profile.name,
+            businessType = businessType?.takeIf { it.isNotBlank() } ?: profile.businessType,
+            ownerName = ownerName?.takeIf { it.isNotBlank() } ?: profile.ownerName,
+        )
+        store = store.copy(
+            name = profile.name,
+            businessType = profile.businessType,
+            ownerName = profile.ownerName,
+        )
+        return profile
+    }
+
+    override suspend fun uploadPhoto(dataUrl: String) {
+        require(dataUrl.startsWith("data:image/jpeg;base64,") || dataUrl.startsWith("data:image/png;base64,")) {
+            "La foto debe ser JPEG o PNG en data URL"
+        }
+        require(dataUrl.length <= 5_000_000) { "La foto supera los 5 MB" }
+        photoDataUrl = dataUrl
+    }
+
+    override suspend fun employees(): List<Employee> {
+        ownerActor()
+        return team.toList()
+    }
+
+    override suspend fun patchEmployee(
+        id: Int,
+        name: String?,
+        nickname: String?,
+        active: Boolean?,
+        canSell: Boolean?,
+        canFiado: Boolean?,
+        canInventory: Boolean?,
+    ): Employee {
+        ownerActor()
+        val current = team.firstOrNull { it.id == id } ?: throw ApiFailure(404, "Empleado desconocido")
+        if (current.isOwner && active == false) throw ApiFailure(400, "El dueño no puede desactivarse")
+        val updated = current.copy(
+            name = name?.takeIf { it.isNotBlank() } ?: current.name,
+            nickname = nickname ?: current.nickname,
+            active = active ?: current.active,
+            canSell = canSell ?: current.canSell,
+            canFiado = canFiado ?: current.canFiado,
+            canInventory = canInventory ?: current.canInventory,
+        )
+        team[team.indexOf(current)] = updated
+        return updated
+    }
+
+    override suspend fun createInvite(name: String, canSell: Boolean, canFiado: Boolean, canInventory: Boolean): Invite {
+        ownerActor()
+        require(name.isNotBlank()) { "Escribe el nombre de la persona" }
+        val id = (team.maxOfOrNull { it.id } ?: 0) + 1
+        team += Employee(id, name.trim(), "employee", active = false, canSell = canSell, canFiado = canFiado, canInventory = canInventory)
+        val token = UUID.randomUUID().toString().replace("-", "")
+        invites[token] = id
+        return Invite(token, id, "https://abarpay-api.onrender.com/invite/$token")
+    }
+
+    override suspend fun inviteInfo(token: String): InviteInfo {
+        val employeeId = invites[token] ?: throw ApiFailure(404, "La invitación no existe o venció")
+        if (token in acceptedTokens) throw ApiFailure(410, "Esta invitación ya se usó")
+        val employee = team.firstOrNull { it.id == employeeId } ?: throw ApiFailure(404, "La invitación no existe")
+        return InviteInfo(
+            token = token,
+            employeeId = employee.id,
+            name = employee.name,
+            storeName = store.name,
+            businessType = store.businessType,
+            canSell = employee.canSell,
+            canFiado = employee.canFiado,
+            canInventory = employee.canInventory,
+        )
+    }
+
+    override suspend fun acceptInvite(token: String, nickname: String): Employee {
+        val employeeId = invites[token] ?: throw ApiFailure(404, "La invitación no existe o venció")
+        if (token in acceptedTokens) throw ApiFailure(410, "Esta invitación ya se usó")
+        require(nickname.isNotBlank()) { "Escribe tu apodo" }
+        val current = team.firstOrNull { it.id == employeeId } ?: throw ApiFailure(404, "La invitación no existe")
+        val updated = current.copy(nickname = nickname.trim(), active = true)
+        team[team.indexOf(current)] = updated
+        acceptedTokens += token
+        return updated
+    }
+
+    override suspend fun inventory(): InventorySnapshot {
+        val items = products.map { product ->
+            val movement = lastUpdate[product.id]
+            InventoryItem(
+                productId = product.id,
+                name = product.name,
+                unit = product.unit,
+                stockMilli = product.stockMilli,
+                unlimitedStock = product.unlimitedStock,
+                lastUpdatedAt = movement?.at,
+                lastUpdatedByName = movement?.name,
+                lastUpdatedByNickname = movement?.nickname,
+            )
+        }
+        val total = products.sumOf { product ->
+            if (product.unlimitedStock) 0L else Math.floorDiv(product.priceCents * product.stockMilli + 500L, 1000L)
+        }
+        return InventorySnapshot(items, total)
+    }
+
+    override suspend fun inventorySet(productId: Int, qtyMilli: Int, note: String?): Product {
+        requireInventoryPermission()
+        val current = products.firstOrNull { it.id == productId } ?: throw ApiFailure(404, "Producto desconocido")
+        if (current.unlimitedStock) throw ApiFailure(400, "Este producto tiene inventario sin límite")
+        val updated = current.copy(stockMilli = qtyMilli)
+        products = products.map { if (it.id == productId) updated else it }
+        recordMovement(productId)
+        return updated
+    }
+
+    override suspend fun inventoryVoice(text: String): VoiceResult {
+        val parsed = demoParse(text, products)
+        val items = parsed.items.map { VoiceLine(it.productId, it.name, it.qtyMilli, it.unit) }
+        return VoiceResult(
+            items = items,
+            note = if (parsed.unmatched.isEmpty()) null else "No encontré: " + parsed.unmatched.joinToString(", "),
+        )
+    }
 
     override suspend fun report(): Report {
+        val actor = actor()
+        if (actor != null && !actor.isOwner) throw ApiFailure(403, "Solo el dueño ve reportes")
         val settled = sales.values.filter { it.settled }
         val cashSales = settled.filter { it.paymentMethod == PAYMENT_CASH }
         val peySales = settled.filter { it.paymentMethod == PAYMENT_PEY }
@@ -369,7 +705,7 @@ class DemoRepository : ShopRepository {
                 TopProduct(product?.name ?: "#$id", lines.sumOf { it.qtyMilli }, product?.unit ?: "pieza", id)
             }.sortedByDescending { it.qtyMilli }
         val byEmployee = settled.groupBy { saleEmployees[it.id] ?: 0 }.map { (id, list) ->
-            EmployeeTotal(employees.firstOrNull { it.id == id }?.name ?: "Sin asignar", list.sumOf { it.totalCents }, list.size)
+            EmployeeTotal(team.firstOrNull { it.id == id }?.displayName ?: "Sin asignar", list.sumOf { it.totalCents }, list.size)
         }
         return Report(
             totalCents = settled.sumOf { it.totalCents },
@@ -436,6 +772,8 @@ class DemoRepository : ShopRepository {
             if (product.unlimitedStock) product else
                 cart.find { it.productId == product.id }?.let { product.copy(stockMilli = product.stockMilli - it.qtyMilli) } ?: product
         }
+        cart.filter { line -> products.firstOrNull { it.id == line.productId }?.unlimitedStock == false }
+            .forEach { recordMovement(it.productId, team.firstOrNull { e -> e.id == employeeId }?.name ?: "Doña Rosa") }
         if (paymentMethod == PAYMENT_FIADO && customerId != null) {
             customers = customers.map {
                 if (it.id == customerId) it.copy(balanceCents = it.balanceCents + total) else it
@@ -462,10 +800,12 @@ class DemoRepository : ShopRepository {
     }
 
     override suspend fun adjust(employeeId: Int, productId: Int, deltaMilli: Int, reason: String): Product {
+        requireInventoryPermission()
         val current = products.firstOrNull { it.id == productId } ?: throw ApiFailure(404, "Producto desconocido")
         if (current.unlimitedStock) throw ApiFailure(400, "Este producto tiene inventario sin límite")
         val updated = current.copy(stockMilli = current.stockMilli + deltaMilli)
         products = products.map { if (it.id == productId) updated else it }
+        recordMovement(productId)
         return updated
     }
 

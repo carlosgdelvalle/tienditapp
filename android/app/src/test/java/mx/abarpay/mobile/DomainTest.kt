@@ -134,4 +134,98 @@ class DomainTest {
         assertEquals("Pagada con PEY", statusLabel("paid_pey"))
         assertEquals("A crédito (fiado)", statusLabel("credit"))
     }
+
+    // ------------------------------------------------------------------
+    // Contrato v2: permisos, onboarding, enlaces de invitación e inventario
+    // ------------------------------------------------------------------
+
+    @Test fun tabsFollowRoleAndPermissions() {
+        assertEquals(listOf("Inicio", "Cobrar", "Fiado", "Inventario", "Reportes"), tabsFor("owner", true, true))
+        assertEquals(listOf("Inicio", "Cobrar", "Fiado", "Inventario"), tabsFor("employee", true, true))
+        assertEquals(listOf("Inicio", "Fiado"), tabsFor("employee", false, false))
+        assertTrue(canUseTabs(null, "Reportes"))
+        assertFalse(canUseTabs(Employee(2, "Lupita", "employee"), "Reportes"))
+        assertFalse(canUseTabs(Employee(5, "Beto", "employee", canSell = false), "Cobrar"))
+        assertTrue(canUseTabs(Employee(2, "Lupita", "employee", canInventory = true), "Inventario"))
+    }
+
+    @Test fun fiadoChipNeedsPermission() {
+        assertTrue(canChoosePaymentMethod(null, PAYMENT_FIADO))
+        assertTrue(canChoosePaymentMethod(Employee(1, "Rosa", "owner"), PAYMENT_FIADO))
+        assertTrue(canChoosePaymentMethod(Employee(2, "Lupita", "employee", canFiado = true), PAYMENT_FIADO))
+        assertFalse(canChoosePaymentMethod(Employee(5, "Beto", "employee", canFiado = false), PAYMENT_FIADO))
+        assertTrue(canChoosePaymentMethod(Employee(5, "Beto", "employee", canFiado = false), PAYMENT_CASH))
+        assertFalse(canUseInventory(Employee(5, "Beto", "employee", canInventory = false)))
+        assertTrue(canUseInventory(Employee(2, "Lupita", "employee", canInventory = true)))
+        assertFalse(canUseReports(Employee(2, "Lupita", "employee")))
+        assertTrue(canUseReports(Employee(1, "Rosa", "owner")))
+    }
+
+    @Test fun inviteLinksFromBothSchemesAreParsed() {
+        assertEquals("abc123", extractInviteToken("abarpay://empleado/abc123"))
+        assertEquals("abc123", extractInviteToken("https://abarpay-api.onrender.com/invite/abc123"))
+        assertEquals("abc123", extractInviteToken(" https://abarpay-api.onrender.com/invite/abc123/ "))
+        assertNull(extractInviteToken(null))
+        assertNull(extractInviteToken(""))
+        assertNull(extractInviteToken("abarpay://otro/abc123"))
+        assertNull(extractInviteToken("https://abarpay-api.onrender.com/otra/abc123"))
+        assertNull(extractInviteToken("abarpay://empleado/"))
+        assertNull(extractInviteToken("abarpay://empleado/no vale"))
+    }
+
+    @Test fun onboardingNeedsOwnerStoreAndType() {
+        assertTrue(onboardingReady("Doña Rosa", "Tiendita", "Tiendita"))
+        assertFalse(onboardingReady("", "Tiendita", "Tiendita"))
+        assertFalse(onboardingReady("Rosa", "  ", "Tiendita"))
+        assertFalse(onboardingReady("Rosa", "Tiendita", ""))
+        assertEquals(4, OWNER_GOALS.size)
+        assertEquals(listOf("Tiendita", "Abarrotes", "Miscelánea", "Fondita", "Otro"), BUSINESS_TYPES)
+    }
+
+    @Test fun quantityInputRoundTripsBetweenMilliAndText() {
+        assertEquals(12000, parseQtyMilli("12"))
+        assertEquals(1500, parseQtyMilli("1.5"))
+        assertEquals(250, parseQtyMilli("0.25"))
+        assertNull(parseQtyMilli("abc"))
+        assertNull(parseQtyMilli("-4"))
+        assertEquals("12", qtyInputText(12000))
+        assertEquals("1.5", qtyInputText(1500))
+        assertEquals("0.25", qtyInputText(250))
+    }
+
+    @Test fun voiceSummaryMarksMissingQuantity() {
+        val result = VoiceResult(listOf(VoiceLine(1, "Coca-Cola 600 ml", 12000), VoiceLine(2, "Pan", null)))
+        assertEquals("Coca-Cola 600 ml: 12 pza, Pan: falta la cantidad", voiceSummary(result.items))
+        assertEquals("Coca-Cola 600 ml: 12 pza", voiceLineLabel(result.items.first()))
+        assertEquals("Pan: falta la cantidad", voiceLineLabel(VoiceLine(2, "Pan", null)))
+    }
+
+    @Test fun recentAdjustmentsAreSortedAndLimited() {
+        val snapshot = InventorySnapshot(
+            listOf(
+                InventoryItem(1, "A", stockMilli = 1000, lastUpdatedAt = 10.0, lastUpdatedByName = "Rosa"),
+                InventoryItem(2, "B", stockMilli = 1000, lastUpdatedAt = 30.0, lastUpdatedByName = "Lupita"),
+                InventoryItem(3, "C", stockMilli = 1000, lastUpdatedAt = null),
+                InventoryItem(4, "D", stockMilli = 1000, lastUpdatedAt = 20.0),
+            ),
+        )
+        assertEquals(listOf(2, 4, 1), recentAdjustments(snapshot).map { it.productId })
+        assertEquals(listOf(2), recentAdjustments(snapshot, limit = 1).map { it.productId })
+        assertTrue(recentAdjustments(null).isEmpty())
+    }
+
+    @Test fun pendingInvitesOnlyCountInactiveEmployees() {
+        val team = listOf(
+            Employee(1, "Rosa", "owner", canInventory = true),
+            Employee(2, "Lupita", "employee"),
+            Employee(4, "Invitada", "employee", active = false),
+        )
+        assertEquals(1, pendingInvites(team))
+        assertEquals(0, pendingInvites(null))
+    }
+
+    @Test fun employeeDisplayNameIncludesNickname() {
+        assertEquals("Lupita · Lupis", Employee(2, "Lupita", "employee", nickname = "Lupis").displayName)
+        assertEquals("Lupita", Employee(2, "Lupita", "employee", nickname = "  ").displayName)
+    }
 }

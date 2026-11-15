@@ -1,5 +1,6 @@
 package mx.abarpay.mobile
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -9,13 +10,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,9 +23,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.PointOfSale
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -43,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -55,14 +53,25 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    /** Token de abarpay://empleado/<token> o https://…/invite/<token>. */
+    private var deepLink by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        deepLink = extractInviteToken(intent?.dataString)
         setContent {
             AbarpayTheme {
                 val model: ShopViewModel = viewModel()
                 val state by model.ui.collectAsStateWithLifecycle()
                 var scanning by rememberSaveable { mutableStateOf(false) }
+                val pendingInvite = deepLink
+                LaunchedEffect(pendingInvite) {
+                    if (pendingInvite != null) {
+                        deepLink = null
+                        model.openInvite(pendingInvite)
+                    }
+                }
                 Box(Modifier.fillMaxSize()) {
                     AbarpayApp(state, model) { scanning = true }
                     if (scanning) {
@@ -77,6 +86,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        extractInviteToken(intent.dataString)?.let { deepLink = it }
     }
 }
 
@@ -96,55 +111,36 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
         }
     }
 
-    BackHandler(enabled = settings || s.customerDetail != null || s.sale != null || s.uncertain || s.tab != "Inicio") {
+    BackHandler(
+        enabled = settings || s.teamOpen || s.inviteToken != null || s.customerDetail != null ||
+            s.sale != null || s.uncertain || s.tab != TAB_HOME,
+    ) {
         when {
+            s.inviteToken != null -> vm.dismissInvite()
             settings -> settings = false
+            s.teamOpen -> vm.closeTeam()
             s.customerDetail != null -> vm.closeCustomer()
             s.sale != null || s.uncertain ->
                 vm.message("Conservamos el cobro. Consultar o salir de la app no confirma ni cancela el pago.")
-            else -> vm.tab("Inicio")
+            else -> vm.tab(TAB_HOME)
         }
     }
 
     Scaffold(
         containerColor = Purple,
-        topBar = {
-            Column(Modifier.statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(painterResource(R.drawable.abarpay_logo), "Abarpay", Modifier.width(162.dp).height(55.dp))
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { settings = true }, enabled = !s.busy) {
-                        Icon(Icons.Outlined.Settings, "Conexión y alcance", tint = Color.White)
-                    }
-                }
-                Text(
-                    s.bootstrap?.store?.name ?: "Tu tiendita, en tu teléfono",
-                    color = Color.White.copy(alpha = .82f),
-                    fontSize = 13.sp,
-                )
-                Text(
-                    if (s.simulated) "Simulación local" else (s.server.ifBlank { "Sin servidor configurado" }),
-                    color = Color.White.copy(alpha = .55f),
-                    fontSize = 11.sp,
-                )
-            }
-        },
         bottomBar = {
-            if (!settings && s.employee != null && s.sale == null && !s.uncertain) {
+            val tabs = tabsFor(s.employee)
+            val showTabs = !settings && s.employee != null && s.sale == null && !s.uncertain &&
+                !s.teamOpen && s.inviteToken == null
+            if (showTabs) {
                 NavigationBar(containerColor = Color.White) {
-                    listOf(
-                        "Inicio" to Icons.Outlined.Home,
-                        "Cobrar" to Icons.Outlined.PointOfSale,
-                        "Fiado" to Icons.Outlined.People,
-                        "Inventario" to Icons.Outlined.Inventory2,
-                        "Reportes" to Icons.Outlined.BarChart,
-                    ).forEach { (label, icon) ->
+                    tabs.forEach { label ->
                         NavigationBarItem(
                             selected = s.tab == label,
                             onClick = { vm.tab(label) },
                             enabled = !s.busy,
-                            modifier = Modifier.testTag("tab-$label"),
-                            icon = { Icon(icon, label) },
+                            modifier = Modifier.testTag("tab-" + label),
+                            icon = { Icon(tabIcon(label), label) },
                             label = { Text(label, maxLines = 1, fontSize = 10.sp) },
                         )
                     }
@@ -158,6 +154,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         ) {
             Column(Modifier.fillMaxSize().imePadding()) {
+                CompactHeader()
                 if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Notice(
                     when {
@@ -169,21 +166,49 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                 )
                 s.message?.let { Notice(it, true) }
                 when {
+                    s.inviteToken != null -> InviteAcceptScreen(s, vm)
                     settings -> SettingsScreen(s, vm) { settings = false }
                     !s.busy && (s.uncertain || (!s.simulated && s.server.isBlank())) -> UncertainScreen(s.sale?.id)
                     s.sale != null -> SaleScreen(s, vm)
                     s.bootstrap == null -> ConnectingScreen(s, vm) { settings = true }
+                    s.teamOpen -> TeamScreen(s, vm)
+                    s.employee == null && !s.onboarded -> OnboardingScreen(s, vm)
                     s.employee == null && s.simulated -> AccessMockups(s, vm::select)
                     s.employee == null -> People(s, vm)
-                    s.tab == "Inicio" -> HomeScreen(s, vm)
-                    s.tab == "Cobrar" -> CheckoutScreen(s, vm, scan)
-                    s.tab == "Fiado" -> FiadoScreen(s, vm)
-                    s.tab == "Inventario" -> InventoryScreen(s, vm)
+                    s.tab == TAB_HOME -> HomeScreen(s, vm) { settings = true }
+                    s.tab == TAB_SELL -> CheckoutScreen(s, vm, scan)
+                    s.tab == TAB_FIADO -> FiadoScreen(s, vm)
+                    s.tab == TAB_INVENTORY -> InventoryScreen(s, vm)
                     else -> ReportsScreen(s, vm)
                 }
             }
         }
     }
+}
+
+/** Encabezado compacto: solo el logo pequeño dentro del contenido, sin nombre ni URL. */
+@Composable
+private fun CompactHeader() {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(shape = RoundedCornerShape(10.dp), color = Color.White) {
+            Image(
+                painterResource(R.drawable.abarpay_logo),
+                "Abarpay",
+                Modifier.padding(horizontal = 8.dp, vertical = 5.dp).width(58.dp).height(19.dp),
+            )
+        }
+    }
+}
+
+private fun tabIcon(label: String): ImageVector = when (label) {
+    TAB_SELL -> Icons.Outlined.PointOfSale
+    TAB_FIADO -> Icons.Outlined.People
+    TAB_INVENTORY -> Icons.Outlined.Inventory2
+    TAB_REPORTS -> Icons.Outlined.BarChart
+    else -> Icons.Outlined.Home
 }
 
 @Composable
@@ -195,7 +220,7 @@ private fun People(s: ShopState, vm: ShopViewModel) {
         item { Title("¿Quién cobra hoy?") }
         item {
             Text(
-                "Perfiles de demostración del servidor. Elegir una persona todavía no es iniciar sesión.",
+                "Elige tu perfil de esta tienda. La app recordará al empleado que aceptó una invitación en este teléfono.",
                 color = Muted,
                 fontSize = 13.sp,
             )
@@ -203,11 +228,15 @@ private fun People(s: ShopState, vm: ShopViewModel) {
         items(s.bootstrap?.employees.orEmpty().size) { index ->
             val employee = s.bootstrap!!.employees[index]
             Action(
-                title = employee.name + if (employee.role == "owner") " · Dueño" else " · Empleado",
+                title = employee.displayName + if (employee.isOwner) " · Dueño" else " · Empleado",
                 icon = Icons.Outlined.People,
             ) { vm.select(employee) }
         }
         if (s.bootstrap?.employees.isNullOrEmpty()) item { MutedText("El servidor no devolvió empleados.") }
-        item { androidx.compose.material3.OutlinedButton(onClick = vm::refresh, enabled = !s.busy) { Text("Reintentar") } }
+        item {
+            androidx.compose.material3.OutlinedButton(onClick = vm::refresh, enabled = !s.busy) {
+                Text("Reintentar")
+            }
+        }
     }
 }

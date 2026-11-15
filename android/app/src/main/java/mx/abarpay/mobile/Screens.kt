@@ -13,6 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -20,12 +26,14 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -49,73 +57,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun HomeScreen(s: ShopState, vm: ShopViewModel) {
-    val report = s.report
-    val products = s.bootstrap?.products.orEmpty()
-    val lowStock = products.count { it.isLowStock }
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("Hola, ${s.employee?.name.orEmpty()}", color = Muted) }
-        item { Title(s.bootstrap?.store?.name ?: "Tiendita de la Esquina") }
-        item {
-            Action(
-                title = "Cobrar ahora",
-                icon = Icons.Outlined.PointOfSale,
-                subtitle = "Efectivo, PEY/CoDi o fiado",
-                primary = true,
-            ) { vm.tab("Cobrar") }
-        }
-        item {
-            Panel {
-                Text("Ventas de hoy", fontSize = 15.sp)
-                Text(money(report?.totalCents ?: 0), fontSize = 34.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    "${report?.salesCount ?: 0} ventas · cobrado ${money(report?.collectedCents ?: 0)}",
-                    color = Green,
-                    fontSize = 13.sp,
-                )
-                HorizontalDivider()
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Stat("Efectivo", money(report?.cashCents ?: 0), Modifier.weight(1f))
-                    Stat("PEY", money(report?.peyCents ?: 0), Modifier.weight(1f))
-                    Stat("Fiado", money(report?.fiadoCents ?: 0), Modifier.weight(1f))
-                }
-                InfoRow("Fiado por cobrar", money(report?.fiadoOutstandingCents ?: 0), strong = true)
-                if ((report?.pending ?: 0) > 0) {
-                    Text("${report?.pending} cobro(s) PEY por conciliar", color = Amber, fontSize = 13.sp)
-                }
-            }
-        }
-        item {
-            Action("Fiado de clientes", Icons.Outlined.AccountBalanceWallet, "Saldos y abonos") { vm.tab("Fiado") }
-        }
-        item {
-            Action(
-                "Inventario",
-                Icons.Outlined.Inventory2,
-                if (lowStock > 0) "$lowStock producto(s) con stock bajo" else "Productos y existencias",
-            ) { vm.tab("Inventario") }
-        }
-        item { Action("Reportes", Icons.Outlined.BarChart, "Hoy por forma de pago") { vm.tab("Reportes") } }
-        item { TextButton(onClick = vm::refresh, enabled = !s.busy) { Text("Actualizar información") } }
-    }
-}
-
-@Composable
-private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(label, color = Muted, fontSize = 11.sp)
-        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
 internal fun InventoryScreen(s: ShopState, vm: ShopViewModel) {
     var query by rememberSaveable { mutableStateOf("") }
     val products = s.bootstrap?.products.orEmpty().filter { it.name.contains(query, ignoreCase = true) }
+    val canEdit = canUseInventory(s.employee)
+    val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (result.resultCode == Activity.RESULT_OK && !spoken.isNullOrBlank()) {
+            vm.voiceInventory(spoken)
+        }
+    }
+    fun dictate() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-MX")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Dicta lo que contaste: doce coca colas")
+        }
+        try {
+            voice.launch(intent)
+        } catch (_: ActivityNotFoundException) {
+            vm.message("Este teléfono no tiene reconocimiento de voz. Ajusta el conteo a mano.")
+        }
+    }
+    s.voice?.let { result -> VoiceConfirmDialog(result, s.busy, vm) }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Title("Inventario") }
         item {
-            MutedText("Ajuste simple: una unidad (1000 milli) por toque. Cada cambio queda registrado en el servidor.")
+            MutedText("Ajuste simple: una unidad por toque. Cada cambio queda registrado en el servidor.")
+        }
+        if (canEdit) {
+            item {
+                Button(
+                    onClick = { dictate() },
+                    enabled = !s.busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("inventario-voz"),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Icon(Icons.Outlined.Mic, "Contar por voz", Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Contar por voz")
+                }
+            }
+            item {
+                MutedText("Dicta en español: «doce coca colas». La app te muestra la cantidad y tú confirmas antes de guardar.", 12)
+            }
         }
         item {
             OutlinedTextField(
@@ -134,24 +120,72 @@ internal fun InventoryScreen(s: ShopState, vm: ShopViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(p.name, fontWeight = FontWeight.Bold)
-                        Text("${money(p.priceCents)} · ${qtyText(1000, p.unit)}", color = Muted, fontSize = 12.sp)
+                        Text(money(p.priceCents) + " · " + qtyText(1000, p.unit), color = Muted, fontSize = 12.sp)
                         Text(
-                            "Stock: ${p.stockLabel}",
+                            "Stock: " + p.stockLabel,
                             color = if (low) Amber else Muted,
                             fontSize = 12.sp,
                         )
                     }
                     IconButton(onClick = { vm.adjust(p.id, -1000) }, enabled = !s.busy && !p.unlimitedStock) {
-                        Icon(Icons.Outlined.RemoveCircleOutline, "Restar una unidad de ${p.name}")
+                        Icon(Icons.Outlined.RemoveCircleOutline, "Restar una unidad de " + p.name)
                     }
                     IconButton(onClick = { vm.adjust(p.id, 1000) }, enabled = !s.busy && !p.unlimitedStock) {
-                        Icon(Icons.Outlined.AddCircleOutline, "Sumar una unidad de ${p.name}")
+                        Icon(Icons.Outlined.AddCircleOutline, "Sumar una unidad de " + p.name)
                     }
                 }
             }
         }
         item { TextButton(onClick = vm::refresh, enabled = !s.busy) { Text("Actualizar inventario") } }
     }
+}
+
+/** Hoja de confirmación del conteo por voz: nada se guarda hasta tocar «Guardar conteo». */
+@Composable
+internal fun VoiceConfirmDialog(result: VoiceResult, busy: Boolean, vm: ShopViewModel) {
+    AlertDialog(
+        onDismissRequest = vm::closeVoice,
+        title = { Text("Confirma tu conteo") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                MutedText("Revisa producto y cantidad. Nada se guarda hasta que confirmes.", 12)
+                result.items.forEach { line ->
+                    var amount by rememberSaveable(line.productId) {
+                        mutableStateOf(line.qtyMilli?.let { qtyInputText(it) } ?: "")
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(line.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(if (line.unit == "kg") "kilogramos" else "piezas", color = Muted, fontSize = 11.sp)
+                        }
+                        OutlinedTextField(
+                            amount,
+                            { value ->
+                                amount = value
+                                vm.updateVoiceLine(line.productId, parseQtyMilli(value))
+                            },
+                            Modifier.width(96.dp).testTag("voice-qty-" + line.productId),
+                            singleLine = true,
+                            enabled = !busy,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        )
+                    }
+                }
+                result.note?.let { Text(it, color = Amber, fontSize = 12.sp) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = vm::confirmVoice,
+                enabled = !busy && result.items.any { (it.qtyMilli ?: 0) > 0 },
+                modifier = Modifier.testTag("voice-guardar"),
+            ) { Text("Guardar conteo") }
+        },
+        dismissButton = { TextButton(onClick = vm::closeVoice) { Text("Cancelar") } },
+    )
 }
 
 @Composable
@@ -368,6 +402,20 @@ internal fun SettingsScreen(s: ShopState, vm: ShopViewModel, close: () -> Unit) 
                     color = Muted,
                     fontSize = 12.sp,
                 )
+            }
+        }
+        s.profile?.let { profile ->
+            item {
+                Panel {
+                    Text("Tu tienda", fontWeight = FontWeight.Bold)
+                    InfoRow("Negocio", profile.name.ifBlank { s.bootstrap?.store?.name.orEmpty() })
+                    InfoRow("Tipo", profile.businessType.ifBlank { "Sin definir" })
+                    InfoRow("Dueño", profile.ownerName.ifBlank { "Sin definir" })
+                    if (s.ownerGoals.isNotEmpty()) {
+                        Text("Metas guardadas en este teléfono: " + s.ownerGoals.joinToString(", "), fontSize = 12.sp, color = Muted)
+                    }
+                    MutedText("La foto del negocio se muestra en la consola del dueño.", 12)
+                }
             }
         }
         if (s.simulated && s.employee != null) {

@@ -322,4 +322,219 @@ class RepositoryTest {
         assertEquals(2000, result.items.first { it.productId == 1 }.qtyMilli)
         assertEquals(500, result.items.first { it.productId == 9 }.qtyMilli)
     }
+
+    // ------------------------------------------------------------------
+    // Contrato v2: perfil, equipo, invitaciones, inventario y X-Employee-Id
+    // ------------------------------------------------------------------
+
+    @Test fun employeeHeaderIsSentOnlyAfterSelectingProfile() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"totalCents":0,"salesCount":0}"""))
+            server.enqueue(MockResponse().setBody("""{"totalCents":0,"salesCount":0}"""))
+            val repo = repo(server)
+            repo.report()
+            assertNull(server.takeRequest().getHeader("X-Employee-Id"))
+            repo.actAs(2)
+            repo.report()
+            assertEquals("2", server.takeRequest().getHeader("X-Employee-Id"))
+        } finally { server.shutdown() }
+    }
+
+    @Test fun storeProfileAndPhotoUseContractBodies() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            val profile = """{"storeId":"tiendita-esquina","name":"Tiendita","businessType":"Tiendita","ownerName":"Doña Rosa"}"""
+            server.enqueue(MockResponse().setBody(profile))
+            server.enqueue(MockResponse().setBody(profile.replace("Tiendita\"", "La Esquina\"")))
+            server.enqueue(MockResponse().setBody("""{"ok":true}"""))
+            val repo = repo(server)
+            assertEquals("tiendita-esquina", repo.profile().storeId)
+            repo.updateProfile(name = "La Esquina", businessType = "Abarrotes", ownerName = "Rosa")
+            repo.uploadPhoto("data:image/jpeg;base64,AAAA")
+            val get = server.takeRequest()
+            assertEquals("GET", get.method)
+            assertEquals("/api/store/profile", get.path)
+            val put = server.takeRequest()
+            assertEquals("PUT", put.method)
+            val putBody = JSONObject(put.body.readUtf8())
+            assertEquals(setOf("name", "businessType", "ownerName"), putBody.keys().asSequence().toSet())
+            assertEquals("La Esquina", putBody.getString("name"))
+            assertEquals("Abarrotes", putBody.getString("businessType"))
+            val photo = server.takeRequest()
+            assertEquals("/api/store/photo", photo.path)
+            assertEquals("data:image/jpeg;base64,AAAA", JSONObject(photo.body.readUtf8()).getString("dataUrl"))
+        } finally { server.shutdown() }
+    }
+
+    @Test fun employeesListAndPatchRespectPermissions() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"items":[{"id":1,"name":"Doña Rosa","role":"owner","active":true,"canSell":true,"canFiado":true,"canInventory":true},{"id":2,"name":"Lupita","nickname":"Lupis","role":"employee","active":true,"canSell":true,"canFiado":true,"canInventory":true},{"id":4,"name":"Invitada","role":"employee","active":false,"canInventory":true}]}"""))
+            server.enqueue(MockResponse().setBody("""{"id":2,"name":"Lupita","nickname":"Lupis","role":"employee","active":true,"canSell":true,"canFiado":false,"canInventory":true}"""))
+            val repo = repo(server)
+            val team = repo.employees()
+            assertEquals(3, team.size)
+            assertEquals("Lupis", team[1].nickname)
+            assertTrue(team[1].canInventory)
+            assertFalse(team[2].active)
+            assertEquals("Invitada", team[2].name)
+            assertEquals("/api/employees", server.takeRequest().path)
+            val patched = repo.patchEmployee(2, canFiado = false)
+            assertFalse(patched.canFiado)
+            val patch = server.takeRequest()
+            assertEquals("PATCH", patch.method)
+            assertEquals("/api/employees/2", patch.path)
+            assertEquals(setOf("canFiado"), JSONObject(patch.body.readUtf8()).keys().asSequence().toSet())
+        } finally { server.shutdown() }
+    }
+
+    @Test fun inviteCreationAndAcceptanceFlow() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"token":"abc123","employeeId":5,"url":"https://abarpay-api.onrender.com/invite/abc123"}"""))
+            server.enqueue(MockResponse().setBody("""{"token":"abc123","employeeId":5,"name":"Juan","storeName":"Tiendita","businessType":"Abarrotes","canSell":true,"canFiado":false,"canInventory":true}"""))
+            server.enqueue(MockResponse().setBody("""{"id":5,"name":"Juan","nickname":"Juancho","role":"employee","active":true,"canSell":true,"canFiado":false,"canInventory":true}"""))
+            val repo = repo(server)
+            val invite = repo.createInvite("Juan", canSell = true, canFiado = false, canInventory = true)
+            assertEquals("abc123", invite.token)
+            assertTrue(invite.url.endsWith("/invite/abc123"))
+            val create = server.takeRequest()
+            assertEquals("/api/employees/invites", create.path)
+            assertEquals(
+                setOf("name", "canSell", "canFiado", "canInventory"),
+                JSONObject(create.body.readUtf8()).keys().asSequence().toSet(),
+            )
+            val info = repo.inviteInfo("abc123")
+            assertEquals("Juan", info.name)
+            assertEquals("Tiendita", info.storeName)
+            assertFalse(info.canFiado)
+            assertTrue(info.canInventory)
+            assertEquals("/api/employees/invites/abc123", server.takeRequest().path)
+            val accepted = repo.acceptInvite("abc123", "Juancho")
+            assertEquals("Juancho", accepted.nickname)
+            assertTrue(accepted.active)
+            assertEquals(setOf("nickname"), JSONObject(server.takeRequest().body.readUtf8()).keys().asSequence().toSet())
+        } finally { server.shutdown() }
+    }
+
+    @Test fun inventorySetAndVoiceUseContractBodies() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"id":1,"name":"Coca-Cola 600 ml","unit":"pieza","priceCents":1800,"stockMilli":12000}"""))
+            server.enqueue(MockResponse().setBody("""{"items":[{"productId":1,"name":"Coca-Cola 600 ml","qtyMilli":12000,"unit":"pieza"},{"productId":2,"name":"Pan","unit":"pieza"}],"note":"Revisa el pan"}"""))
+            val repo = repo(server)
+            val updated = repo.inventorySet(1, 12000, "conteo por voz")
+            assertEquals(12000, updated.stockMilli)
+            val set = server.takeRequest()
+            assertEquals("/api/inventory/set", set.path)
+            val setBody = JSONObject(set.body.readUtf8())
+            assertEquals(1, setBody.getInt("productId"))
+            assertEquals(12000, setBody.getInt("qtyMilli"))
+            assertEquals("conteo por voz", setBody.getString("note"))
+            val voice = repo.inventoryVoice("12 coca colas")
+            assertEquals(2, voice.items.size)
+            assertEquals(12000, voice.items[0].qtyMilli)
+            assertNull(voice.items[1].qtyMilli)
+            assertEquals("Revisa el pan", voice.note)
+            val voiceRequest = server.takeRequest()
+            assertEquals("/api/inventory/voice", voiceRequest.path)
+            assertEquals("12 coca colas", JSONObject(voiceRequest.body.readUtf8()).getString("text"))
+        } finally { server.shutdown() }
+    }
+
+    @Test fun inventorySnapshotReadsValueAndLastUpdate() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"items":[{"productId":1,"name":"Coca-Cola 600 ml","unit":"pieza","priceCents":1800,"stockMilli":24000,"unlimitedStock":false,"lastUpdatedAt":1700000000.0,"lastUpdatedByName":"Lupita","lastUpdatedByNickname":"Lupis"}],"totalValueCents":43200}"""))
+            val snapshot = repo(server).inventory()
+            assertEquals(43200L, snapshot.totalValueCents)
+            val item = snapshot.items.single()
+            assertEquals(24000, item.stockMilli)
+            assertEquals(1700000000.0, item.lastUpdatedAt!!, 0.001)
+            assertEquals("Lupita", item.lastUpdatedByName)
+            assertEquals("Lupis", item.lastUpdatedByNickname)
+            assertEquals("/api/inventory", server.takeRequest().path)
+        } finally { server.shutdown() }
+    }
+
+    @Test fun report403IsRecognizableForEmployees() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(403).setBody("""{"detail":"Solo el dueño ve reportes"}"""))
+            val repo = repo(server)
+            repo.actAs(2)
+            val error = runCatching { repo.report() }.exceptionOrNull()
+            assertTrue(error is ApiFailure)
+            assertEquals(403, (error as ApiFailure).code)
+            assertTrue(error.message!!.contains("Solo el dueño"))
+        } finally { server.shutdown() }
+    }
+
+    @Test fun demoPermissionsGateReportsAndInventory() = runBlocking {
+        val demo = DemoRepository()
+        demo.actAs(2)
+        val reportError = runCatching { demo.report() }.exceptionOrNull()
+        assertTrue(reportError is ApiFailure)
+        assertEquals(403, (reportError as ApiFailure).code)
+        demo.actAs(5)
+        val denied = runCatching { demo.inventorySet(1, 5000) }.exceptionOrNull()
+        assertTrue(denied is ApiFailure)
+        assertEquals(403, (denied as ApiFailure).code)
+        demo.actAs(1)
+        demo.inventorySet(1, 5000)
+        assertEquals(5000, demo.bootstrap().products.first { it.id == 1 }.stockMilli)
+    }
+
+    @Test fun demoInviteCreatesPendingEmployeeAndAcceptsOnce() = runBlocking {
+        val demo = DemoRepository()
+        demo.actAs(1)
+        val invite = demo.createInvite("Juan", canSell = true, canFiado = false, canInventory = true)
+        assertTrue(invite.token.isNotBlank())
+        assertTrue(invite.url.contains(invite.token))
+        assertTrue(demo.employees().any { it.name == "Juan" && !it.active })
+        val info = demo.inviteInfo(invite.token)
+        assertEquals("Juan", info.name)
+        assertEquals("Tiendita de la Esquina", info.storeName)
+        assertFalse(info.canFiado)
+        assertTrue(info.canInventory)
+        val accepted = demo.acceptInvite(invite.token, "Juancho")
+        assertEquals("Juancho", accepted.nickname)
+        assertTrue(accepted.active)
+        assertTrue(demo.bootstrap().employees.any { it.name == "Juan" })
+        val reused = runCatching { demo.inviteInfo(invite.token) }.exceptionOrNull()
+        assertTrue(reused is ApiFailure)
+        assertEquals(410, (reused as ApiFailure).code)
+        assertTrue(runCatching { demo.acceptInvite(invite.token, "Otra") }.exceptionOrNull() is ApiFailure)
+    }
+
+    @Test fun demoOnboardingProfileAndPhoto() = runBlocking {
+        val demo = DemoRepository()
+        val updated = demo.updateProfile(name = "La Esquina", businessType = "Abarrotes", ownerName = "Rosa")
+        assertEquals("La Esquina", updated.name)
+        assertEquals("La Esquina", demo.bootstrap().store.name)
+        assertEquals("Abarrotes", demo.profile().businessType)
+        demo.uploadPhoto("data:image/jpeg;base64,AAAA")
+        assertTrue(runCatching { demo.uploadPhoto("data:text/plain;base64,AAAA") }.isFailure)
+        assertTrue(runCatching { demo.uploadPhoto("data:image/jpeg;base64," + "A".repeat(5_000_001)) }.isFailure)
+    }
+
+    @Test fun demoInventorySnapshotShowsRecentMovements() = runBlocking {
+        val demo = DemoRepository()
+        demo.actAs(1)
+        assertTrue(demo.inventory().items.none { it.lastUpdatedAt != null })
+        demo.inventorySet(1, 12000)
+        val item = demo.inventory().items.first { it.productId == 1 }
+        assertEquals(12000, item.stockMilli)
+        assertNotNull(item.lastUpdatedAt)
+        assertEquals("Doña Rosa", item.lastUpdatedByName)
+        assertTrue(demo.inventory().totalValueCents > 0)
+    }
 }

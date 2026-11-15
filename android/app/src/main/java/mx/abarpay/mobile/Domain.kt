@@ -9,7 +9,12 @@ const val PAYMENT_CASH = "cash"
 const val PAYMENT_PEY = "pey"
 const val PAYMENT_FIADO = "fiado"
 
-data class Store(val id: String, val name: String)
+data class Store(
+    val id: String,
+    val name: String,
+    val businessType: String = "",
+    val ownerName: String = "",
+)
 
 data class Product(
     val id: Int,
@@ -25,7 +30,20 @@ data class Product(
     val stockLabel get() = if (unlimitedStock) "Sin límite" else qtyText(stockMilli, unit)
 }
 
-data class Employee(val id: Int, val name: String, val role: String)
+data class Employee(
+    val id: Int,
+    val name: String,
+    val role: String,
+    val nickname: String? = null,
+    val active: Boolean = true,
+    val canSell: Boolean = true,
+    val canFiado: Boolean = true,
+    val canInventory: Boolean = false,
+) {
+    val isOwner get() = role == "owner"
+    /** Nombre propio y, si existe, el apodo que la persona eligió al aceptar la invitación. */
+    val displayName get() = nickname?.takeIf { it.isNotBlank() }?.let { "$name · $it" } ?: name
+}
 
 data class Bootstrap(
     val store: Store,
@@ -255,3 +273,145 @@ private fun qtyFrom(chunk: String): Int {
     chunk.split(' ', ',', '.').firstOrNull { numberWords.containsKey(it) }?.let { return numberWords.getValue(it) }
     return 1000
 }
+
+// ---------------------------------------------------------------------------
+// Contrato v2 · onboarding, equipo, permisos e inventario
+// ---------------------------------------------------------------------------
+
+const val TAB_HOME = "Inicio"
+const val TAB_SELL = "Cobrar"
+const val TAB_FIADO = "Fiado"
+const val TAB_INVENTORY = "Inventario"
+const val TAB_REPORTS = "Reportes"
+
+/** Metas del onboarding: chips multi-select. Se guardan solo en este teléfono. */
+val OWNER_GOALS = listOf(
+    "Organizar mis ventas y gastos",
+    "Controlar lo que me deben",
+    "Gestionar mejor mi inventario",
+    "Ver estadísticas avanzadas",
+)
+
+/** Tipos de negocio del onboarding: chips de una sola elección. */
+val BUSINESS_TYPES = listOf("Tiendita", "Abarrotes", "Miscelánea", "Fondita", "Otro")
+
+data class StoreProfile(
+    val storeId: String = "",
+    val name: String = "",
+    val businessType: String = "",
+    val ownerName: String = "",
+)
+
+data class Invite(val token: String, val employeeId: Int, val url: String)
+
+data class InviteInfo(
+    val token: String,
+    val employeeId: Int,
+    val name: String,
+    val storeName: String,
+    val businessType: String,
+    val canSell: Boolean = true,
+    val canFiado: Boolean = true,
+    val canInventory: Boolean = false,
+)
+
+/** Una línea que el servidor entendió del dictado. qtyMilli nulo = falta la cantidad. */
+data class VoiceLine(
+    val productId: Int,
+    val name: String,
+    val qtyMilli: Int?,
+    val unit: String = "pieza",
+)
+
+data class VoiceResult(val items: List<VoiceLine> = emptyList(), val note: String? = null)
+
+data class InventoryItem(
+    val productId: Int,
+    val name: String,
+    val unit: String = "pieza",
+    val stockMilli: Int = 0,
+    val unlimitedStock: Boolean = false,
+    val lastUpdatedAt: Double? = null,
+    val lastUpdatedByName: String? = null,
+    val lastUpdatedByNickname: String? = null,
+)
+
+data class InventorySnapshot(val items: List<InventoryItem> = emptyList(), val totalValueCents: Long = 0)
+
+/** Pestañas visibles según rol y permisos. Sin perfil se muestran todas. */
+fun tabsFor(employee: Employee?): List<String> = tabsFor(
+    role = employee?.role ?: "owner",
+    canSell = employee?.canSell ?: true,
+    canInventory = employee?.canInventory ?: true,
+)
+
+fun tabsFor(role: String, canSell: Boolean, canInventory: Boolean): List<String> = buildList {
+    add(TAB_HOME)
+    if (canSell) add(TAB_SELL)
+    add(TAB_FIADO)
+    if (canInventory) add(TAB_INVENTORY)
+    if (role == "owner") add(TAB_REPORTS)
+}
+
+fun canUseTabs(employee: Employee?, tab: String): Boolean = tab in tabsFor(employee)
+
+fun canChoosePaymentMethod(employee: Employee?, method: String): Boolean =
+    method != PAYMENT_FIADO || employee == null || employee.canFiado
+
+fun canUseInventory(employee: Employee?): Boolean = employee == null || employee.canInventory
+
+fun canUseReports(employee: Employee?): Boolean = employee == null || employee.role == "owner"
+
+/** Solo los empleados inactivos con invitación pendiente cuentan como invitación por aceptar. */
+fun pendingInvites(team: List<Employee>?): Int =
+    team?.count { !it.active && it.role != "owner" } ?: 0
+
+fun onboardingReady(ownerName: String, storeName: String, businessType: String): Boolean =
+    ownerName.isNotBlank() && storeName.isNotBlank() && businessType.isNotBlank()
+
+fun goalSelectionLabel(goals: List<String>): String =
+    if (goals.isEmpty()) "Sin metas por ahora" else goals.joinToString(", ")
+
+/**
+ * Acepta abarpay://empleado/<token> y https://<host>/invite/<token>.
+ * Devuelve null si el enlace no trae un token válido.
+ */
+fun extractInviteToken(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return null
+    val token = when {
+        uri.scheme == "abarpay" && uri.host == "empleado" -> uri.path?.trim('/')
+        uri.scheme == "https" && uri.path?.startsWith("/invite/") == true ->
+            uri.path.removePrefix("/invite/").trim('/')
+        else -> null
+    }
+    return token?.takeIf { it.matches(Regex("^[A-Za-z0-9-]{4,128}$")) }
+}
+
+/** 12 -> 12000 (12 piezas); 1.5 -> 1500 (1.5 kg). Null si no se puede leer. */
+fun parseQtyMilli(raw: String): Int? {
+    val cents = parseCashCents(raw) ?: return null
+    val milli = cents * 10L
+    return if (milli in 0L..999_000L) milli.toInt() else null
+}
+
+/** Texto editable para la hoja de confirmación: 12000 -> "12", 1500 -> "1.5". */
+fun qtyInputText(qtyMilli: Int): String {
+    val whole = qtyMilli / 1000
+    val rem = qtyMilli % 1000
+    return if (rem == 0) whole.toString()
+    else String.format(Locale.ROOT, "%.3f", qtyMilli / 1000.0).trimEnd('0').trimEnd('.')
+}
+
+fun voiceLineLabel(line: VoiceLine): String =
+    line.name + ": " + (line.qtyMilli?.let { qtyText(it, line.unit) } ?: "falta la cantidad")
+
+fun voiceSummary(items: List<VoiceLine>): String =
+    items.joinToString(", ") { voiceLineLabel(it) }
+
+/** Ajustes recientes para «Actividades»: los productos con movimiento más nuevo primero. */
+fun recentAdjustments(snapshot: InventorySnapshot?, limit: Int = 3): List<InventoryItem> =
+    snapshot?.items.orEmpty()
+        .filter { it.lastUpdatedAt != null }
+        .sortedByDescending { it.lastUpdatedAt ?: 0.0 }
+        .take(limit)

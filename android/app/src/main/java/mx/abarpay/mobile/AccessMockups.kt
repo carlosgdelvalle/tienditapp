@@ -75,7 +75,10 @@ import androidx.compose.ui.unit.sp
         item { MockField("Contraseña de ejemplo", "DEMO-SIN-CLAVE", Icons.Outlined.Lock, password = true) }
         if (!owner && !register) item {
             MockField("Invitación de tu dueño", "TIENDITA-DEMO", Icons.Outlined.ConfirmationNumber)
-            Text("Código ficticio. La invitación real y los permisos todavía no están implementados.", fontSize = 12.sp)
+            Text(
+                "Código ficticio. En la app real la invitación llega por enlace o QR y eliges tu apodo al aceptarla.",
+                fontSize = 12.sp,
+            )
         }
         item {
             Button(onClick = { if (register) dialog = "Registro simulado" else person?.let(enter) },
