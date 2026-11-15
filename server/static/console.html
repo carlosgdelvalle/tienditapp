@@ -299,6 +299,45 @@
     .btn-inline { padding: 10px 15px; border-radius: 10px; font-size: 12.5px; }
     .btn-inline.ghost { border: 1px solid var(--line); background: transparent; color: var(--ink-soft); }
     .btn-inline.ghost:hover { background: #fff; color: var(--ink); }
+    .ticket-id { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ticket-note {
+      display: inline-block;
+      max-width: 280px;
+      white-space: normal;
+      line-height: 1.4;
+      color: var(--ink-soft);
+      vertical-align: top;
+    }
+    .ticket-sale { line-height: 1.35; }
+    .ticket-sale-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 3px;
+      color: #7b8882;
+      font-size: 11px;
+    }
+    .ticket-when { color: #8b9892; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .ticket-actions { display: flex; align-items: center; gap: 6px; }
+    .ticket-btn {
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--ink-soft);
+      font-size: 11.5px;
+      font-weight: 750;
+      line-height: 1.25;
+    }
+    .ticket-btn:hover { background: #f6f3ec; color: var(--ink); }
+    .ticket-btn.resolve { border-color: #cfe4da; background: #eef7f2; color: var(--green-dark); }
+    .ticket-btn.resolve:hover { border-color: var(--green); background: var(--green); color: #fff; }
+    .ticket-btn:disabled { border-color: var(--line); background: #f1efe8; color: #8b9892; cursor: default; }
+    .pey-charge { color: #7b8882; font-size: 11px; }
+    tbody tr.pey-alert td { background: #fff7e6; }
+    tbody tr.pey-alert td:first-child { box-shadow: inset 3px 0 0 var(--orange); }
+    tbody tr.pey-alert:hover td { background: #fff2d9; }
     [hidden] { display: none !important; }
     @media (max-width: 1180px) {
       .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -469,6 +508,38 @@
             </table>
           </div>
         </div>
+
+        <div class="panel span-2" id="tickets-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Tickets de soporte</div>
+              <div class="panel-sub" id="tickets-sub">Cobros no confirmados reportados en la tienda</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Ticket</th><th>Fecha</th><th>Venta</th><th>Estado</th><th>Reportado por</th><th>Nota</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="tickets-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel span-2" id="pey-events-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Eventos PEY</div>
+              <div class="panel-sub" id="pey-events-sub">Rastro de eventos · ventas PEY de cualquier estado</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Hora</th><th>Folio</th><th>Estado</th><th class="right">Monto</th></tr></thead>
+              <tbody id="pey-events-body"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <div class="footer">
@@ -497,6 +568,8 @@
       var pendingOps = {};
       var editingProductId = null;
       var inventoryState = { items: [], totalValueCents: 0, lowCount: 0, source: "v2" };
+      var ticketsState = { ok: false, loaded: false, items: [], error: null };
+      var pendingTicketOps = {};
 
       var loginScreen = document.getElementById("login-screen");
       var app = document.getElementById("app");
@@ -633,6 +706,35 @@
       function methodLabel(method) {
         var map = { cash: "Efectivo", pey: "PEY", fiado: "Fiado" };
         return map[method] || method || "—";
+      }
+
+      function epochValue(value) {
+        if (value === null || value === undefined || value === "") return null;
+        var number = Number(value);
+        if (Number.isFinite(number)) return number;
+        var parsed = Date.parse(String(value));
+        return Number.isFinite(parsed) ? parsed / 1000 : null;
+      }
+
+      function ticketCode(id) {
+        var text = String(id || "").trim();
+        if (!text) return "—";
+        if (text.indexOf("tkt_") === 0) text = text.slice(4);
+        var rest = text.replace(/[^A-Za-z0-9]/g, "");
+        return "tkt_" + rest.slice(0, 8).toUpperCase();
+      }
+
+      function ticketStatusBadge(status) {
+        var labels = { open: ["Abierto", "warn"], resolved: ["Resuelto", "ok"] };
+        var item = labels[status] || [status || "—", "muted"];
+        return '<span class="badge ' + item[1] + '">' + escapeHtml(item[0]) + '</span>';
+      }
+
+      function truncateText(value, max) {
+        var text = String(value == null ? "" : value).trim();
+        if (!text) return "";
+        if (text.length <= max) return text;
+        return text.slice(0, max - 1).trim() + "…";
       }
 
       function showToast(message) {
@@ -883,6 +985,15 @@
         });
       }
 
+      function fetchSupportTickets() {
+        return consoleFetch("/api/support/tickets?status=all", { employeeId: EMPLOYEE_ID }).then(function (data) {
+          return { ok: true, loaded: true, items: (data && data.items) || [], error: null };
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+          return { ok: false, loaded: true, items: [], error: error };
+        });
+      }
+
       function findProduct(productId) {
         var key = String(productId);
         for (var i = 0; i < inventoryState.items.length; i += 1) {
@@ -1098,7 +1209,156 @@
         body.innerHTML = html;
       }
 
-      function renderAll(summary, sales, inventory, fiado, profile) {
+      function findTicket(ticketId) {
+        var key = String(ticketId);
+        for (var i = 0; i < ticketsState.items.length; i += 1) {
+          if (String(ticketsState.items[i].id) === key) return ticketsState.items[i];
+        }
+        return null;
+      }
+
+      function ticketSaleCell(ticket) {
+        if (!ticket || !ticket.saleId) return '<span class="muted">Sin venta</span>';
+        var meta = [];
+        if (ticket.saleTotalCents !== undefined && ticket.saleTotalCents !== null) {
+          meta.push('<span class="mono">' + escapeHtml(money(ticket.saleTotalCents)) + '</span>');
+        }
+        if (ticket.saleStatus) meta.push(statusBadge(ticket.saleStatus));
+        if (ticket.chargedCents !== undefined && ticket.chargedCents !== null && Number(ticket.chargedCents) !== Number(ticket.saleTotalCents)) {
+          meta.push('<span class="pey-charge">cobro ' + escapeHtml(money(ticket.chargedCents)) + '</span>');
+        }
+        return '<div class="ticket-sale">' +
+          '<div class="mono">' + escapeHtml(shortId(ticket.saleId)) + '</div>' +
+          (meta.length ? '<div class="ticket-sale-meta">' + meta.join('') + '</div>' : '') +
+          '</div>';
+      }
+
+      function ticketRow(ticket) {
+        var ticketId = String(ticket.id || "");
+        var busy = Boolean(pendingTicketOps[ticketId]);
+        var note = truncateText(ticket.note, 120);
+        var noteCell = note
+          ? '<span class="ticket-note" title="' + escapeHtml(ticket.note) + '">' + escapeHtml(note) + '</span>'
+          : '<span class="muted">—</span>';
+        var when = epochValue(ticket.createdAt);
+        var whenCell = '<div>' + escapeHtml(when ? dateTimeLabel(when) : "—") + '</div>';
+        var resolvedAt = epochValue(ticket.resolvedAt);
+        if (ticket.status === "resolved" && resolvedAt) {
+          whenCell += '<div class="ticket-when">Resuelto ' + escapeHtml(dateTimeLabel(resolvedAt)) + '</div>';
+        }
+        var action;
+        if (ticket.status === "resolved") {
+          action = '<button type="button" class="ticket-btn" data-ticket-action="reopen" data-ticket-id="' + escapeHtml(ticketId) + '"' + (busy ? ' disabled' : '') + '>Reabrir</button>';
+        } else {
+          action = '<button type="button" class="ticket-btn resolve" data-ticket-action="resolve" data-ticket-id="' + escapeHtml(ticketId) + '"' + (busy ? ' disabled' : '') + '>Resolver</button>';
+        }
+        return '<tr>' +
+          '<td><span class="mono ticket-id" title="' + escapeHtml(ticketId) + '">' + escapeHtml(ticketCode(ticketId)) + '</span></td>' +
+          '<td>' + whenCell + '</td>' +
+          '<td>' + ticketSaleCell(ticket) + '</td>' +
+          '<td>' + ticketStatusBadge(ticket.status) + '</td>' +
+          '<td>' + escapeHtml(ticket.reportedByName || "—") + '</td>' +
+          '<td>' + noteCell + '</td>' +
+          '<td>' + (ticketId ? '<div class="ticket-actions">' + action + '</div>' : '<span class="muted">—</span>') + '</td>' +
+          '</tr>';
+      }
+
+      function renderTickets() {
+        var state = ticketsState;
+        var body = document.getElementById("tickets-body");
+        var sub = document.getElementById("tickets-sub");
+        if (!state.loaded) {
+          sub.textContent = "Cobros no confirmados reportados en la tienda";
+          body.innerHTML = '<tr><td colspan="7" class="empty">Cargando tickets…</td></tr>';
+          return;
+        }
+        if (!state.ok) {
+          sub.textContent = "Tickets fuera de línea; el resto de la consola sigue";
+          body.innerHTML = '<tr><td colspan="7" class="empty">' +
+            escapeHtml("No se pudieron leer los tickets: " + ((state.error && state.error.message) || "error de red") + ". Se reintenta solo.") +
+            '</td></tr>';
+          return;
+        }
+        var items = state.items || [];
+        var openCount = 0;
+        for (var i = 0; i < items.length; i += 1) {
+          if (items[i].status === "open") openCount += 1;
+        }
+        sub.textContent = items.length
+          ? items.length + " tickets · " + openCount + " abiertos"
+          : "Cobros no confirmados reportados en la tienda";
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="7" class="empty">Sin tickets de soporte. Un cobro PEY sin confirmar se reporta desde la app.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var j = 0; j < items.length; j += 1) {
+          html += ticketRow(items[j]);
+        }
+        body.innerHTML = html;
+      }
+
+      function updateTicket(ticket, nextStatus) {
+        if (!ticket || !ticket.id) return;
+        var key = String(ticket.id);
+        if (pendingTicketOps[key]) return;
+        pendingTicketOps[key] = true;
+        renderTickets();
+        consoleFetch("/api/support/tickets/" + encodeURIComponent(key), {
+          method: "PATCH",
+          employeeId: EMPLOYEE_ID,
+          body: JSON.stringify({ status: nextStatus })
+        }).then(function () {
+          ticket.status = nextStatus;
+          ticket.resolvedAt = nextStatus === "resolved" ? Date.now() / 1000 : null;
+          showToast("Ticket " + ticketCode(key) + (nextStatus === "resolved" ? " resuelto." : " reabierto."));
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            showToast(error.message || "No se pudo actualizar el ticket.");
+          }
+        }).then(function () {
+          delete pendingTicketOps[key];
+          renderTickets();
+          refreshAll();
+        });
+      }
+
+      function renderPeyEvents(sales) {
+        var all = (sales && sales.items) || [];
+        var items = [];
+        for (var i = 0; i < all.length; i += 1) {
+          if (all[i] && all[i].paymentMethod === "pey") items.push(all[i]);
+        }
+        var body = document.getElementById("pey-events-body");
+        var sub = document.getElementById("pey-events-sub");
+        sub.textContent = items.length
+          ? "Rastro de eventos · " + items.length + " PEY recientes, cualquier estado"
+          : "Rastro de eventos · ventas PEY de cualquier estado";
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="4" class="empty">Todavía no hay eventos PEY.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var j = 0; j < items.length; j += 1) {
+          var sale = items[j];
+          var alert = sale.status === "pending" || sale.status === "por_conciliar";
+          var folio = shortId(sale.id);
+          if (sale.peyTxId) folio += " · " + truncateText(sale.peyTxId, 14);
+          var charged = "";
+          if (sale.chargedCents !== undefined && sale.chargedCents !== null && Number(sale.chargedCents) !== Number(sale.totalCents)) {
+            charged = '<div class="pey-charge">cobro ' + escapeHtml(money(sale.chargedCents)) + '</div>';
+          }
+          html += '<tr' + (alert ? ' class="pey-alert"' : '') + '>' +
+            '<td class="mono">' + escapeHtml(timeLabel(epochValue(sale.createdAt))) + '</td>' +
+            '<td class="mono">' + escapeHtml(folio) + '</td>' +
+            '<td>' + statusBadge(sale.status) + '</td>' +
+            '<td class="right mono">' + escapeHtml(money(sale.totalCents)) + charged + '</td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      function renderAll(summary, sales, inventory, fiado, profile, tickets) {
         var store = (profile && profile.name) || (summary.store ? summary.store.name : "Tiendita de la Esquina");
         document.getElementById("store-pill").textContent = store;
         document.getElementById("demo-banner").className = (summary.today && summary.today.demoMode) ? "demo-banner show" : "demo-banner";
@@ -1111,6 +1371,9 @@
         renderInventory();
         renderFiado(fiado);
         renderStoreProfile(profile, summary);
+        ticketsState = tickets || { ok: false, loaded: true, items: [], error: null };
+        renderTickets();
+        renderPeyEvents(sales);
         maybeRefreshStorePhoto();
         document.getElementById("updated").innerHTML = '<span class="live-dot"></span>Actualizado ' + escapeHtml(timeLabel(Date.now() / 1000)) + ' · ' + escapeHtml(dateLabel(Date.now() / 1000));
       }
@@ -1120,12 +1383,13 @@
         refreshing = true;
         Promise.all([
           consoleFetch("/api/console/summary"),
-          consoleFetch("/api/console/sales?limit=25"),
+          consoleFetch("/api/console/sales?limit=50"),
           fetchInventory(),
           consoleFetch("/api/console/fiado"),
-          fetchStoreProfile()
+          fetchStoreProfile(),
+          fetchSupportTickets()
         ]).then(function (results) {
-          renderAll(results[0], results[1], results[2], results[3], results[4]);
+          renderAll(results[0], results[1], results[2], results[3], results[4], results[5]);
         }).catch(function (error) {
           if (error && error.message === "AUTH") return;
           showToast(error && error.message ? error.message : "No se pudo actualizar la consola");
@@ -1143,6 +1407,15 @@
         if (action === "increase") adjustInventory(product, 1000);
         else if (action === "decrease") adjustInventory(product, -1000);
         else if (action === "set") openStockEditor(product);
+      });
+
+      document.getElementById("tickets-body").addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("button[data-ticket-action]") : null;
+        if (!button || button.disabled) return;
+        var ticket = findTicket(button.getAttribute("data-ticket-id"));
+        if (!ticket) return;
+        var action = button.getAttribute("data-ticket-action");
+        updateTicket(ticket, action === "resolve" ? "resolved" : "open");
       });
 
       document.getElementById("inventory-low-only").addEventListener("change", function (event) {
