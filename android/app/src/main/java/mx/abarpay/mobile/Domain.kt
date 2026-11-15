@@ -30,6 +30,9 @@ data class Product(
     val category: String? = null,
     val durationMinutes: Int? = null,
     val aliases: List<String> = emptyList(),
+    // Contrato v3.1 · imagen de producto desde la web (https, opcional).
+    // null o blank = miniatura con el emoji de la categoría.
+    val imageUrl: String? = null,
 ) {
     val isLowStock get() = !unlimitedStock && stockMilli <= lowStockMilli
     val stockLabel get() = if (unlimitedStock) "Sin límite" else qtyText(stockMilli, unit)
@@ -136,9 +139,37 @@ data class FiadoEntry(
     val note: String? = null,
     val createdAt: Double = 0.0,
     val saleId: String? = null,
+    // Contrato v3.2 · quién registró el cargo o el abono (solo lo trae /entries).
+    val employeeName: String? = null,
 )
 
 data class CustomerDetail(val customer: Customer, val entries: List<FiadoEntry> = emptyList())
+
+/** Contrato v3.2 · el dueño siempre puede; el empleado necesita canFiado. Sin perfil = v1 abierto. */
+fun canRegisterAbono(employee: Employee?): Boolean =
+    employee == null || employee.isOwner || employee.canFiado
+
+/**
+ * Atajos «Abonar $50» / «Abonar $100» del detalle de fiado: solo los presets
+ * redondeados que caben en el saldo pendiente. Liquidar el saldo siempre es
+ * una opción aparte y se calcula con el saldo completo.
+ */
+fun fiadoAbonoPresets(balanceCents: Long): List<Long> =
+    listOf(5_000L, 10_000L).filter { it in 1..balanceCents }
+
+/** «Cargo» o «Abono» para el historial de fiado. */
+fun fiadoKindLabel(kind: String): String = if (kind == "payment") "Abono" else "Cargo"
+
+/** Monto con signo del historial: los cargos suman y los abonos restan. */
+fun fiadoSignedAmount(entry: FiadoEntry): String =
+    (if (entry.kind == "payment") "−" else "+") + money(entry.amountCents)
+
+/** Fecha corta del movimiento; vacío si el servidor no la manda. */
+fun fiadoDateText(seconds: Double): String {
+    if (seconds <= 0.0) return ""
+    return java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.ROOT)
+        .format(java.util.Date((seconds * 1000).toLong()))
+}
 
 fun money(cents: Long): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-MX"))
     .format(BigDecimal.valueOf(cents, 2))
@@ -405,6 +436,8 @@ data class InventoryItem(
     val lastUpdatedAt: Double? = null,
     val lastUpdatedByName: String? = null,
     val lastUpdatedByNickname: String? = null,
+    // Contrato v3.1 · el servidor también incluye la imagen del producto en inventario.
+    val imageUrl: String? = null,
 )
 
 data class InventorySnapshot(val items: List<InventoryItem> = emptyList(), val totalValueCents: Long = 0)
@@ -602,6 +635,8 @@ data class CatalogDraft(
     val category: String? = null,
     val durationMinutes: Int? = null,
     val quick: Boolean = false,
+    // Contrato v3.1 · «URL de imagen» opcional del formulario de alta/edición.
+    val imageUrl: String? = null,
 ) {
     val tracksStock get() = kindTracksStock(kind) && !unlimitedStock
 }
@@ -617,10 +652,36 @@ fun catalogDraft(product: Product): CatalogDraft = CatalogDraft(
     category = product.category,
     durationMinutes = product.durationMinutes,
     quick = product.quick,
+    imageUrl = product.imageUrl,
 )
 
-/** Nombre y precio son obligatorios; el resto tiene valores sensatos. */
-fun catalogDraftReady(draft: CatalogDraft): Boolean = draft.name.isNotBlank() && draft.priceCents > 0
+/**
+ * Contrato v3.1 · URL de imagen opcional: solo https y máximo 500 caracteres.
+ * Vacía/null significa «sin imagen»: se muestra el emoji de la categoría.
+ */
+const val IMAGE_URL_MAX_LENGTH = 500
+
+fun normalizedImageUrl(raw: String?): String? = raw?.trim()?.takeIf { it.isNotEmpty() }
+
+/** Motivo por el que una URL de imagen no se puede mandar al servidor, o null si es válida. */
+fun imageUrlProblem(raw: String?): String? {
+    val url = normalizedImageUrl(raw) ?: return null
+    return when {
+        url.length > IMAGE_URL_MAX_LENGTH -> "La URL de imagen no puede pasar de 500 caracteres"
+        !url.startsWith("https://") -> "La URL de imagen debe empezar con https://"
+        else -> null
+    }
+}
+
+fun imageUrlValid(raw: String?): Boolean = imageUrlProblem(raw) == null
+
+/** URL que la app puede mostrar (https y dentro del límite) o null para usar el emoji. */
+fun productImageUrl(product: Product): String? =
+    normalizedImageUrl(product.imageUrl)?.takeIf(::imageUrlValid)
+
+/** Nombre y precio son obligatorios; la URL de imagen, si viene, debe ser https válida. */
+fun catalogDraftReady(draft: CatalogDraft): Boolean =
+    draft.name.isNotBlank() && draft.priceCents > 0 && imageUrlValid(draft.imageUrl)
 
 fun aliasesFrom(raw: String): List<String> =
     raw.split(',', ';').map { it.trim() }.filter { it.isNotBlank() }.distinct()

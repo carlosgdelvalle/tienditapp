@@ -78,6 +78,8 @@ interface ShopRepository {
     suspend fun customers(): List<Customer>
     suspend fun addCustomer(name: String, phone: String?): Customer
     suspend fun customer(id: Int): CustomerDetail
+    /** Contrato v3.2 · historial de cargos y abonos, más reciente primero. */
+    suspend fun fiadoEntries(customerId: Int): List<FiadoEntry>
     suspend fun abono(customerId: Int, amountCents: Long, employeeId: Int, note: String?): Long
 }
 
@@ -93,6 +95,9 @@ internal fun JSONObject.nullableLong(key: String): Long? =
     if (!has(key) || isNull(key)) null else optLong(key)
 internal fun JSONObject.nullableInt(key: String): Int? =
     if (!has(key) || isNull(key)) null else optInt(key)
+/** Contrato v3.1 · imagen opcional; tolera null, vacío y el alias snake_case. */
+internal fun JSONObject.optionalImageUrl(): String? =
+    (nullableString("imageUrl") ?: nullableString("image_url"))?.trim()?.takeIf { it.isNotEmpty() }
 
 internal fun readProduct(j: JSONObject) = Product(
     id = j.optInt("id"),
@@ -107,6 +112,7 @@ internal fun readProduct(j: JSONObject) = Product(
     category = j.nullableString("category"),
     durationMinutes = j.nullableInt("durationMinutes"),
     aliases = j.optJSONArray("aliases")?.strings().orEmpty(),
+    imageUrl = j.optionalImageUrl(),
 )
 
 /** Lee la página del catálogo v3; acepta {items,total} o una lista suelta ya envuelta. */
@@ -150,9 +156,12 @@ internal fun catalogBody(draft: CatalogDraft, includeNulls: Boolean = true) = JS
         if (includeNulls) {
             put("category", draft.category ?: JSONObject.NULL)
             put("durationMinutes", draft.durationMinutes ?: JSONObject.NULL)
+            // v3.1: null explícito borra la imagen al editar; el servidor la acepta opcional.
+            put("imageUrl", normalizedImageUrl(draft.imageUrl) ?: JSONObject.NULL)
         } else {
             draft.category?.let { put("category", it) }
             draft.durationMinutes?.let { put("durationMinutes", it) }
+            normalizedImageUrl(draft.imageUrl)?.let { put("imageUrl", it) }
         }
     }
     .put("quick", draft.quick)
@@ -222,6 +231,7 @@ internal fun readInventoryItem(j: JSONObject) = InventoryItem(
     lastUpdatedAt = if (j.has("lastUpdatedAt") && !j.isNull("lastUpdatedAt")) j.optDouble("lastUpdatedAt") else null,
     lastUpdatedByName = j.nullableString("lastUpdatedByName"),
     lastUpdatedByNickname = j.nullableString("lastUpdatedByNickname"),
+    imageUrl = j.optionalImageUrl(),
 )
 
 internal fun readInventory(j: JSONObject) = InventorySnapshot(
@@ -339,18 +349,20 @@ internal fun readCustomer(j: JSONObject) = Customer(
     balanceCents = j.optLong("balanceCents"),
 )
 
+/** Contrato v3.2: cargo o abono, con el nombre de quien lo registró. */
+internal fun readFiadoEntry(j: JSONObject) = FiadoEntry(
+    id = j.optInt("id"),
+    kind = j.optString("kind", "charge"),
+    amountCents = j.optLong("amountCents"),
+    note = j.nullableString("note"),
+    createdAt = j.optDouble("createdAt", 0.0),
+    saleId = j.nullableString("saleId"),
+    employeeName = j.nullableString("employeeName"),
+)
+
 internal fun readCustomerDetail(j: JSONObject): CustomerDetail {
     val customerJson = j.optJSONObject("customer") ?: j
-    val entries = j.optJSONArray("entries")?.objects()?.map {
-        FiadoEntry(
-            id = it.optInt("id"),
-            kind = it.optString("kind", "charge"),
-            amountCents = it.optLong("amountCents"),
-            note = it.nullableString("note"),
-            createdAt = it.optDouble("createdAt", 0.0),
-            saleId = it.nullableString("saleId"),
-        )
-    }.orEmpty()
+    val entries = j.optJSONArray("entries")?.objects()?.map(::readFiadoEntry).orEmpty()
     return CustomerDetail(readCustomer(customerJson), entries)
 }
 
@@ -651,6 +663,10 @@ class ApiRepository(private val base: String) : ShopRepository {
     override suspend fun customer(id: Int): CustomerDetail =
         readCustomerDetail(request("/api/fiado/customers/$id"))
 
+    override suspend fun fiadoEntries(customerId: Int): List<FiadoEntry> =
+        request("/api/fiado/customers/$customerId/entries")
+            .optJSONArray("items")?.objects()?.map(::readFiadoEntry).orEmpty()
+
     override suspend fun abono(customerId: Int, amountCents: Long, employeeId: Int, note: String?): Long {
         val body = JSONObject()
             .put("amountCents", amountCents)
@@ -716,6 +732,14 @@ class DemoRepository(
         }
     }
 
+    /** Contrato v3.2: el servidor rechaza abonos e historial de empleados sin canFiado. */
+    private fun requireFiadoPermission() {
+        val actor = actor() ?: return
+        if (!actor.isOwner && !actor.canFiado) {
+            throw ApiFailure(403, "Tu perfil no puede registrar abonos")
+        }
+    }
+
     private fun recordMovement(productId: Int, fallbackName: String = "Doña Rosa") {
         val actor = runCatching { actor() }.getOrNull()
         lastUpdate[productId] = Movement(
@@ -737,10 +761,21 @@ class DemoRepository(
         Customer(1, "Doña Mari (ejemplo)", "555-000-0001", 3500),
         Customer(2, "Cliente de la esquina", null, 0),
     )
-    private val entries = mutableMapOf<Int, MutableList<FiadoEntry>>(
-        1 to mutableListOf(FiadoEntry(1, "charge", 3500, "Fiado anterior (ejemplo)", System.currentTimeMillis() / 1000.0)),
-    )
-    private var nextEntry = 2
+    // Contrato v3.2 · historial ficticio por cliente con cargos y abonos de ejemplo.
+    private val entries = mutableMapOf<Int, MutableList<FiadoEntry>>().apply {
+        val seedNow = System.currentTimeMillis() / 1000.0
+        put(1, mutableListOf(
+            FiadoEntry(1, "charge", 3500, "Fiado anterior (ejemplo)", seedNow - 86_400.0,
+                employeeName = "Doña Rosa"),
+        ))
+        put(2, mutableListOf(
+            FiadoEntry(2, "charge", 1200, "Venta a crédito (ejemplo)", seedNow - 172_800.0,
+                employeeName = "Lupita"),
+            FiadoEntry(3, "payment", 1200, "Abono (ejemplo)", seedNow - 86_400.0,
+                employeeName = "Doña Rosa"),
+        ))
+    }
+    private var nextEntry = 4
 
     override suspend fun bootstrap() = Bootstrap(store, products.toList(), team.filter { it.active }, true, "demo")
 
@@ -846,6 +881,7 @@ class DemoRepository(
                 lastUpdatedAt = movement?.at,
                 lastUpdatedByName = movement?.name,
                 lastUpdatedByNickname = movement?.nickname,
+                imageUrl = product.imageUrl,
             )
         }
         val total = products.sumOf { product ->
@@ -905,6 +941,7 @@ class DemoRepository(
             category = draft.category?.trim()?.takeIf { it.isNotBlank() },
             durationMinutes = draft.durationMinutes,
             aliases = draft.aliases,
+            imageUrl = normalizedImageUrl(draft.imageUrl),
         )
         products += product
         return product
@@ -927,6 +964,7 @@ class DemoRepository(
             category = draft.category?.trim()?.takeIf { it.isNotBlank() },
             durationMinutes = draft.durationMinutes,
             aliases = draft.aliases,
+            imageUrl = normalizedImageUrl(draft.imageUrl),
         )
         products = products.map { if (it.id == id) updated else it }
         return updated
@@ -1135,7 +1173,8 @@ class DemoRepository(
                 if (it.id == customerId) it.copy(balanceCents = it.balanceCents + total) else it
             }
             entries.getOrPut(customerId) { mutableListOf() }.add(
-                FiadoEntry(nextEntry++, "charge", total, "Venta simulada", now, id)
+                FiadoEntry(nextEntry++, "charge", total, "Venta simulada", now, id,
+                    employeeName = team.firstOrNull { it.id == employeeId }?.name)
             )
         }
         return sale
@@ -1178,14 +1217,25 @@ class DemoRepository(
         return CustomerDetail(customer, entries[id].orEmpty().toList())
     }
 
+    override suspend fun fiadoEntries(customerId: Int): List<FiadoEntry> {
+        customers.firstOrNull { it.id == customerId } ?: throw ApiFailure(404, "Cliente desconocido")
+        // Igual que el servidor: el historial con nombres exige dueño o canFiado.
+        requireFiadoPermission()
+        return entries[customerId].orEmpty().sortedByDescending { it.createdAt }
+    }
+
     override suspend fun abono(customerId: Int, amountCents: Long, employeeId: Int, note: String?): Long {
         require(amountCents > 0) { "El abono debe ser mayor a cero" }
+        customers.firstOrNull { it.id == customerId } ?: throw ApiFailure(404, "Cliente desconocido")
+        requireFiadoPermission()
+        val registeredBy = team.firstOrNull { it.id == employeeId }?.name ?: store.ownerName
         val updated = customers.map {
             if (it.id == customerId) it.copy(balanceCents = it.balanceCents - amountCents) else it
         }
         customers = updated
         entries.getOrPut(customerId) { mutableListOf() }.add(
-            FiadoEntry(nextEntry++, "payment", amountCents, note, System.currentTimeMillis() / 1000.0)
+            FiadoEntry(nextEntry++, "payment", amountCents, note, System.currentTimeMillis() / 1000.0,
+                employeeName = registeredBy)
         )
         return customers.first { it.id == customerId }.balanceCents
     }
@@ -1221,6 +1271,7 @@ private fun validateCatalogDraft(draft: CatalogDraft) {
     require(draft.priceCents > 0) { "Escribe un precio mayor a cero" }
     require(PRODUCT_UNITS.contains(draft.unit)) { "Unidad no válida" }
     require(PRODUCT_KINDS.contains(draft.kind)) { "Tipo de artículo no válido" }
+    require(imageUrlValid(draft.imageUrl)) { imageUrlProblem(draft.imageUrl) ?: "URL de imagen no válida" }
 }
 
 private fun isTodaySeconds(seconds: Double): Boolean {

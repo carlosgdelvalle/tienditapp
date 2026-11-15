@@ -24,6 +24,8 @@ data class ShopState(
     val customer: Customer? = null,
     val customers: List<Customer> = emptyList(),
     val customerDetail: CustomerDetail? = null,
+    // Contrato v3.2 · historial del cliente abierto (cargo/abono, empleado, fecha).
+    val fiadoEntries: List<FiadoEntry> = emptyList(),
     val sale: Sale? = null,
     val uncertain: Boolean = false,
     val busy: Boolean = false,
@@ -241,6 +243,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         state.update {
             it.copy(
                 employee = employee, tab = TAB_HOME, message = null, customerDetail = null,
+                fiadoEntries = emptyList(),
                 teamOpen = false, invite = null, catalogOpen = false, tasksOpen = false,
             )
         }
@@ -254,7 +257,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         state.update {
             it.copy(
                 employee = null, tab = TAB_HOME, message = null, customer = null, customerDetail = null,
-                catalogOpen = false, tasksOpen = false,
+                fiadoEntries = emptyList(), catalogOpen = false, tasksOpen = false,
             )
         }
     }
@@ -925,11 +928,11 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openCustomer(id: Int) = work {
         val detail = repo.customer(id)
-        state.update { it.copy(customerDetail = detail) }
+        state.update { it.copy(customerDetail = detail, fiadoEntries = loadFiadoEntries(id, detail)) }
     }
 
     fun closeCustomer() {
-        state.update { it.copy(customerDetail = null) }
+        state.update { it.copy(customerDetail = null, fiadoEntries = emptyList()) }
     }
 
     fun abono(amountCents: Long, note: String) = work {
@@ -941,6 +944,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         state.update {
             it.copy(
                 customerDetail = refreshed,
+                fiadoEntries = loadFiadoEntries(detail.customer.id, refreshed),
                 customers = it.customers.map { c -> if (c.id == refreshed.customer.id) refreshed.customer else c },
                 customer = if (it.customer?.id == refreshed.customer.id) refreshed.customer else it.customer,
                 message = "Abono registrado. Saldo: " + money(refreshed.customer.balanceCents) + ".",
@@ -948,6 +952,20 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         }
         loadSummary()
     }
+
+    /**
+     * Historial con nombres vía /entries. El servidor lo reserva a dueño o canFiado,
+     * así que un empleado sin permiso conserva el historial que trae el detalle del
+     * cliente (saldo e historial visibles, controles de abono ocultos).
+     */
+    private suspend fun loadFiadoEntries(customerId: Int, detail: CustomerDetail): List<FiadoEntry> =
+        try {
+            repo.fiadoEntries(customerId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            detail.entries
+        }
 
     fun adjust(productId: Int, deltaMilli: Int) = work {
         check(canUseInventory(state.value.employee)) { "Tu perfil no puede editar el inventario" }

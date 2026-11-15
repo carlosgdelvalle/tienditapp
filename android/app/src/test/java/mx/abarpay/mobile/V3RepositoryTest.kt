@@ -43,7 +43,7 @@ class V3RepositoryTest {
         val server = MockWebServer()
         server.start()
         try {
-            val created = """{"id":61,"name":"Corte express","unit":"servicio","priceCents":8000,"stockMilli":0,"unlimitedStock":true,"kind":"servicio","category":"Estética","durationMinutes":20,"aliases":["rapido"],"quick":true}"""
+            val created = """{"id":61,"name":"Corte express","unit":"servicio","priceCents":8000,"stockMilli":0,"unlimitedStock":true,"kind":"servicio","category":"Estética","durationMinutes":20,"aliases":["rapido"],"quick":true,"imageUrl":"https://images.openfoodfacts.org/images/products/corte.jpg"}"""
             server.enqueue(MockResponse().setBody(created))
             server.enqueue(MockResponse().setBody(created.replace("Corte express", "Corte express 2")))
             server.enqueue(MockResponse().setResponseCode(409).setBody("""{"detail":"No se puede borrar: tiene ventas o movimientos"}"""))
@@ -53,16 +53,24 @@ class V3RepositoryTest {
                 name = "Corte express", unit = "servicio", priceCents = 8000,
                 aliases = listOf("rapido"), unlimitedStock = true, kind = KIND_SERVICIO,
                 category = "Estética", durationMinutes = 20, quick = true,
+                imageUrl = "https://images.openfoodfacts.org/images/products/corte.jpg",
             )
-            assertEquals(61, repo.createCatalogItem(draft).id)
+            val createdItem = repo.createCatalogItem(draft)
+            assertEquals(61, createdItem.id)
+            // v3.1 · el serializador del servidor manda imageUrl y la app lo conserva.
+            assertEquals("https://images.openfoodfacts.org/images/products/corte.jpg", createdItem.imageUrl)
             val post = server.takeRequest()
             assertEquals("POST", post.method)
             assertEquals("/api/catalog", post.path)
             assertEquals("1", post.getHeader("X-Employee-Id"))
             val postBody = JSONObject(post.body.readUtf8())
             assertEquals(
-                setOf("name", "unit", "priceCents", "aliases", "stockMilli", "unlimitedStock", "kind", "category", "durationMinutes", "quick"),
+                setOf("name", "unit", "priceCents", "aliases", "stockMilli", "unlimitedStock", "kind", "category", "durationMinutes", "quick", "imageUrl"),
                 postBody.keys().asSequence().toSet(),
+            )
+            assertEquals(
+                "https://images.openfoodfacts.org/images/products/corte.jpg",
+                postBody.getString("imageUrl"),
             )
             assertEquals("servicio", postBody.getString("unit"))
             assertEquals(KIND_SERVICIO, postBody.getString("kind"))
@@ -70,7 +78,9 @@ class V3RepositoryTest {
             assertEquals(20, postBody.getInt("durationMinutes"))
             assertEquals(1, postBody.getJSONArray("aliases").length())
             assertTrue(postBody.getBoolean("unlimitedStock"))
-            assertEquals("Corte express 2", repo.updateCatalogItem(61, draft.copy(name = "Corte express 2")).name)
+            val updatedItem = repo.updateCatalogItem(61, draft.copy(name = "Corte express 2"))
+            assertEquals("Corte express 2", updatedItem.name)
+            assertEquals("https://images.openfoodfacts.org/images/products/corte.jpg", updatedItem.imageUrl)
             val patch = server.takeRequest()
             assertEquals("PATCH", patch.method)
             assertEquals("/api/catalog/61", patch.path)

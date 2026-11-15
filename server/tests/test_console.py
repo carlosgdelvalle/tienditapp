@@ -43,6 +43,7 @@ def test_console_endpoints_require_owner_pin(client):
         "/api/console/sales",
         "/api/console/inventory",
         "/api/console/fiado",
+        "/api/console/fiado/1",
         "/api/console/webhooks",
         "/api/console/pending",
     ):
@@ -62,6 +63,7 @@ def test_console_endpoints_require_owner_pin(client):
         "recentSales",
         "lowStock",
         "fiadoOutstandingCents",
+        "fiadoCollectedCents",
     }
     assert body["store"]["id"] == "tiendita-esquina"
     assert body["today"]["salesCount"] == 1

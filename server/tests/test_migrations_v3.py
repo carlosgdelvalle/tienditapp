@@ -6,7 +6,16 @@ import sqlite3
 
 import pytest
 
-from server.db import PRODUCT_KINDS, PRODUCT_UNITS, initialize_db
+from server.db import PRODUCTS_TABLE_BODY, PRODUCT_KINDS, PRODUCT_UNITS, initialize_db
+
+# v3.1: a real image URL shape (not fetched by any test, only stored/returned).
+IMAGE_URL = (
+    "https://images.openfoodfacts.org/images/products/"
+    "750/105/532/0639/front_es.17.200.jpg"
+)
+
+# The v3 table as it was created before v3.1 (same body without image_url).
+V3_WITHOUT_IMAGE_URL_BODY = PRODUCTS_TABLE_BODY.replace(",\n    image_url TEXT", "")
 
 LEGACY_V2_SCHEMA = """
 CREATE TABLE stores (
@@ -281,3 +290,105 @@ def test_new_database_uses_generic_name_and_keeps_seed_idempotent(tmp_path):
         ).fetchone()["id"] == 14
         assert conn.execute("SELECT COUNT(*) FROM day_tasks").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0] == 0
+
+
+def test_legacy_rebuild_adds_the_v31_image_url_column(tmp_path):
+    """A v1/v2 database is rebuilt once and gets image_url with NULL values."""
+
+    path = tmp_path / "legacy-v31.db"
+    build_legacy_v2_db(path)
+
+    initialize_db(path, seed_catalog=True)
+    initialize_db(path, seed_catalog=True)
+
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(products)")]
+        assert columns.count("image_url") == 1
+        old = conn.execute(
+            "SELECT name, price_cents, image_url FROM products WHERE id = 42"
+        ).fetchone()
+        assert (old["name"], old["price_cents"], old["image_url"]) == (
+            "Producto viejo",
+            123,
+            None,
+        )
+        # The column is nullable and accepts a value without another migration.
+        conn.execute("UPDATE products SET image_url = ? WHERE id = 42", (IMAGE_URL,))
+        conn.commit()
+
+    # Further starts are idempotent: no duplicate column, no row loss.
+    initialize_db(path, seed_catalog=True)
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(products)")]
+        assert columns.count("image_url") == 1
+        assert conn.execute(
+            "SELECT image_url FROM products WHERE id = 42"
+        ).fetchone()["image_url"] == IMAGE_URL
+        assert conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 3
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_v3_database_without_image_url_gets_an_additive_column(tmp_path):
+    """A database already rebuilt by v3 only needs ALTER TABLE, not a rebuild."""
+
+    assert "image_url" not in V3_WITHOUT_IMAGE_URL_BODY
+    path = tmp_path / "v3-sin-imagen.db"
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(
+            f"""
+            CREATE TABLE stores (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            CREATE TABLE employees (
+                id INTEGER PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id),
+                name TEXT NOT NULL,
+                role TEXT NOT NULL CHECK(role IN ('owner','employee')),
+                active INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE TABLE products ({V3_WITHOUT_IMAGE_URL_BODY});
+            """
+        )
+        conn.execute(
+            "INSERT INTO stores (id, name) VALUES ('tiendita-esquina', 'Mi negocio')"
+        )
+        conn.execute(
+            """INSERT INTO employees (id, store_id, name, role, active)
+               VALUES (1, 'tiendita-esquina', 'Doña Rosa', 'owner', 1)"""
+        )
+        conn.execute(
+            """INSERT INTO products
+                   (id, store_id, name, aliases, unit, price_cents, stock_milli,
+                    kind, category, duration_minutes)
+               VALUES (7, 'tiendita-esquina', 'Servicio viejo', '[]', 'servicio',
+                       5000, 0, 'servicio', 'Servicios', 30)"""
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    initialize_db(path, seed_catalog=False)
+    initialize_db(path, seed_catalog=False)
+
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(products)")]
+        assert columns.count("image_url") == 1
+        row = conn.execute(
+            """SELECT name, kind, category, duration_minutes, image_url
+               FROM products WHERE id = 7"""
+        ).fetchone()
+        assert tuple(row) == ("Servicio viejo", "servicio", "Servicios", 30, None)
+        tables = {
+            row["name"]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        # The column was added in place: no half-built table left behind.
+        assert "products" in tables
+        assert "products_new" not in tables
+        conn.execute("UPDATE products SET image_url = ? WHERE id = 7", (IMAGE_URL,))
+        conn.commit()

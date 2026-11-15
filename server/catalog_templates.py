@@ -87,6 +87,7 @@ def _item(
     quick: bool = False,
     duration_minutes: int | None = None,
     unlimited_stock: bool | None = None,
+    image_url: str | None = None,
 ) -> dict[str, Any]:
     """Normalize one template item. Services/dishes carry no inventory."""
 
@@ -108,6 +109,7 @@ def _item(
         "quick": bool(quick),
         "unlimitedStock": bool(unlimited_stock),
         "durationMinutes": duration_minutes,
+        "imageUrl": image_url,
     }
 
 
@@ -211,6 +213,20 @@ def _read_resumen(path: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _http_image_url(raw: str | None) -> str | None:
+    """v3.1: only an http(s) URL from the resource CSV becomes an image.
+
+    The curated rows carry an Open Food Facts image URL (CC BY-SA) in the
+    'imagen' column; empty cells or anything that is not a real http(s) link
+    stay as no image (NULL) so the app shows its category emoji fallback.
+    """
+
+    text = (raw or "").strip()
+    if text.lower().startswith(("http://", "https://")):
+        return text
+    return None
+
+
 def _observed_cents(raw: str | None) -> int | None:
     text = (raw or "").strip().replace(",", ".")
     if not text:
@@ -232,11 +248,13 @@ def _load_tiendita_catalog(directory: str) -> dict[str, Any]:
     resumen = _read_resumen(base / RESUMEN_FILE)
     observed = 0
     matched = 0
+    images = 0
     items: list[dict[str, Any]] = []
     for entry in _TIENDITA_CURATED:
         row = rows.get(entry["codigo"])
         price = entry["demoPriceCents"]
         category = entry["category"]
+        image_url: str | None = None
         if row is not None:
             matched += 1
             observed_price = _observed_cents(row.get("precio_observado_mxn"))
@@ -246,6 +264,9 @@ def _load_tiendita_catalog(directory: str) -> dict[str, Any]:
             family = (row.get("familia_tiendita") or "").strip()
             if family and not entry["categoryOverride"]:
                 category = _CATEGORY_BY_FAMILY.get(family, category)
+            image_url = _http_image_url(row.get("imagen"))
+            if image_url is not None:
+                images += 1
         items.append(
             _item(
                 entry["name"],
@@ -255,6 +276,7 @@ def _load_tiendita_catalog(directory: str) -> dict[str, Any]:
                 aliases=entry["aliases"],
                 stock_milli=entry["stockMilli"],
                 quick=entry["quick"],
+                image_url=image_url,
             )
         )
     incluir_total = (
@@ -274,6 +296,7 @@ def _load_tiendita_catalog(directory: str) -> dict[str, Any]:
             "curatedItems": len(items),
             "matchedItems": matched,
             "observedPrices": observed,
+            "imageUrls": images,
             "incluirTotal": incluir_total,
         },
     }
@@ -468,6 +491,7 @@ def business_template(
             "curatedItems": len(template["items"]),
             "matchedItems": len(template["items"]),
             "observedPrices": 0,
+            "imageUrls": 0,
             "incluirTotal": None,
         },
     }

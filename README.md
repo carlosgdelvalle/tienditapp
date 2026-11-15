@@ -40,7 +40,7 @@ flowchart LR
 | Entregable | Estado | Dónde |
 | --- | --- | --- |
 | **Backend** | Efectivo, PEY, fiado, catálogo de artículos/servicios (CRUD, unidades abiertas, plantillas por giro), inventario, **gastos**, tareas del día, reportes, webhook, cancelación segura de cobros PEY, perfil/foto, equipo con permisos, invitaciones, tickets de soporte y consola. **164 pruebas**. Desplegado en Render con disco persistente. | [`server/`](server/README.md), [`docs/despliegue-render.md`](docs/despliegue-render.md) |
-| **APK Android** | Release firmado **1.2.1 / code 13** en [`dist/`](dist/). Servidor Render fijo y de solo lectura. Onboarding por tipo de negocio y oferta (productos/servicios/comida), catálogo del dueño con búsqueda/categorías, **Cobrar con carrito en hoja, categorías con emoji, feedback háptico y Deshacer**, tareas asignadas por empleado, gastos con dictado, comprobante imagen/PDF, equipo/invitaciones/permisos, inventario por voz y cobros PEY/fiado/inventario. | [`android/`](android/README.md) |
+| **APK Android** | Release firmado **1.2.3 / code 15** en [`dist/`](dist/). Servidor Render fijo y de solo lectura. Onboarding por tipo de negocio y oferta, catálogo del dueño con búsqueda/categorías e **imágenes de producto (Open Food Facts) con fallback de emoji**, Cobrar con carrito en hoja, categorías con emoji, feedback háptico y Deshacer, **fiado con abonos/liquidación e historial**, tareas asignadas, gastos con dictado, comprobante imagen/PDF, **splash de marca (video en el primer arranque, imagen después)**, equipo/invitaciones/permisos, inventario por voz y cobros PEY/fiado/inventario. | [`android/`](android/README.md) |
 | **Consola del dueño** | `https://abarpay-api.onrender.com/console` con PIN demo 1234 y refresco cada 3 s; foto y perfil del negocio, **catálogo paginado (CRUD)**, inventario (niveles, valor, última persona), **gastos**, **tareas con asignación**, tickets de soporte, rastro de eventos PEY y ventas/fiado/equipo. | [`server/static/console.html`](server/static/console.html) |
 | **Pago real PEY** | Confirmado por conciliación: `sale_fed4e2ffe9684050b4d6`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, $0.01 `PAID` a las 10:28:34. El webhook real llegó con 400 `invalid_payload` (payload plano); corregido y verificado con el payload exacto. El portal de PEY ya apunta a `https://abarpay-api.onrender.com/webhooks/pey`; la entrega real del webhook queda por ejercitar con otro pago. | Ver [`docs/pendientes-manana.md`](docs/pendientes-manana.md) |
 | **Referencia** | App vieja y prototipos; no son la entrega v1. | [`app/`](app/README.md), [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) |
@@ -52,14 +52,16 @@ flowchart LR
 - **Onboarding (dueño, primer arranque)**: metas del negocio, nombre del dueño, nombre y tipo del negocio y foto; nombre/tipo/foto se guardan en el servidor, las metas quedan locales.
 - **Equipo**: el dueño invita empleados con nombre y permisos (vender, fiado, inventario) y comparte un enlace o un QR; el empleado abre el enlace en su app, elige su apodo y queda ligado a ese teléfono. Reportes solo dueño.
 - **Tickets de soporte**: un cobro PEY en limbo (`por_conciliar`) no es una alarma en el teléfono; la persona toca «Reportar problema» y crea un ticket en la base de Abarpay. La consola lista los tickets (abrir/resolver) y muestra el rastro de eventos PEY. Expired/canceled son estados normales.
-- **Catálogo (artículos y servicios)**: el dueño crea, edita y borra items en la app y en la consola; unidades abiertas (pieza, kg, servicio, sesión, turno, minuto…) y `kind` producto/servicio/platillo. Los servicios no llevan inventario. Negocios nuevos aplican una plantilla por giro (tiendita curada de PROFECO, tortillería, taquería, peluquería, estética, comida corrida…).
+- **Catálogo (artículos y servicios)**: el dueño crea, edita y borra items en la app y en la consola; unidades abiertas (pieza, kg, servicio, sesión, turno, minuto…) y `kind` producto/servicio/platillo. Los servicios no llevan inventario. Negocios nuevos aplican una plantilla por giro (tiendita curada de PROFECO, tortillería, taquería, peluquería, estética, comida corrida…). Los items pueden llevar una **imagen (URL https)**: la app la carga con caché y cae al emoji por categoría si no hay imagen o falla; la plantilla de tiendita trae fotos de Open Food Facts.
 - **Tareas del día**: plantillas fijas por tipo de negocio; el dueño las asigna a empleados y un empleado solo ve las que le tocan.
 - **Gastos**: registro simple con monto y nota, con dictado («veinte pesos de gas»); el total del día aparece en reportes y consola.
 - **Comprobante**: tras una venta asentada se comparte imagen o PDF con el nombre del negocio, folio, estado Pagado y desglose.
+- **Splash**: video de marca solo en el primer arranque tras instalar (tocar para saltar, máx. 5 s); en los arranques en frío siguientes se muestra la imagen de marca. En debug se omite para las pruebas.
+- **Atribución**: las fotos de producto de la plantilla de tiendita provienen de **Open Food Facts (CC BY-SA)**; el dueño puede sustituirlas por su propia URL.
 - **Cobrar**: escáner continuo con CameraX + ML Kit, dictado primero y texto/código manual en una acción secundaria. Catálogo por categorías con emoji y «Rápidos» al inicio; al agregar hay vibración, sonido, píldora animada y «Deshacer». El carrito vive en una hoja inferior desde la barra fija (conteo + total) y el pago en una hoja dedicada con billetes rápidos y presets por unidad. El servidor confirma precios y total.
 - **Efectivo**: se captura el efectivo recibido, el servidor calcula el cambio y registra `paid_cash`; no se llama a PEY.
 - **PEY/CoDi**: el servidor crea el QR; la app lo muestra y consulta cada 3 s. Solo pasa a éxito con `paid_pey`. En modo demo se cobra **$0.01** y la pantalla lo dice. Los cobros pendientes se pueden **cancelar desde la app**: el servidor concilia con PEY y rechaza la cancelación (409) si el pago ya llegó; no revoca el QR bancario ni reembolsa.
-- **Fiado**: cliente existente o alta con nombre/teléfono; la venta queda `credit`, con saldo y abonos.
+- **Fiado**: cliente existente o alta con nombre/teléfono; la venta queda `credit`, con saldo. Los **abonos parciales o la liquidación total** se registran desde la app (atajos «Liquidar saldo», «Abonar $50/$100») y desde la consola, y quedan en el **historial** por cliente con quién los registró. Solo dueño o empleados con permiso de fiado.
 - **Inventario**: consulta y ajuste de ±1000 miliunidades o **fijado absoluto por conteo** (voz: «coca colas de 600… 4, 5, 6… 12 piezas» → 12 pza); cada cambio deja un movimiento con quién lo hizo. El stock negativo está permitido en la demo. Los productos con stock sin límite (Tacos de pastor) no descuentan existencias ni aceptan ajustes.
 - **Reportes**: total registrado, cobrado, efectivo, PEY, fiado, pendientes, fiado por cobrar, por empleado y productos más vendidos.
 
@@ -130,8 +132,8 @@ python -m pytest server/tests -q
 cd android && ./scripts/test-core.sh
 ```
 
-- Backend: **164 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
-- Android: **133 pruebas Gradle** (dominio, repositorio y flujos Compose en simulación) más las pruebas de núcleo JVM de [`android/scripts/test-core.sh`](android/scripts/test-core.sh).
+- Backend: **183 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
+- Android: **154 pruebas Gradle** (dominio, repositorio y flujos Compose en simulación) más las pruebas de núcleo JVM de [`android/scripts/test-core.sh`](android/scripts/test-core.sh).
 - No hay pago real en las pruebas. El pago real de $0.01 lo hace una persona.
 
 ## Integración con PEY
@@ -167,12 +169,12 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 
 | Evidencia | Resultado |
 | --- | --- |
-| Backend | **164 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado; `./scripts/verificar.sh` OK (gitleaks + 16 pruebas legacy) |
+| Backend | **183 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado; `./scripts/verificar.sh` OK (gitleaks + 16 pruebas legacy) |
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
 | Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`. El portal de PEY apunta al host de Render; la entrega real del webhook queda por ejercitar con otro pago |
 | Render | Servicio `abarpay-api` (Python, Oregon), disco persistente de 1 GB en `/var/data`; `/api/health`, `/api/bootstrap` y `/console` HTTP 200; 18 productos; persistencia verificada tras reinicio |
-| Release APK | [`dist/Abarpay-Android-1.2.1.apk`](dist/Abarpay-Android-1.2.1.apk); 34 MB; SHA-256 `032b525a730e7176d7c9c624571f796aab126c120d7b3f9bbedf38716c84ea7a`; firma v2 verificada |
+| Release APK | [`dist/Abarpay-Android-1.2.3.apk`](dist/Abarpay-Android-1.2.3.apk); 38 MB; SHA-256 `35ab8c4174e3e5b53dbf7534c3cf3649e41e650859d6afae2cb144dd5add05d5`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
 ## Limitaciones y decisiones abiertas

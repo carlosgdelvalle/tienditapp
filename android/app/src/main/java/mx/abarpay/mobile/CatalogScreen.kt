@@ -186,6 +186,9 @@ internal fun CatalogScreen(s: ShopState, vm: ShopViewModel) {
         items(visible, key = { "catalog-" + it.id }) { product ->
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // v3.1 · miniatura cuadrada con la imagen del producto (o emoji).
+                    ProductThumbnail(product = product, size = 52.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(product.name, fontWeight = FontWeight.Bold)
                         Text(catalogItemSubtitle(product), color = Muted, fontSize = 12.sp)
@@ -253,6 +256,8 @@ private fun CatalogForm(
         mutableStateOf(initial.durationMinutes?.toString().orEmpty())
     }
     var aliases by rememberSaveable(item?.id) { mutableStateOf(aliasesText(initial.aliases)) }
+    // v3.1 · «URL de imagen» opcional (https, ≤ 500 caracteres).
+    var imageUrl by rememberSaveable(item?.id) { mutableStateOf(initial.imageUrl.orEmpty()) }
     var quick by rememberSaveable(item?.id) { mutableStateOf(initial.quick) }
     val tracksStock = kindTracksStock(kind) && !unlimited
     val draft = CatalogDraft(
@@ -266,6 +271,7 @@ private fun CatalogForm(
         category = category.trim().ifBlank { null },
         durationMinutes = if (kind != KIND_PRODUCTO) duration.trim().toIntOrNull() else null,
         quick = quick,
+        imageUrl = normalizedImageUrl(imageUrl),
     )
     Panel {
         Text(if (item == null) "Nuevo artículo" else "Editar artículo", fontWeight = FontWeight.Bold, fontSize = 17.sp)
@@ -364,6 +370,21 @@ private fun CatalogForm(
             placeholder = { Text("Ej. coca, refresco") },
             singleLine = true,
             enabled = !busy,
+            shape = RoundedCornerShape(16.dp),
+        )
+        val imageProblem = imageUrlProblem(imageUrl)
+        OutlinedTextField(
+            imageUrl, { imageUrl = it },
+            Modifier.fillMaxWidth().testTag("form-imagen"),
+            label = { Text("URL de imagen (opcional)") },
+            placeholder = { Text("https://…") },
+            singleLine = true,
+            enabled = !busy,
+            isError = imageProblem != null,
+            supportingText = if (imageProblem != null) {
+                { Text(imageProblem) }
+            } else null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             shape = RoundedCornerShape(16.dp),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {

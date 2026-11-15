@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -223,11 +222,12 @@ internal fun CatalogProductRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Box(
-                    Modifier.size(46.dp).clip(CircleShape)
-                        .background(if (inCart) SoftViolet else Lavender),
-                    contentAlignment = Alignment.Center,
-                ) { Text(categoryEmoji(product.category), fontSize = 24.sp) }
+                // v3.1 · imagen cuadrada del producto con caché; si no hay URL, emoji.
+                ProductThumbnail(
+                    product = product,
+                    size = 46.dp,
+                    background = if (inCart) SoftViolet else Lavender,
+                )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -478,10 +478,8 @@ private fun CartSheetLine(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Box(
-                    Modifier.size(38.dp).clip(CircleShape).background(SoftViolet),
-                    contentAlignment = Alignment.Center,
-                ) { Text(categoryEmoji(product.category), fontSize = 20.sp) }
+                // v3.1 · misma miniatura de la fila, un poco más chica en la hoja.
+                ProductThumbnail(product = product, size = 40.dp, background = SoftViolet)
                 Column(Modifier.weight(1f)) {
                     Text(
                         product.name,

@@ -49,12 +49,15 @@ def test_catalog_is_public_and_exposes_v3_fields(client):
         "kind",
         "category",
         "durationMinutes",
+        "imageUrl",
         "aliases",
     }
     assert first["name"] == "Coca-Cola 600 ml"
     assert first["kind"] == "producto"
     assert first["category"] is None
     assert first["durationMinutes"] is None
+    # v3.1: seed products start without an image.
+    assert first["imageUrl"] is None
     assert isinstance(first["aliases"], list) and first["aliases"]
 
 

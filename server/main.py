@@ -50,6 +50,7 @@ from .serializers import (
     employee_summary_to_dict,
     employee_to_dict,
     expense_to_dict,
+    fiado_entry_to_dict,
     product_to_dict,
     sale_to_dict,
     store_to_dict,
@@ -75,10 +76,14 @@ STORE_PHOTO_FILENAME = "store-photo.jpg"
 STORE_PHOTO_DATA_PREFIX = "data:image/jpeg;base64,"
 MAX_STORE_PHOTO_BYTES = 5 * 1024 * 1024
 
+# v3.1 product images: only https URLs of at most 500 characters are accepted.
+IMAGE_URL_MAX_LENGTH = 500
+
 OWNER_ONLY_DETAIL = "Solo el dueño puede hacer esto"
 REPORTS_OWNER_ONLY_DETAIL = "Solo el dueño ve reportes"
 INVENTORY_FORBIDDEN_DETAIL = "No tienes permiso para inventario"
 INVALID_EMPLOYEE_DETAIL = "Empleado no válido o inactivo"
+FIADO_FORBIDDEN_DETAIL = "Tu perfil no puede registrar abonos"
 
 ANDROID_PACKAGE_NAME = "mx.abarpay.mobile"
 ANDROID_SHA256_CERT_FINGERPRINT = (
@@ -280,6 +285,7 @@ class CatalogItemIn(BaseModel):
     category: str | None = None
     durationMinutes: int | None = None
     quick: bool | None = None
+    imageUrl: str | None = None
 
 
 class CatalogItemPatchIn(BaseModel):
@@ -293,6 +299,7 @@ class CatalogItemPatchIn(BaseModel):
     category: str | None = None
     durationMinutes: int | None = None
     quick: bool | None = None
+    imageUrl: str | None = None
 
 
 class TemplateApplyIn(BaseModel):
@@ -427,6 +434,53 @@ def _require_inventory_employee(
     return employee
 
 
+# v3.2 fiado payments -------------------------------------------------------
+
+
+def _require_fiado_employee(
+    conn: sqlite3.Connection, employee_id: int | None
+) -> sqlite3.Row | None:
+    """Gate abonos/history on canFiado.
+
+    The owner can always register an abono. No header keeps the open v1
+    behavior (console and scripts); a header for an employee without the
+    canFiado permission is rejected with the app's Spanish copy.
+    """
+
+    employee = _optional_employee(conn, employee_id)
+    if (
+        employee is not None
+        and employee["role"] != "owner"
+        and not employee["can_fiado"]
+    ):
+        raise HTTPException(status_code=403, detail=FIADO_FORBIDDEN_DETAIL)
+    return employee
+
+
+def _fiado_entry_rows(
+    conn: sqlite3.Connection, customer_id: int
+) -> list[sqlite3.Row]:
+    """Movements of one customer, newest first (deterministic on ties)."""
+
+    return conn.execute(
+        """SELECT e.id, e.kind, e.amount_cents, e.note, e.employee_id,
+                  e.created_at, emp.name AS employee_name
+           FROM fiado_entries e
+           LEFT JOIN employees emp ON emp.id = e.employee_id
+           WHERE e.customer_id = ?
+           ORDER BY e.created_at DESC, e.id DESC""",
+        (customer_id,),
+    ).fetchall()
+
+
+def _fiado_entries_payload(
+    conn: sqlite3.Connection, customer_id: int
+) -> list[dict[str, Any]]:
+    return [
+        fiado_entry_to_dict(row) for row in _fiado_entry_rows(conn, customer_id)
+    ]
+
+
 # v2 support tickets --------------------------------------------------------
 
 
@@ -552,6 +606,35 @@ def _validate_product_kind(kind: str | None) -> str:
     return value
 
 
+def _validate_image_url(value: str | None) -> str | None:
+    """Optional product image URL: https only, at most 500 characters.
+
+    A missing or blank value clears the image (NULL); anything else must be a
+    real https URL. The check is deliberately narrow: we never fetch or build
+    the URL here, the client loads it directly.
+    """
+
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if not text.lower().startswith("https://"):
+        raise HTTPException(
+            status_code=400,
+            detail="La URL de imagen debe empezar con https://",
+        )
+    if len(text) > IMAGE_URL_MAX_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "La URL de imagen no puede pasar de "
+                f"{IMAGE_URL_MAX_LENGTH} caracteres"
+            ),
+        )
+    return text
+
+
 def _catalog_search_text(row: sqlite3.Row) -> str:
     """Accent/hyphen-insensitive text used by the catalog search."""
 
@@ -603,6 +686,7 @@ def _catalog_item_values(body: CatalogItemIn) -> dict[str, Any]:
         "duration_minutes": duration,
         "aliases": aliases,
         "quick": 1 if body.quick else 0,
+        "image_url": _validate_image_url(body.imageUrl),
     }
 
 
@@ -613,8 +697,8 @@ def _insert_catalog_item(
         """INSERT INTO products
                (store_id, name, aliases, unit, price_cents, stock_milli,
                 low_stock_milli, quick, unlimited_stock, kind, category,
-                duration_minutes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                duration_minutes, image_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             STORE_ID,
             values["name"],
@@ -628,6 +712,7 @@ def _insert_catalog_item(
             values["kind"],
             values["category"],
             values["duration_minutes"],
+            values["image_url"],
         ),
     )
     return int(cursor.lastrowid)
@@ -1379,6 +1464,8 @@ def _install_routes(app: FastAPI) -> None:
             updates["duration_minutes"] = duration
         if "category" in fields:
             updates["category"] = (body.category or "").strip() or None
+        if "imageUrl" in fields:
+            updates["image_url"] = _validate_image_url(body.imageUrl)
         if "aliases" in fields:
             aliases = [
                 str(alias).strip()
@@ -1485,6 +1572,7 @@ def _install_routes(app: FastAPI) -> None:
                         "duration_minutes": item["durationMinutes"],
                         "aliases": item["aliases"],
                         "quick": 1 if item["quick"] else 0,
+                        "image_url": item.get("imageUrl"),
                     },
                 )
                 items_created += 1
@@ -1993,16 +2081,28 @@ def _install_routes(app: FastAPI) -> None:
         row = _require_customer(conn, customer_id)
         return customer_to_dict(conn, row, include_entries=True)
 
+    @api.get("/fiado/customers/{customer_id}/entries")
+    def fiado_customer_entries(
+        customer_id: int,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_customer(conn, customer_id)
+        _require_fiado_employee(conn, x_employee_id)
+        return {"items": _fiado_entries_payload(conn, customer_id)}
+
     @api.post("/fiado/customers/{customer_id}/abono")
     def fiado_abono(
         customer_id: int,
         body: AbonoIn,
         conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
     ):
         if body.amountCents <= 0:
             raise HTTPException(status_code=400, detail="El abono debe ser mayor que cero")
         with write_transaction(conn):
             _require_customer(conn, customer_id)
+            _require_fiado_employee(conn, x_employee_id)
             _require_employee(conn, body.employeeId)
             conn.execute(
                 """INSERT INTO fiado_entries
@@ -2180,6 +2280,7 @@ def _install_routes(app: FastAPI) -> None:
             "recentSales": [sale_to_dict(conn, row) for row in recent],
             "lowStock": report["lowStock"],
             "fiadoOutstandingCents": report["fiadoOutstandingCents"],
+            "fiadoCollectedCents": report["fiadoCollectedCents"],
         }
 
     @console.get("/sales")
@@ -2242,6 +2343,16 @@ def _install_routes(app: FastAPI) -> None:
         return {
             "customers": customers,
             "totalOutstandingCents": fiado_outstanding_cents(conn),
+        }
+
+    @console.get("/fiado/{customer_id}")
+    def console_fiado_customer(
+        customer_id: int, conn: sqlite3.Connection = Depends(get_db)
+    ):
+        row = _require_customer(conn, customer_id)
+        return {
+            "customer": customer_to_dict(conn, row),
+            "entries": _fiado_entries_payload(conn, customer_id),
         }
 
     app.include_router(api)

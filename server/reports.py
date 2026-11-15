@@ -46,6 +46,31 @@ def today_expenses_cents(
     return int(row["total"] or 0)
 
 
+def fiado_collected_cents(
+    conn: sqlite3.Connection,
+    settings: Settings,
+    now: float | None = None,
+) -> int:
+    """v3.2: abonos (fiado_entries kind='payment') registered today.
+
+    Collected fiado is cash that entered the register when a customer paid
+    part (or all) of what they owed, so it counts for today's report even
+    though the original sale happened earlier. Payments are independent of
+    the sale status, so no sales join is needed beyond scoping by store.
+    """
+
+    start, end = today_bounds(settings, now)
+    row = conn.execute(
+        """SELECT COALESCE(SUM(e.amount_cents), 0) AS total
+           FROM fiado_entries e
+           JOIN fiado_customers c ON c.id = e.customer_id
+           WHERE c.store_id = ? AND e.kind = 'payment'
+             AND e.created_at >= ? AND e.created_at < ?""",
+        (STORE_ID, start, end),
+    ).fetchone()
+    return int(row["total"] or 0)
+
+
 def fiado_outstanding_cents(conn: sqlite3.Connection) -> int:
     row = conn.execute(
         """SELECT COALESCE(SUM(CASE WHEN e.kind = 'charge' THEN e.amount_cents
@@ -161,6 +186,8 @@ def build_today_report(
         "pending": pending,
         "pendingCents": pending_cents,
         "fiadoOutstandingCents": fiado_outstanding_cents(conn),
+        # v3.2: fiado paid today (partial abonos and full settlements).
+        "fiadoCollectedCents": fiado_collected_cents(conn, settings, now),
         # v3: simple expenses registered today (voice or manual).
         "totalExpensesCents": today_expenses_cents(conn, settings, now),
         "demoMode": settings.modo_demo,

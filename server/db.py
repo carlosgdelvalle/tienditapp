@@ -205,7 +205,8 @@ PRODUCTS_TABLE_BODY = f"""
     unlimited_stock INTEGER NOT NULL DEFAULT 0 CHECK(unlimited_stock IN (0,1)),
     kind TEXT NOT NULL DEFAULT 'producto' CHECK(kind IN ({_PRODUCT_KINDS_SQL})),
     category TEXT,
-    duration_minutes INTEGER
+    duration_minutes INTEGER,
+    image_url TEXT
 """
 
 # Tables only. Indexes live in INDEXES_SQL and run *after* the products table
@@ -530,20 +531,32 @@ def _products_need_rebuild(conn: sqlite3.Connection) -> bool:
 def _migrate_products(conn: sqlite3.Connection) -> None:
     """Additive, idempotent migration of the products table.
 
+    Two paths, both safe to run on every start:
+
+    1. v1/v2 unit CHECK: rebuild the table, copying rows and adding every v3
+       column (kind/category/duration_minutes/image_url) in the same pass.
+    2. a v3 database created before v3.1: only add the missing image_url
+       column with ALTER TABLE, never touching the rows.
+
     Foreign keys are disabled only around the rebuild: dropping the old table
     while barcodes/sale_items/inventory_movements point at it would otherwise
     fail. The data is copied row by row, ids and history are preserved, and
     the caller re-creates the indexes afterwards.
     """
 
-    if not _products_need_rebuild(conn):
+    if _products_need_rebuild(conn):
+        conn.execute("PRAGMA foreign_keys=OFF")
+        try:
+            with write_transaction(conn):
+                _rebuild_products_table(conn)
+        finally:
+            conn.execute("PRAGMA foreign_keys=ON")
         return
-    conn.execute("PRAGMA foreign_keys=OFF")
-    try:
+    # v3.1: image_url is additive. A database already rebuilt by v3 does not
+    # need another rebuild, just the new nullable column.
+    if "image_url" not in _products_columns(conn):
         with write_transaction(conn):
-            _rebuild_products_table(conn)
-    finally:
-        conn.execute("PRAGMA foreign_keys=ON")
+            conn.execute("ALTER TABLE products ADD COLUMN image_url TEXT")
 
 
 def _rebuild_products_table(conn: sqlite3.Connection) -> None:
@@ -562,6 +575,7 @@ def _rebuild_products_table(conn: sqlite3.Connection) -> None:
         "kind",
         "category",
         "duration_minutes",
+        "image_url",
     )
     defaults = {
         "aliases": "'[]'",
@@ -571,6 +585,7 @@ def _rebuild_products_table(conn: sqlite3.Connection) -> None:
         "kind": "'producto'",
         "category": "NULL",
         "duration_minutes": "NULL",
+        "image_url": "NULL",
     }
     targets: list[str] = []
     sources: list[str] = []

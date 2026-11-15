@@ -44,8 +44,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -313,7 +315,20 @@ internal fun FiadoScreen(s: ShopState, vm: ShopViewModel) {
 private fun CustomerDetailScreen(s: ShopState, vm: ShopViewModel, detail: CustomerDetail) {
     var amount by rememberSaveable { mutableStateOf("") }
     var note by rememberSaveable { mutableStateOf("") }
+    // Tras registrar un abono el saldo cambia: limpiamos el monto para no repetirlo.
+    var seenBalance by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(detail.customer.balanceCents) {
+        if (seenBalance != null && seenBalance != detail.customer.balanceCents) {
+            amount = ""
+            note = ""
+        }
+        seenBalance = detail.customer.balanceCents
+    }
     val cents = parseCashCents(amount)
+    val balance = detail.customer.balanceCents
+    val canAbonar = canRegisterAbono(s.employee)
+    val presets = fiadoAbonoPresets(balance)
+    val history = s.fiadoEntries.sortedByDescending { it.createdAt }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             TextButton(onClick = vm::closeCustomer) {
@@ -327,64 +342,104 @@ private fun CustomerDetailScreen(s: ShopState, vm: ShopViewModel, detail: Custom
             Panel {
                 Text("Saldo pendiente")
                 Text(
-                    money(detail.customer.balanceCents),
+                    money(balance),
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (detail.customer.balanceCents > 0) Amber else Green,
+                    color = if (balance > 0) Amber else Green,
                 )
                 detail.customer.phone?.let { InfoRow("Teléfono", it) }
                 Text("Los abonos reducen el saldo y quedan registrados en el servidor.", color = Muted, fontSize = 12.sp)
             }
         }
         item { SectionLabel("Abono") }
-        item {
-            OutlinedTextField(
-                amount, { amount = it },
-                Modifier.fillMaxWidth().testTag("abono-monto"),
-                label = { Text("Monto en pesos") },
-                placeholder = { Text("Ej. 50.00") },
-                singleLine = true,
-                enabled = !s.busy,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                shape = RoundedCornerShape(16.dp),
-            )
-        }
-        item {
-            OutlinedTextField(
-                note, { note = it },
-                Modifier.fillMaxWidth(),
-                label = { Text("Nota (opcional)") },
-                singleLine = true,
-                enabled = !s.busy,
-                shape = RoundedCornerShape(16.dp),
-            )
-        }
-        item {
-            Button(
-                onClick = { cents?.let { vm.abono(it, note) } },
-                enabled = cents != null && cents > 0 && !s.busy,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                shape = RoundedCornerShape(16.dp),
-            ) { Text("Registrar abono") }
-        }
-        item { SectionLabel("Movimientos") }
-        if (detail.entries.isEmpty()) item { MutedText("Sin movimientos todavía.") }
-        items(detail.entries.sortedByDescending { it.createdAt }, key = { it.id }) { entry ->
-            val charge = entry.kind == "charge"
-            Panel {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(if (charge) "Cargo por venta" else "Abono", fontWeight = FontWeight.SemiBold)
-                        entry.note?.let { Text(it, color = Muted, fontSize = 12.sp) }
-                        entry.saleId?.let { Text(it, color = Muted, fontSize = 11.sp) }
+        if (!canAbonar) {
+            // El detalle del cliente sí es visible; los controles de abono no.
+            item { Notice("Tu perfil no puede registrar abonos", true) }
+        } else {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (balance > 0) {
+                        Button(
+                            onClick = { amount = cashInputText(balance) },
+                            enabled = !s.busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("abono-liquidar"),
+                            shape = RoundedCornerShape(16.dp),
+                        ) { Text("Liquidar saldo") }
                     }
-                    Text(
-                        (if (charge) "+" else "−") + money(entry.amountCents),
-                        fontWeight = FontWeight.Bold,
-                        color = if (charge) Purple else Green,
-                    )
+                    if (presets.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            presets.forEach { preset ->
+                                OutlinedButton(
+                                    onClick = { amount = cashInputText(preset) },
+                                    enabled = !s.busy,
+                                    modifier = Modifier.weight(1f).testTag("abono-preset-" + preset / 100),
+                                    shape = RoundedCornerShape(16.dp),
+                                ) { Text("Abonar $" + preset / 100) }
+                            }
+                        }
+                    }
+                    if (balance > 0) {
+                        MutedText("Toca un atajo o escribe el monto; confirma con «Registrar abono».", 12)
+                    }
                 }
             }
+            item {
+                OutlinedTextField(
+                    amount, { amount = it },
+                    Modifier.fillMaxWidth().testTag("abono-monto"),
+                    label = { Text("Monto en pesos") },
+                    placeholder = { Text("Ej. 50.00") },
+                    singleLine = true,
+                    enabled = !s.busy,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(16.dp),
+                )
+            }
+            item {
+                OutlinedTextField(
+                    note, { note = it },
+                    Modifier.fillMaxWidth(),
+                    label = { Text("Nota (opcional)") },
+                    singleLine = true,
+                    enabled = !s.busy,
+                    shape = RoundedCornerShape(16.dp),
+                )
+            }
+            item {
+                Button(
+                    onClick = { cents?.let { vm.abono(it, note) } },
+                    enabled = cents != null && cents > 0 && !s.busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("abono-registrar"),
+                    shape = RoundedCornerShape(16.dp),
+                ) { Text("Registrar abono") }
+            }
+        }
+        item { SectionLabel("Historial") }
+        if (history.isEmpty()) item { MutedText("Sin movimientos todavía.") }
+        items(history, key = { it.id }) { entry -> FiadoEntryRow(entry) }
+    }
+}
+
+/** Fila del historial v3.2: cargo o abono con signo, nota, empleado y fecha. */
+@Composable
+private fun FiadoEntryRow(entry: FiadoEntry) {
+    val payment = entry.kind == "payment"
+    Panel(Modifier.testTag("fiado-entry")) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(fiadoKindLabel(entry.kind), fontWeight = FontWeight.SemiBold)
+                entry.note?.takeIf { it.isNotBlank() }?.let { Text(it, color = Muted, fontSize = 12.sp) }
+                val meta = listOfNotNull(
+                    entry.employeeName?.takeIf { it.isNotBlank() },
+                    fiadoDateText(entry.createdAt).takeIf { it.isNotBlank() },
+                ).joinToString(" · ")
+                if (meta.isNotBlank()) Text(meta, color = Muted, fontSize = 11.sp)
+            }
+            Text(
+                fiadoSignedAmount(entry),
+                fontWeight = FontWeight.Bold,
+                color = if (payment) Green else Purple,
+            )
         }
     }
 }

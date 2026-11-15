@@ -19,8 +19,8 @@ android {
         applicationId = "mx.abarpay.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.2.1"
+        versionCode = 15
+        versionName = "1.2.3"
         // Servidor HTTPS estable de Render para la demo.
         buildConfigField("String", "DEMO_SERVER", "\"https://abarpay-api.onrender.com\"")
     }
@@ -71,9 +71,14 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
     // QR de invitaciones generado en el teléfono (core puro, sin servicios de Google).
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Contrato v3.1 · imágenes de producto desde la web, con caché en memoria y disco.
+    implementation("io.coil-kt:coil-compose:2.7.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

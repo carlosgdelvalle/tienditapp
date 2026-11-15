@@ -390,6 +390,20 @@
     .catalog-name { font-weight: 650; }
     .catalog-sub { margin-top: 2px; color: var(--ink-soft); font-size: 11px; white-space: normal; line-height: 1.35; }
     .catalog-cat { color: var(--ink-soft); }
+    /* v3.1 · miniatura de producto: 48 px, recortada (object-fit cover), radio 10.
+       Si la imagen falla, onerror la oculta y el texto queda alineado igual. */
+    .catalog-item { display: flex; align-items: center; gap: 10px; }
+    .catalog-item-text { min-width: 0; }
+    .catalog-thumb {
+      display: block;
+      flex: 0 0 48px;
+      width: 48px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 10px;
+      background: var(--soft-violet);
+    }
+    .catalog-thumb[hidden] { display: none; }
     .task-title { font-weight: 650; }
     .task-key { margin-top: 2px; color: #8a839e; font-size: 11px; font-variant-numeric: tabular-nums; }
     .task-assign {
@@ -401,9 +415,74 @@
       color: var(--ink);
       font-size: 12px;
     }
+    /* v3.2 · pagos de fiado: fila expandible con saldo, abono, liquidación e historial */
+    .fiado-row { cursor: pointer; }
+    .fiado-row.is-open { background: #f8f3ff; }
+    .fiado-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--violet-deep);
+      font-size: 12.5px;
+      font-weight: 750;
+      text-align: left;
+      cursor: pointer;
+    }
+    .fiado-toggle:hover { background: transparent; color: var(--purple); text-decoration: underline; }
+    .fiado-toggle .chevron { display: inline-block; width: 12px; color: #8a839e; transition: transform 120ms ease; }
+    .fiado-row.is-open .fiado-toggle .chevron { transform: rotate(90deg); }
+    .fiado-detail td { padding: 0; border-bottom: 1px solid var(--line); background: #faf7ff; white-space: normal; }
+    .fiado-detail-inner { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 22px; padding: 16px 19px 18px; }
+    .fiado-detail-summary { flex: 0 0 190px; min-width: 190px; }
+    .fiado-detail-label { color: var(--ink-soft); font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; }
+    .fiado-detail-balance { margin-top: 4px; font-size: 23px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .fiado-detail-actions { display: flex; align-items: center; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
+    .fiado-detail-actions .btn-inline:disabled { border-color: var(--line); background: #f2eef8; color: #9c95b3; cursor: default; box-shadow: none; }
+    .fiado-detail-actions .btn-inline:disabled:hover { border-color: var(--line); background: #f2eef8; color: #9c95b3; }
+    .fiado-detail-actions .btn-inline.ghost:disabled { background: transparent; }
+    .fiado-detail-actions .btn-inline.ghost:disabled:hover { background: transparent; }
+    .fiado-history { flex: 1 1 340px; min-width: 260px; }
+    .fiado-history-list { margin: 7px 0 0; padding: 0; list-style: none; }
+    .fiado-history-list li { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+    .fiado-history-list li:last-child { border-bottom: 0; }
+    .fiado-history-text { flex: 1; min-width: 0; line-height: 1.35; }
+    .fiado-history-note { display: block; max-width: 520px; font-weight: 650; white-space: normal; }
+    .fiado-history-meta { display: block; color: #8a839e; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .fiado-history-amount { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .fiado-history-amount.payment { color: var(--green-dark); }
+    .fiado-history-empty { margin: 7px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.45; white-space: normal; }
+    .fiado-retry {
+      margin-left: 4px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--violet-deep);
+      font-size: 11.5px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    .fiado-retry:hover { border-color: var(--violet); background: #f6f1fe; }
+    .fiado-dialog-customer { display: grid; gap: 3px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 14px; background: #faf7ff; }
+    .fiado-dialog-name { font-size: 14px; font-weight: 800; }
+    .fiado-dialog-balance { color: var(--ink-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+    /* En pantallas angostas la columna «Detalle» sobra: la fila entera es clicable. */
+    @media (max-width: 720px) {
+      .fiado-col-detail { display: none; }
+    }
+    @media (max-width: 560px) {
+      .fiado-detail-inner { flex-direction: column; gap: 14px; }
+      .fiado-detail-summary { flex: 1 1 auto; min-width: 0; }
+      .fiado-history { min-width: 0; }
+    }
     .ticket-btn.danger { border-color: #f0cbc7; background: var(--red-soft); color: #8f1d17; }
     .ticket-btn.danger:hover { border-color: var(--red); background: var(--red); color: #fff; }
-    dialog#catalog-dialog {
+    dialog#catalog-dialog,
+    dialog#fiado-dialog {
       width: min(600px, calc(100vw - 32px));
       max-height: calc(100vh - 48px);
       padding: 0;
@@ -414,8 +493,11 @@
       box-shadow: var(--shadow);
       overflow: auto;
     }
-    dialog#catalog-dialog[open] { display: block; }
-    dialog#catalog-dialog::backdrop { background: rgba(42, 0, 101, 0.45); }
+    dialog#fiado-dialog { width: min(460px, calc(100vw - 32px)); }
+    dialog#catalog-dialog[open],
+    dialog#fiado-dialog[open] { display: block; }
+    dialog#catalog-dialog::backdrop,
+    dialog#fiado-dialog::backdrop { background: rgba(42, 0, 101, 0.45); }
     .dialog-head {
       display: flex;
       align-items: center;
@@ -1012,7 +1094,7 @@
               </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Cliente</th><th>Teléfono</th><th class="right">Saldo</th></tr></thead>
+              <thead><tr><th>Cliente</th><th>Teléfono</th><th class="right">Saldo</th><th class="right fiado-col-detail">Detalle</th></tr></thead>
               <tbody id="fiado-body"></tbody>
             </table>
           </div>
@@ -1195,6 +1277,36 @@
     </form>
   </dialog>
 
+  <dialog id="fiado-dialog" aria-labelledby="fiado-dialog-title">
+    <form id="fiado-abono-form" autocomplete="off">
+      <div class="dialog-head">
+        <div class="dialog-title" id="fiado-dialog-title">Abonar</div>
+        <button type="button" class="ghost-btn" id="fiado-cancel-x">Cerrar</button>
+      </div>
+      <div class="dialog-body">
+        <div class="fiado-dialog-customer">
+          <div class="fiado-dialog-name" id="fiado-dialog-name">Cliente</div>
+          <div class="fiado-dialog-balance" id="fiado-dialog-balance">Saldo pendiente: —</div>
+        </div>
+        <div class="field">
+          <label for="fiado-amount">Monto ($)</label>
+          <input id="fiado-amount" type="text" inputmode="decimal" placeholder="50.00">
+          <span class="field-hint">En pesos, con centavos si hace falta (ej. 50 o 50.50).</span>
+        </div>
+        <div class="field">
+          <label for="fiado-note">Nota</label>
+          <input id="fiado-note" type="text" maxlength="140" placeholder="Abono en efectivo">
+          <span class="field-hint">Opcional. Ej. «Pagó la mitad», «Abono en efectivo».</span>
+        </div>
+        <p class="error" id="fiado-form-error" hidden></p>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" class="btn-inline ghost" id="fiado-cancel">Cancelar</button>
+        <button type="submit" class="btn-inline" id="fiado-save">Registrar abono</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast" hidden></div>
 
   <script>
@@ -1256,6 +1368,7 @@
       var tasksState = { ok: false, loaded: false, items: [], error: null };
       var taskOps = {};
       var employeesForTasks = [];
+      var fiadoState = newFiadoState();
 
       var loginScreen = document.getElementById("login-screen");
       var app = document.getElementById("app");
@@ -2030,33 +2143,334 @@
         });
       }
 
-      function renderFiado(fiado) {
-        var customers = fiado.customers || [];
+      function newFiadoState() {
+        return {
+          loaded: false,
+          customers: [],
+          totalOutstandingCents: 0,
+          error: null,
+          expandedId: null,
+          details: {},
+          ops: {},
+          dialogCustomerId: null
+        };
+      }
+
+      function fiadoCustomerKey(customer) {
+        var id = customer && customer.id !== undefined && customer.id !== null ? customer.id : "";
+        return String(id);
+      }
+
+      function findFiadoCustomer(customerId) {
+        var key = String(customerId == null ? "" : customerId);
+        for (var i = 0; i < fiadoState.customers.length; i += 1) {
+          if (fiadoCustomerKey(fiadoState.customers[i]) === key) return fiadoState.customers[i];
+        }
+        return null;
+      }
+
+      function fiadoEntryEmployee(entry) {
+        if (entry && entry.employeeName) return String(entry.employeeName);
+        var employee = entry ? employeeById(entry.employeeId) : null;
+        if (employee) return employeeLabel(employee);
+        if (entry && entry.employeeId !== null && entry.employeeId !== undefined) return "Persona #" + entry.employeeId;
+        return "—";
+      }
+
+      function fiadoEntryWhen(entry) {
+        var epoch = epochValue(entry && entry.createdAt);
+        return epoch ? dateTimeLabel(epoch) : "—";
+      }
+
+      function fiadoEntrySort(a, b) {
+        var left = epochValue(a && a.createdAt) || 0;
+        var right = epochValue(b && b.createdAt) || 0;
+        if (left !== right) return right - left;
+        return Number((b && b.id) || 0) - Number((a && a.id) || 0);
+      }
+
+      function fiadoEntryItem(entry) {
+        var isPayment = Boolean(entry && entry.kind === "payment");
+        var label = isPayment ? "Abono" : "Cargo";
+        var badgeCls = isPayment ? "ok" : "credit";
+        var amountCents = Number((entry && entry.amountCents) || 0);
+        var sign = isPayment ? "−" : "+";
+        var note = entry && entry.note ? truncateText(entry.note, 140) : "Sin nota";
+        return '<li>' +
+          '<span class="badge ' + badgeCls + '">' + escapeHtml(label) + '</span>' +
+          '<span class="fiado-history-text">' +
+            '<span class="fiado-history-note">' + escapeHtml(note) + '</span>' +
+            '<span class="fiado-history-meta">' + escapeHtml(fiadoEntryEmployee(entry)) + ' · ' + escapeHtml(fiadoEntryWhen(entry)) + '</span>' +
+          '</span>' +
+          '<span class="fiado-history-amount' + (isPayment ? " payment" : "") + '">' + escapeHtml(sign + money(amountCents)) + '</span>' +
+          '</li>';
+      }
+
+      function fiadoHistoryHtml(customer) {
+        var key = fiadoCustomerKey(customer);
+        var detail = fiadoState.details[key];
+        if (!detail || detail.status === "loading") {
+          return '<p class="fiado-history-empty">Cargando historial…</p>';
+        }
+        if (detail.status === "error") {
+          return '<p class="fiado-history-empty">Historial fuera de línea; el resto de la vista sigue. ' +
+            '<button type="button" class="fiado-retry" data-fiado-action="retry" data-fiado-customer="' + escapeHtml(key) + '">Reintentar</button>' +
+            '</p>';
+        }
+        var entries = (detail.entries || []).slice().sort(fiadoEntrySort);
+        if (!entries.length) return '<p class="fiado-history-empty">Sin movimientos todavía.</p>';
+        var items = "";
+        for (var i = 0; i < entries.length; i += 1) items += fiadoEntryItem(entries[i]);
+        return '<ul class="fiado-history-list">' + items + '</ul>';
+      }
+
+      function fiadoDetailHtml(customer) {
+        var key = fiadoCustomerKey(customer);
+        var balanceCents = Number(customer.balanceCents || 0);
+        var busy = Boolean(fiadoState.ops[key]);
+        var liquidate = '<button type="button" class="btn-inline ghost" data-fiado-action="liquidar" data-fiado-customer="' + escapeHtml(key) + '"' +
+          (busy || balanceCents <= 0 ? ' disabled title="' + (balanceCents <= 0 ? "Sin saldo pendiente" : "Guardando…") + '"' : '') + '>Liquidar</button>';
+        return '<tr class="fiado-detail" id="fiado-detail-' + escapeHtml(key) + '" data-fiado-detail="' + escapeHtml(key) + '"><td colspan="4">' +
+          '<div class="fiado-detail-inner">' +
+            '<div class="fiado-detail-summary">' +
+              '<div class="fiado-detail-label">Saldo pendiente</div>' +
+              '<div class="fiado-detail-balance">' + escapeHtml(money(balanceCents)) + '</div>' +
+              '<div class="fiado-detail-actions">' +
+                '<button type="button" class="btn-inline" data-fiado-action="abonar" data-fiado-customer="' + escapeHtml(key) + '"' +
+                  (busy || balanceCents <= 0 ? " disabled" : "") + '>Abonar</button>' +
+                liquidate +
+              '</div>' +
+            '</div>' +
+            '<div class="fiado-history">' +
+              '<div class="fiado-detail-label">Historial</div>' +
+              fiadoHistoryHtml(customer) +
+            '</div>' +
+          '</div>' +
+        '</td></tr>';
+      }
+
+      function fiadoCustomerRow(customer) {
+        var key = fiadoCustomerKey(customer);
+        var open = fiadoState.expandedId === key;
+        var busy = Boolean(fiadoState.ops[key]);
+        var row = '<tr class="fiado-row' + (open ? " is-open" : "") + '" data-fiado-row="' + escapeHtml(key) + '">' +
+          '<td>' +
+            '<button type="button" class="fiado-toggle" data-fiado-action="toggle" data-fiado-customer="' + escapeHtml(key) + '"' +
+              ' aria-expanded="' + (open ? "true" : "false") + '" aria-controls="fiado-detail-' + escapeHtml(key) + '">' +
+              '<span class="chevron" aria-hidden="true">▸</span>' +
+              '<span>' + escapeHtml(customer.name) + '</span>' +
+            '</button>' +
+          '</td>' +
+          '<td>' + escapeHtml(customer.phone || "—") + '</td>' +
+          '<td class="right mono">' + escapeHtml(money(customer.balanceCents)) + '</td>' +
+          '<td class="right fiado-col-detail"><span class="muted">' + (busy ? "Guardando…" : (open ? "Ocultar" : "Ver")) + '</span></td>' +
+          '</tr>';
+        return open ? row + fiadoDetailHtml(customer) : row;
+      }
+
+      function renderFiadoBody() {
         var body = document.getElementById("fiado-body");
-        document.getElementById("fiado-sub").textContent = money(fiado.totalOutstandingCents) + " pendiente";
+        if (!body) return;
+        if (!fiadoState.loaded) {
+          body.innerHTML = '<tr><td colspan="4" class="empty">Cargando fiado…</td></tr>';
+          return;
+        }
+        if (fiadoState.error) {
+          body.innerHTML = '<tr><td colspan="4" class="empty">' +
+            escapeHtml("No se pudo leer el fiado: " + ((fiadoState.error && fiadoState.error.message) || "error de red") + ". Se reintenta solo.") +
+            '</td></tr>';
+          return;
+        }
+        var customers = fiadoState.customers || [];
         if (!customers.length) {
-          body.innerHTML = '<tr><td colspan="3" class="empty">Sin clientes de fiado todavía.</td></tr>';
+          body.innerHTML = '<tr><td colspan="4" class="empty">Sin clientes de fiado todavía.</td></tr>';
           return;
         }
         var html = "";
-        for (var i = 0; i < customers.length; i += 1) {
-          var customer = customers[i];
-          html += '<tr>' +
-            '<td>' + escapeHtml(customer.name) + '</td>' +
-            '<td>' + escapeHtml(customer.phone || "—") + '</td>' +
-            '<td class="right mono">' + escapeHtml(money(customer.balanceCents)) + '</td>' +
-            '</tr>';
-        }
+        for (var i = 0; i < customers.length; i += 1) html += fiadoCustomerRow(customers[i]);
         body.innerHTML = html;
       }
 
+      function renderFiado(fiado) {
+        var customers = fiado && Array.isArray(fiado.customers) ? fiado.customers : [];
+        fiadoState.customers = customers;
+        fiadoState.totalOutstandingCents = Number((fiado && fiado.totalOutstandingCents) || 0);
+        fiadoState.loaded = true;
+        fiadoState.error = null;
+        if (fiadoState.expandedId !== null && !findFiadoCustomer(fiadoState.expandedId)) {
+          fiadoState.expandedId = null;
+        }
+        var subtotal = document.getElementById("fiado-sub");
+        if (subtotal) subtotal.textContent = money(fiadoState.totalOutstandingCents) + " pendiente";
+        renderFiadoBody();
+        refreshFiadoDetailIfOpen();
+      }
+
       function renderFiadoError(error) {
-        var body = document.getElementById("fiado-body");
-        document.getElementById("fiado-sub").textContent = "Fiado fuera de línea; el resto de la consola sigue";
+        fiadoState.error = error || new Error("error de red");
+        fiadoState.loaded = true;
+        var subtotal = document.getElementById("fiado-sub");
+        if (subtotal) subtotal.textContent = "Fiado fuera de línea; el resto de la consola sigue";
         setViewSub("fiado", "No se pudo leer el fiado; se reintenta solo");
-        body.innerHTML = '<tr><td colspan="3" class="empty">' +
-          escapeHtml("No se pudo leer el fiado: " + ((error && error.message) || "error de red") + ". Se reintenta solo.") +
-          '</td></tr>';
+        renderFiadoBody();
+      }
+
+      function loadFiadoDetail(customerId, options) {
+        var key = String(customerId == null ? "" : customerId);
+        var opts = options || {};
+        var previous = fiadoState.details[key];
+        var token;
+        if (previous && previous.status === "ok" && opts.keep !== false) {
+          token = { status: "ok", entries: previous.entries, customer: previous.customer, error: null };
+        } else {
+          token = { status: "loading", entries: [], customer: findFiadoCustomer(key), error: null };
+        }
+        fiadoState.details[key] = token;
+        if (fiadoState.expandedId === key) renderFiadoBody();
+        return consoleFetch("/api/console/fiado/" + encodeURIComponent(key)).then(function (data) {
+          if (fiadoState.details[key] !== token) return;
+          var payload = data || {};
+          var customer = payload.customer || findFiadoCustomer(key) || token.customer;
+          var entries = Array.isArray(payload.entries)
+            ? payload.entries
+            : (customer && Array.isArray(customer.entries) ? customer.entries : []);
+          fiadoState.details[key] = { status: "ok", entries: entries, customer: customer, error: null };
+          if (fiadoState.expandedId === key) renderFiadoBody();
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") return;
+          if (fiadoState.details[key] !== token) return;
+          fiadoState.details[key] = { status: "error", entries: [], customer: token.customer, error: error };
+          if (fiadoState.expandedId === key) renderFiadoBody();
+        });
+      }
+
+      function refreshFiadoDetailIfOpen() {
+        var key = fiadoState.expandedId;
+        if (key === null || key === undefined) return;
+        if (!findFiadoCustomer(key)) return;
+        loadFiadoDetail(key);
+      }
+
+      function toggleFiadoCustomer(customerId) {
+        var key = String(customerId == null ? "" : customerId);
+        if (fiadoState.expandedId === key) {
+          fiadoState.expandedId = null;
+          renderFiadoBody();
+          return;
+        }
+        fiadoState.expandedId = key;
+        fiadoState.details[key] = { status: "loading", entries: [], customer: findFiadoCustomer(key), error: null };
+        renderFiadoBody();
+        loadFiadoDetail(key, { keep: false });
+      }
+
+      function openFiadoAbonoDialog(customer) {
+        if (!customer) return;
+        var balanceCents = Number(customer.balanceCents || 0);
+        if (balanceCents <= 0) {
+          showToast("Ese cliente no tiene saldo pendiente.");
+          return;
+        }
+        fiadoState.dialogCustomerId = fiadoCustomerKey(customer);
+        document.getElementById("fiado-dialog-title").textContent = "Abonar a " + (customer.name || "cliente");
+        document.getElementById("fiado-dialog-name").textContent = customer.name || "Cliente";
+        document.getElementById("fiado-dialog-balance").textContent = "Saldo pendiente: " + money(balanceCents);
+        document.getElementById("fiado-amount").value = "";
+        document.getElementById("fiado-note").value = "";
+        var errorBox = document.getElementById("fiado-form-error");
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+        var dialog = document.getElementById("fiado-dialog");
+        if (!dialog.hasAttribute("open")) {
+          if (typeof dialog.showModal === "function") dialog.showModal();
+          else dialog.setAttribute("open", "");
+        }
+        setTimeout(function () { document.getElementById("fiado-amount").focus(); }, 30);
+      }
+
+      function closeFiadoDialog() {
+        fiadoState.dialogCustomerId = null;
+        var dialog = document.getElementById("fiado-dialog");
+        if (!dialog) return;
+        if (typeof dialog.close === "function" && dialog.hasAttribute("open")) dialog.close();
+        else dialog.removeAttribute("open");
+      }
+
+      function showFiadoFormError(message) {
+        var errorBox = document.getElementById("fiado-form-error");
+        errorBox.hidden = false;
+        errorBox.textContent = message;
+        return null;
+      }
+
+      function saveFiadoAbono() {
+        var key = fiadoState.dialogCustomerId;
+        var customer = key !== null && key !== undefined ? findFiadoCustomer(key) : null;
+        if (!customer) {
+          closeFiadoDialog();
+          return;
+        }
+        var errorBox = document.getElementById("fiado-form-error");
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+        var amountCents = parseMoneyCents(document.getElementById("fiado-amount").value, false);
+        if (amountCents === null) return showFiadoFormError("Escribe un monto válido, por ejemplo 50 o 50.50.");
+        if (amountCents > Number(customer.balanceCents || 0)) {
+          return showFiadoFormError("El abono no puede ser mayor que el saldo (" + money(customer.balanceCents) + ").");
+        }
+        if (fiadoState.ops[key]) return null;
+        var note = document.getElementById("fiado-note").value.trim();
+        var saveButton = document.getElementById("fiado-save");
+        fiadoState.ops[key] = true;
+        saveButton.disabled = true;
+        saveButton.textContent = "Registrando…";
+        renderFiadoBody();
+        consoleFetch("/api/fiado/customers/" + encodeURIComponent(key) + "/abono", {
+          method: "POST",
+          employeeId: EMPLOYEE_ID,
+          body: JSON.stringify({ amountCents: amountCents, note: note, employeeId: EMPLOYEE_ID })
+        }).then(function () {
+          closeFiadoDialog();
+          delete fiadoState.details[key];
+          showToast("Abono de " + money(amountCents) + " registrado");
+          return refreshFiado();
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            showFiadoFormError(error.message || "No se pudo registrar el abono.");
+          }
+        }).then(function () {
+          delete fiadoState.ops[key];
+          saveButton.disabled = false;
+          saveButton.textContent = "Registrar abono";
+          renderFiadoBody();
+        });
+      }
+
+      function liquidarFiado(customer) {
+        if (!customer) return;
+        var key = fiadoCustomerKey(customer);
+        var balanceCents = Number(customer.balanceCents || 0);
+        if (balanceCents <= 0 || fiadoState.ops[key]) return;
+        var name = customer.name || "este cliente";
+        if (!window.confirm("¿Liquidar el saldo completo de " + name + " por " + money(balanceCents) + "?")) return;
+        fiadoState.ops[key] = true;
+        renderFiadoBody();
+        consoleFetch("/api/fiado/customers/" + encodeURIComponent(key) + "/abono", {
+          method: "POST",
+          employeeId: EMPLOYEE_ID,
+          body: JSON.stringify({ amountCents: balanceCents, note: "Liquidación", employeeId: EMPLOYEE_ID })
+        }).then(function () {
+          delete fiadoState.details[key];
+          showToast("Liquidación de " + money(balanceCents) + " registrada");
+          return refreshFiado();
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            showToast(error.message || "No se pudo liquidar el saldo.");
+          }
+        }).then(function () {
+          delete fiadoState.ops[key];
+          renderFiadoBody();
+        });
       }
 
       function findTicket(ticketId) {
@@ -2240,6 +2654,9 @@
         expensesState = { ok: false, loaded: false, items: [], totalTodayCents: null, error: null };
         tasksState = { ok: false, loaded: false, items: [], error: null };
         employeesForTasks = [];
+        closeFiadoDialog();
+        fiadoState = newFiadoState();
+        renderFiadoBody();
         catalogDeleteOps = {};
         taskOps = {};
         lastSummary = null;
@@ -2367,6 +2784,7 @@
           priceCents: Number(item.priceCents || 0),
           kind: item.kind ? String(item.kind) : "producto",
           category: item.category ? String(item.category) : "",
+          imageUrl: item.imageUrl ? String(item.imageUrl).trim() : "",
           durationMinutes: Number.isFinite(duration) ? duration : null,
           aliases: catalogItemAliases(item.aliases),
           stockMilli: Number(item.stockMilli || 0),
@@ -2445,6 +2863,14 @@
         return '<span class="mono">' + escapeHtml(quantity(item.stockMilli, item.unit)) + '</span>';
       }
 
+      function catalogThumb(item) {
+        var url = typeof item.imageUrl === "string" ? item.imageUrl.trim() : "";
+        if (!/^https?:\/\//i.test(url)) return "";
+        return '<img class="catalog-thumb" src="' + escapeHtml(url) + '" alt="" width="48" height="48"' +
+          ' loading="lazy" decoding="async" referrerpolicy="no-referrer"' +
+          ' onerror="this.hidden=true">';
+      }
+
       function catalogRow(item) {
         var id = String(item.id);
         var busy = Boolean(catalogDeleteOps[id]);
@@ -2454,8 +2880,14 @@
         var duration = item.durationMinutes
           ? '<span class="mono">' + escapeHtml(String(item.durationMinutes)) + ' min</span>'
           : '<span class="muted">—</span>';
+        var article = '<div class="catalog-name">' + escapeHtml(item.name) + '</div>' + aliases;
+        var thumb = catalogThumb(item);
+        if (thumb) {
+          article = '<div class="catalog-item">' + thumb +
+            '<div class="catalog-item-text">' + article + '</div></div>';
+        }
         return '<tr>' +
-          '<td><div class="catalog-name">' + escapeHtml(item.name) + '</div>' + aliases + '</td>' +
+          '<td>' + article + '</td>' +
           '<td>' + catalogKindBadge(item.kind) + '</td>' +
           '<td class="catalog-cat">' + escapeHtml(item.category || "—") + '</td>' +
           '<td>' + escapeHtml(unitLabel(item.unit)) + '</td>' +
@@ -3392,6 +3824,24 @@
         updateTicket(ticket, action === "resolve" ? "resolved" : "open");
       });
 
+      document.getElementById("fiado-body").addEventListener("click", function (event) {
+        var target = event.target;
+        var button = target && target.closest ? target.closest("button[data-fiado-action]") : null;
+        if (button) {
+          if (button.disabled) return;
+          var action = button.getAttribute("data-fiado-action");
+          var key = button.getAttribute("data-fiado-customer");
+          if (action === "toggle") toggleFiadoCustomer(key);
+          else if (action === "retry") loadFiadoDetail(key, { keep: false });
+          else if (action === "abonar") openFiadoAbonoDialog(findFiadoCustomer(key));
+          else if (action === "liquidar") liquidarFiado(findFiadoCustomer(key));
+          return;
+        }
+        var row = target && target.closest ? target.closest("tr[data-fiado-row]") : null;
+        if (!row) return;
+        toggleFiadoCustomer(row.getAttribute("data-fiado-row"));
+      });
+
       document.getElementById("inventory-low-only").addEventListener("change", function (event) {
         lowOnly = Boolean(event.target.checked);
         renderInventory();
@@ -3503,6 +3953,23 @@
 
       document.getElementById("catalog-dialog").addEventListener("close", function () {
         catalogEditingId = null;
+      });
+
+      document.getElementById("fiado-abono-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        saveFiadoAbono();
+      });
+
+      document.getElementById("fiado-cancel").addEventListener("click", function () {
+        closeFiadoDialog();
+      });
+
+      document.getElementById("fiado-cancel-x").addEventListener("click", function () {
+        closeFiadoDialog();
+      });
+
+      document.getElementById("fiado-dialog").addEventListener("close", function () {
+        fiadoState.dialogCustomerId = null;
       });
 
       document.getElementById("catalog-kind-field").addEventListener("change", setCatalogStockState);

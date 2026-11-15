@@ -1,4 +1,10 @@
 <resources>
+    <style name="Theme.Abarpay.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#2A0065</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_abarpay</item>
+        <item name="postSplashScreenTheme">@style/Theme.Abarpay</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+    </style>
     <style name="Theme.Abarpay" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>

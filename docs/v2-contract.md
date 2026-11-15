@@ -143,3 +143,21 @@ Decisiones del dueño (todas confirmadas): CRUD de catálogo en consola Y app; p
 ### Reglas que no cambian
 
 - Solo apply_payment marca PEY pagado; el verde es la única señal de entrega; tickets de soporte y eventos PEY siguen igual; equipo/invitaciones/permisos siguen igual.
+
+## v3.1 · Imágenes de producto (web) · 15-nov
+
+Decisión del dueño: usar imágenes de la web para los productos. Regla: solo fuentes con licencia admisible — usamos las URLs `imagen` de Open Food Facts que ya vienen en resources/catalogo-mx (CC BY-SA, con atribución en el README) y una URL opcional por item editable por el dueño. NO se construye un scraper.
+
+- server: columna `image_url TEXT` nullable en products (migración aditiva idempotente); CRUD de catálogo acepta `imageUrl` (https, ≤ 500 chars, opcional); serializers incluyen `imageUrl`. La plantilla tiendita asigna a cada item curado su URL `imagen` del CSV si existe y empieza con http(s); otras plantillas la dejan null.
+- android: añadir Coil (io.coil-kt:coil-compose) para AsyncImage con caché; en filas de catálogo, hoja del carrito y pantalla Catálogo del dueño: si `imageUrl` no es null/blank se muestra la imagen (aspecto cuadrado, recortada), placeholder = emoji por categoría y fallback = emoji si la carga falla. Campo opcional «URL de imagen» en el formulario de alta/edición. Versión 1.2.2 / code 14.
+- consola: en la tabla Catálogo, miniatura pequeña (48 px, object-fit cover) cuando `imageUrl` existe, con `onerror` que oculta la imagen; sin cambios de paginación.
+- README: nota de atribución «Imágenes de producto: Open Food Facts (CC BY-SA)» donde aplique.
+
+## v3.2 · Pagos de fiado (abonos y liquidación) · 15-nov
+
+Gap: en la app ya existe «Registrar abono» por cliente, pero sin atajos (liquidar saldo) ni historial; la consola solo lista clientes y saldos, sin registrar pagos ni ver el historial. Requisito: registrar abonos parciales y pagos completos en app Y consola, con rastro.
+
+- server: GET /api/fiado/customers/{id}/entries → {items:[{id, kind ('charge'|'payment'), amountCents, note, employeeName, createdAt}]} orden desc (dueño o canFiado vía X-Employee-Id; sin header abierto v1). GET /api/console/fiado/{customer_id} (owner/PIN) → {customer, entries}. POST /api/fiado/customers/{id}/abono existente se conserva (acepta note y employeeId; la consola mandará X-Employee-Id: 1). reports/today agrega fiadoCollectedCents = suma de entries kind='payment' de hoy (también en console/summary).
+- android: en el detalle de cliente del fiado: botones rápidos «Liquidar saldo» (monto = saldo completo) y «Abonar $50/$100» (presets redondeados según saldo), campo monto + nota + «Registrar abono» (existente); lista «Historial» con los últimos entries (cargo/abono, fecha, empleado) vía el endpoint de entries. Solo con canFiado/owner (regla existente).
+- consola: vista Fiado con fila expandible o panel por cliente: saldo, botón «Abonar» (diálogo monto + nota, POST abono con X-Employee-Id: 1), botón «Liquidar» (envía el saldo completo), e historial de entries (cargo/abono, monto, nota, empleado, fecha) vía GET /api/console/fiado/{id}. KPI Fiado por cobrar se mantiene; reportes/summary pueden mostrar «Fiado cobrado hoy».
+- Permisos: empleados sin canFiado no ven los controles de abono (app) y la consola es solo dueño (PIN).

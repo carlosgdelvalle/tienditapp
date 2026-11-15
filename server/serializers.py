@@ -42,6 +42,7 @@ def product_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "lowStockMilli": row["low_stock_milli"],
         "quick": bool(row["quick"]),
         "unlimitedStock": bool(row["unlimited_stock"]),
+        "imageUrl": row["image_url"] if "image_url" in row.keys() else None,
     }
 
 
@@ -72,6 +73,7 @@ def catalog_item_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "kind": row["kind"],
         "category": row["category"],
         "durationMinutes": row["duration_minutes"],
+        "imageUrl": row["image_url"],
         "aliases": _aliases(row),
     }
 
@@ -116,6 +118,28 @@ def sale_item_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "qtyMilli": row["qty_milli"],
         "unitPriceCents": row["unit_price_cents"],
         "lineTotalCents": row["line_total_cents"],
+    }
+
+
+def fiado_entry_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    """v3.2 movement of a fiado customer: charge or payment.
+
+    The row may carry employee_name from the join with employees; the
+    endpoint returns it so the app and the console can show who charged or
+    collected. Sale id and employee id stay internal (the contract only asks
+    for the kind, amount, note, employee name and timestamp).
+    """
+
+    keys = row.keys()
+    return {
+        "id": row["id"],
+        "kind": row["kind"],
+        "amountCents": row["amount_cents"],
+        "note": row["note"],
+        "employeeName": (
+            row["employee_name"] if "employee_name" in keys else None
+        ),
+        "createdAt": row["created_at"],
     }
 
 
