@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Abarpay · Consola de la dueña</title>
+  <title>Abarpay · Consola del negocio</title>
   <style>
     :root {
       --ink: #14211d;
@@ -349,10 +349,124 @@
       main { padding: 20px 18px 46px; }
       .store-pill { display: none; }
     }
+    /* v3 · catálogo, gastos y tareas */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+      padding: 13px 19px;
+      border-bottom: 1px solid #eeebe2;
+      background: #fcfbf7;
+    }
+    .toolbar .grow { flex: 1 1 240px; min-width: 180px; }
+    .toolbar input[type="search"],
+    .toolbar input[type="text"],
+    .toolbar select {
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 13px;
+      letter-spacing: normal;
+      outline: none;
+    }
+    .toolbar input[type="search"] { width: 100%; }
+    .toolbar input[type="text"] { width: auto; flex: 0 1 210px; }
+    .toolbar select { width: auto; flex: 0 0 auto; }
+    .toolbar input[type="search"]:focus,
+    .toolbar input[type="text"]:focus,
+    .toolbar select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(11, 122, 92, 0.12); }
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 11px 19px;
+      border-top: 1px solid #eeebe2;
+      background: #fcfbf7;
+      color: #7b8882;
+      font-size: 11.5px;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+    }
+    .pager-actions { display: flex; align-items: center; gap: 7px; }
+    .catalog-name { font-weight: 650; }
+    .catalog-sub { margin-top: 2px; color: #7b8882; font-size: 11px; white-space: normal; line-height: 1.35; }
+    .catalog-cat { color: var(--ink-soft); }
+    .task-title { font-weight: 650; }
+    .task-key { margin-top: 2px; color: #8b9892; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .task-assign {
+      max-width: 200px;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+    }
+    .ticket-btn.danger { border-color: #f0cfcc; background: #fdf1ef; color: #9b2f2f; }
+    .ticket-btn.danger:hover { border-color: var(--red); background: var(--red); color: #fff; }
+    dialog#catalog-dialog {
+      width: min(600px, calc(100vw - 32px));
+      max-height: calc(100vh - 48px);
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--card);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      overflow: auto;
+    }
+    dialog#catalog-dialog[open] { display: block; }
+    dialog#catalog-dialog::backdrop { background: rgba(20, 33, 29, 0.42); }
+    .dialog-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 17px 20px 13px;
+      border-bottom: 1px solid #eeebe2;
+    }
+    .dialog-title { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+    .dialog-body { display: grid; gap: 12px; padding: 16px 20px 18px; }
+    .dialog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: grid; gap: 5px; min-width: 0; }
+    .field label { color: var(--ink-soft); font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; }
+    .field input,
+    .field select {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 14px;
+      letter-spacing: normal;
+      outline: none;
+    }
+    .field input:focus,
+    .field select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(11, 122, 92, 0.12); }
+    .field input:disabled { background: #f1efe8; color: #8b9892; }
+    .field-hint { color: #8b9892; font-size: 11px; line-height: 1.4; }
+    .check-field { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 12px; font-weight: 650; }
+    .check-field input { width: 16px; height: 16px; margin: 0; accent-color: var(--green); }
+    .dialog-foot {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 9px;
+      padding: 13px 20px 16px;
+      border-top: 1px solid #eeebe2;
+      background: #fcfbf7;
+    }
     @media (max-width: 560px) {
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .topbar-right .updated { display: none; }
       .login-card { padding: 26px; }
+      .dialog-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -360,8 +474,8 @@
   <section id="login-screen" class="login-screen">
     <div class="login-card">
       <div class="brand">abarpay<span class="dot">.</span></div>
-      <p class="muted">Consola de la dueña</p>
-      <p class="fineprint">Vista de demostración para la Tiendita de la Esquina. No usa cuentas ni sesiones de producción.</p>
+      <p class="muted">Consola del negocio</p>
+      <p class="fineprint">Vista de demostración del negocio. No usa cuentas ni sesiones de producción.</p>
       <form id="login-form" autocomplete="off">
         <label for="pin">PIN de dueño</label>
         <input id="pin" name="pin" type="password" inputmode="numeric" maxlength="16" placeholder="••••" autofocus>
@@ -376,7 +490,7 @@
     <header class="topbar">
       <div class="topbar-left">
         <div class="brand">abarpay<span class="dot">.</span></div>
-        <div class="store-pill" id="store-pill">Tiendita de la Esquina</div>
+        <div class="store-pill" id="store-pill">Mi negocio</div>
       </div>
       <div class="topbar-right">
         <span class="updated" id="updated"><span class="live-dot"></span>Actualizando</span>
@@ -396,8 +510,8 @@
           <img id="store-photo" alt="Foto del negocio" decoding="async">
         </div>
         <div class="store-details">
-          <div class="store-name" id="store-name">Tiendita de la Esquina</div>
-          <div class="store-meta" id="store-meta">Consola de la dueña</div>
+          <div class="store-name" id="store-name">Mi negocio</div>
+          <div class="store-meta" id="store-meta">Consola del negocio</div>
         </div>
       </section>
 
@@ -496,6 +610,100 @@
           </div>
         </div>
 
+        <div class="panel span-2" id="catalog-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Catálogo</div>
+              <div class="panel-sub" id="catalog-sub">Búsqueda y paginación · catálogos grandes</div>
+            </div>
+            <button type="button" class="btn-inline" id="catalog-add">Nuevo artículo</button>
+          </div>
+          <div class="toolbar">
+            <div class="grow">
+              <input id="catalog-q" type="search" placeholder="Buscar por nombre o aliases" aria-label="Buscar en el catálogo" autocomplete="off">
+            </div>
+            <input id="catalog-category" type="text" list="catalog-categories" placeholder="Categoría: todas" aria-label="Filtrar por categoría" autocomplete="off">
+            <datalist id="catalog-categories"></datalist>
+            <select id="catalog-kind" aria-label="Filtrar por tipo">
+              <option value="">Todos los tipos</option>
+              <option value="producto">Productos</option>
+              <option value="servicio">Servicios</option>
+              <option value="platillo">Comida preparada</option>
+            </select>
+            <button type="button" class="btn-inline ghost" id="catalog-clear">Limpiar</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Artículo</th><th>Tipo</th><th>Categoría</th><th>Unidad</th><th class="right">Precio</th><th class="right">Stock</th><th class="right">Duración</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="catalog-body"></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span id="catalog-pager-text">—</span>
+            <div class="pager-actions">
+              <button type="button" class="set-btn" id="catalog-prev">Anterior</button>
+              <button type="button" class="set-btn" id="catalog-next">Siguiente</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel span-2" id="expenses-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Gastos</div>
+              <div class="panel-sub" id="expenses-sub">Dinero que salió hoy del negocio</div>
+            </div>
+          </div>
+          <div class="inv-summary">
+            <div class="inv-total">
+              <div class="label">Gastos de hoy</div>
+              <div class="value" id="expenses-total">$0.00</div>
+              <div class="detail" id="expenses-total-detail">Sin gastos registrados hoy</div>
+            </div>
+          </div>
+          <div class="inv-editor">
+            <div class="inv-editor-head">
+              <div class="inv-editor-title">Registrar gasto</div>
+              <div class="panel-sub">Monto en pesos y una nota breve.</div>
+            </div>
+            <form id="expense-form" autocomplete="off">
+              <div class="inv-field qty">
+                <label for="expense-amount">Monto ($)</label>
+                <input id="expense-amount" type="text" inputmode="decimal" placeholder="20.00">
+              </div>
+              <div class="inv-field note">
+                <label for="expense-note">Nota</label>
+                <input id="expense-note" type="text" maxlength="120" placeholder="Gas, luz, insumos…">
+              </div>
+              <button type="submit" class="btn-inline" id="expense-save">Registrar gasto</button>
+              <p class="error" id="expense-error" hidden></p>
+            </form>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th class="right">Monto</th><th>Nota</th><th>Registró</th></tr></thead>
+              <tbody id="expenses-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel span-2" id="tasks-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Tareas del día</div>
+              <div class="panel-sub" id="tasks-sub">Asigna tareas y actívalas o desactívalas</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tarea</th><th>Asignada a</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody id="tasks-body"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="panel span-2">
           <div class="panel-head">
             <div class="panel-title">Fiado</div>
@@ -543,11 +751,84 @@
       </section>
 
       <div class="footer">
-        <span>Abarpay v1 · consola de demostración</span>
+        <span>Abarpay · consola de demostración</span>
         <span id="footer-mode">Modo demo</span>
       </div>
     </main>
   </div>
+
+  <dialog id="catalog-dialog" aria-labelledby="catalog-dialog-title">
+    <form id="catalog-form" autocomplete="off">
+      <div class="dialog-head">
+        <div class="dialog-title" id="catalog-dialog-title">Nuevo artículo</div>
+        <button type="button" class="ghost-btn" id="catalog-cancel-x">Cerrar</button>
+      </div>
+      <div class="dialog-body">
+        <div class="field">
+          <label for="catalog-name">Nombre</label>
+          <input id="catalog-name" type="text" maxlength="120" placeholder="Ej. Coca-Cola 600 ml, Corte de cabello">
+        </div>
+        <div class="dialog-grid">
+          <div class="field">
+            <label for="catalog-price">Precio ($)</label>
+            <input id="catalog-price" type="text" inputmode="decimal" placeholder="18.00">
+          </div>
+          <div class="field">
+            <label for="catalog-unit">Unidad</label>
+            <select id="catalog-unit">
+              <option value="pieza">pieza</option>
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+              <option value="litro">litro</option>
+              <option value="servicio">servicio</option>
+              <option value="sesion">sesión</option>
+              <option value="turno">turno</option>
+              <option value="minuto">minuto</option>
+              <option value="hora">hora</option>
+              <option value="paquete">paquete</option>
+              <option value="combo">combo</option>
+            </select>
+          </div>
+        </div>
+        <div class="dialog-grid">
+          <div class="field">
+            <label for="catalog-kind-field">Tipo</label>
+            <select id="catalog-kind-field">
+              <option value="producto">Producto</option>
+              <option value="servicio">Servicio</option>
+              <option value="platillo">Comida preparada</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="catalog-category-field">Categoría</label>
+            <input id="catalog-category-field" type="text" list="catalog-categories" maxlength="60" placeholder="Bebidas, Cortes…">
+          </div>
+        </div>
+        <div class="dialog-grid">
+          <div class="field">
+            <label for="catalog-stock">Stock (<span id="catalog-stock-unit">pieza</span>)</label>
+            <input id="catalog-stock" type="text" inputmode="decimal" placeholder="12">
+          </div>
+          <div class="field">
+            <label for="catalog-duration">Duración (min)</label>
+            <input id="catalog-duration" type="text" inputmode="numeric" placeholder="45">
+            <span class="field-hint">Solo para servicios.</span>
+          </div>
+        </div>
+        <label class="check-field"><input type="checkbox" id="catalog-unlimited"> Sin límite / no lleva inventario</label>
+        <div class="field">
+          <label for="catalog-aliases">Aliases</label>
+          <input id="catalog-aliases" type="text" maxlength="240" placeholder="coca, refresco (separados por coma)">
+          <span class="field-hint">Se usan para reconocer el artículo al dictar.</span>
+        </div>
+        <p class="error" id="catalog-form-error" hidden></p>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" class="btn-inline ghost" id="catalog-cancel">Cancelar</button>
+        <button type="submit" class="btn-inline" id="catalog-save">Guardar</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="toast" class="toast" hidden></div>
 
@@ -559,6 +840,8 @@
       var REFRESH_MS = 3000;
       var EMPLOYEE_ID = 1;
       var PHOTO_REFRESH_MS = 30000;
+      var CATALOG_PAGE_SIZE = 25;
+      var CATALOG_DEBOUNCE_MS = 300;
       var pin = "";
       var refreshTimer = null;
       var refreshing = false;
@@ -570,6 +853,17 @@
       var inventoryState = { items: [], totalValueCents: 0, lowCount: 0, source: "v2" };
       var ticketsState = { ok: false, loaded: false, items: [], error: null };
       var pendingTicketOps = {};
+      var lastSummary = null;
+      var catalogState = newCatalogState();
+      var catalogDebounceTimer = null;
+      var catalogEditingId = null;
+      var catalogSaving = false;
+      var catalogDeleteOps = {};
+      var expensesState = { ok: false, loaded: false, items: [], totalTodayCents: null, error: null };
+      var expensesSaving = false;
+      var tasksState = { ok: false, loaded: false, items: [], error: null };
+      var taskOps = {};
+      var employeesForTasks = [];
 
       var loginScreen = document.getElementById("login-screen");
       var app = document.getElementById("app");
@@ -596,21 +890,52 @@
         }).format(value);
       }
 
+      var UNIT_VALUES = {
+        pieza: "pieza", pza: "pieza", kg: "kg", kilo: "kg", g: "g", gramo: "g",
+        litro: "litro", servicio: "servicio", sesion: "sesion", turno: "turno",
+        minuto: "minuto", hora: "hora", paquete: "paquete", combo: "combo"
+      };
+      var UNIT_LABELS = {
+        pieza: "pieza", kg: "kg", g: "g", litro: "litro", servicio: "servicio",
+        sesion: "sesión", turno: "turno", minuto: "minuto", hora: "hora",
+        paquete: "paquete", combo: "combo"
+      };
+
+      function unitValue(unit) {
+        var text = String(unit == null ? "" : unit).trim().toLowerCase();
+        text = text.replace(/á/g, "a").replace(/é/g, "e").replace(/í/g, "i").replace(/ó/g, "o").replace(/ú/g, "u");
+        return UNIT_VALUES[text] || "pieza";
+      }
+
+      function unitLabel(unit) {
+        return UNIT_LABELS[unitValue(unit)] || "pieza";
+      }
+
+      function quantitySuffix(unit) {
+        var canon = unitValue(unit);
+        if (canon === "kg") return " kg";
+        if (canon === "pieza") return " pza";
+        return " " + unitLabel(canon);
+      }
+
       function quantity(milli, unit) {
         var value = Number(milli || 0) / 1000;
         var text = Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
-        return text + (unit === "kg" ? " kg" : " pza");
+        return text + quantitySuffix(unit);
       }
 
       function stockLevelMilli(value, unit) {
         if (value === null || value === undefined || !Number.isFinite(Number(value))) return "Sin nivel";
         var milli = Number(value);
         var text = Number.isInteger(milli / 1000) ? String(milli / 1000) : (milli / 1000).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
-        return text + (unit === "kg" ? " kg" : " pza");
+        return text + quantitySuffix(unit);
       }
 
       function displayUnit(unit) {
-        return unit === "kg" ? "kg" : "pza";
+        var canon = unitValue(unit);
+        if (canon === "kg") return "kg";
+        if (canon === "pieza") return "pza";
+        return unitLabel(canon);
       }
 
       function parseQtyMilli(text) {
@@ -751,6 +1076,12 @@
         pin = "";
         pinInput.value = "";
         closeStockEditor();
+        closeCatalogDialog();
+        if (catalogDebounceTimer) {
+          clearTimeout(catalogDebounceTimer);
+          catalogDebounceTimer = null;
+        }
+        resetV3State();
         pendingOps = {};
         sessionStorage.removeItem(PIN_KEY);
         loginError.hidden = !message;
@@ -941,7 +1272,7 @@
           items.push({
             productId: productId,
             name: rawItem.name || "Producto",
-            unit: rawItem.unit === "kg" ? "kg" : "pieza",
+            unit: unitValue(rawItem.unit),
             priceCents: priceCents,
             stockMilli: stockMilli,
             unlimitedStock: unlimitedStock,
@@ -1071,7 +1402,7 @@
       }
 
       function renderStoreProfile(profile, summary) {
-        var fallbackName = summary && summary.store && summary.store.name ? summary.store.name : "Tiendita de la Esquina";
+        var fallbackName = summary && summary.store && summary.store.name ? summary.store.name : "Mi negocio";
         document.getElementById("store-name").textContent = profile && profile.name ? profile.name : fallbackName;
         var parts = [];
         if (profile && profile.businessType) {
@@ -1358,8 +1689,812 @@
         body.innerHTML = html;
       }
 
+      /* ---------- v3 · catálogo ---------- */
+
+      function newCatalogState() {
+        return {
+          ok: false,
+          loaded: false,
+          loading: false,
+          items: [],
+          total: 0,
+          offset: 0,
+          limit: CATALOG_PAGE_SIZE,
+          q: "",
+          category: "",
+          kind: "",
+          error: null,
+          categories: {},
+          requestId: 0
+        };
+      }
+
+      function resetV3State() {
+        catalogState = newCatalogState();
+        expensesState = { ok: false, loaded: false, items: [], totalTodayCents: null, error: null };
+        tasksState = { ok: false, loaded: false, items: [], error: null };
+        employeesForTasks = [];
+        catalogDeleteOps = {};
+        taskOps = {};
+        lastSummary = null;
+        var qInput = document.getElementById("catalog-q");
+        if (qInput) qInput.value = "";
+        var categoryInput = document.getElementById("catalog-category");
+        if (categoryInput) categoryInput.value = "";
+        var kindInput = document.getElementById("catalog-kind");
+        if (kindInput) kindInput.value = "";
+        var amountInput = document.getElementById("expense-amount");
+        if (amountInput) amountInput.value = "";
+        var noteInput = document.getElementById("expense-note");
+        if (noteInput) noteInput.value = "";
+      }
+
+      function onlyDigits(text) {
+        if (!text) return false;
+        for (var i = 0; i < text.length; i += 1) {
+          var code = text.charCodeAt(i);
+          if (code < 48 || code > 57) return false;
+        }
+        return true;
+      }
+
+      function parseMoneyCents(text, allowZero) {
+        var cleaned = String(text == null ? "" : text).trim();
+        cleaned = cleaned.split("$").join("").split(" ").join("");
+        cleaned = cleaned.split(",").join(".");
+        var parts = cleaned.split(".");
+        if (parts.length > 2) return null;
+        var whole = parts[0];
+        var decimals = parts.length === 2 ? parts[1] : "";
+        if (!onlyDigits(whole)) return null;
+        if (decimals && (!onlyDigits(decimals) || decimals.length > 2)) return null;
+        var number = Number(whole + (decimals ? "." + decimals : ""));
+        if (!Number.isFinite(number)) return null;
+        if (number < 0 || (!allowZero && number === 0)) return null;
+        return Math.round(number * 100);
+      }
+
+      function priceInputValue(cents) {
+        var value = Number(cents || 0) / 100;
+        if (Number.isInteger(value)) return String(value);
+        return value.toFixed(2);
+      }
+
+      function employeeLabel(employee) {
+        if (!employee) return "—";
+        var base = employee.name ? String(employee.name) : "Persona #" + employee.id;
+        if (employee.nickname) base += " (" + employee.nickname + ")";
+        return base;
+      }
+
+      function taskEmployees() {
+        if (employeesForTasks && employeesForTasks.length) return employeesForTasks;
+        return (lastSummary && lastSummary.employees) || [];
+      }
+
+      function employeeById(employeeId) {
+        if (employeeId === null || employeeId === undefined || employeeId === "") return null;
+        var key = String(employeeId);
+        var list = taskEmployees();
+        for (var i = 0; i < list.length; i += 1) {
+          if (String(list[i].id) === key) return list[i];
+        }
+        return null;
+      }
+
+      function catalogHasDialogOpen() {
+        var dialog = document.getElementById("catalog-dialog");
+        return Boolean(dialog && dialog.hasAttribute("open"));
+      }
+
+      function catalogRequestParams() {
+        var params = ["limit=" + catalogState.limit, "offset=" + catalogState.offset];
+        if (catalogState.q) params.push("q=" + encodeURIComponent(catalogState.q));
+        if (catalogState.category) params.push("category=" + encodeURIComponent(catalogState.category));
+        if (catalogState.kind) params.push("kind=" + encodeURIComponent(catalogState.kind));
+        return params.join("&");
+      }
+
+      function syncCatalogFilters() {
+        catalogState.q = document.getElementById("catalog-q").value.trim();
+        catalogState.category = document.getElementById("catalog-category").value.trim();
+        catalogState.kind = document.getElementById("catalog-kind").value;
+        catalogState.offset = 0;
+      }
+
+      function scheduleCatalogReload() {
+        if (catalogDebounceTimer) clearTimeout(catalogDebounceTimer);
+        catalogDebounceTimer = setTimeout(function () {
+          catalogDebounceTimer = null;
+          syncCatalogFilters();
+          reloadCatalog();
+        }, CATALOG_DEBOUNCE_MS);
+      }
+
+      function catalogItemAliases(raw) {
+        var aliases = [];
+        if (Array.isArray(raw)) aliases = raw;
+        else if (typeof raw === "string" && raw) {
+          try {
+            var parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) aliases = parsed;
+          } catch (error) {
+            aliases = [];
+          }
+        }
+        var clean = [];
+        for (var i = 0; i < aliases.length; i += 1) {
+          var alias = String(aliases[i] == null ? "" : aliases[i]).trim();
+          if (alias && clean.indexOf(alias) === -1) clean.push(alias);
+        }
+        return clean;
+      }
+
+      function normalizeCatalogItem(raw) {
+        var item = raw || {};
+        var id = item.id !== undefined && item.id !== null ? item.id : item.productId;
+        var duration = item.durationMinutes !== undefined && item.durationMinutes !== null ? Number(item.durationMinutes) : null;
+        return {
+          id: id,
+          name: item.name ? String(item.name) : "Sin nombre",
+          unit: unitValue(item.unit),
+          priceCents: Number(item.priceCents || 0),
+          kind: item.kind ? String(item.kind) : "producto",
+          category: item.category ? String(item.category) : "",
+          durationMinutes: Number.isFinite(duration) ? duration : null,
+          aliases: catalogItemAliases(item.aliases),
+          stockMilli: Number(item.stockMilli || 0),
+          unlimitedStock: Boolean(item.unlimitedStock),
+          quick: Boolean(item.quick)
+        };
+      }
+
+      function fetchCatalog() {
+        catalogState.requestId += 1;
+        var requestId = catalogState.requestId;
+        catalogState.loading = true;
+        return consoleFetch("/api/catalog?" + catalogRequestParams()).then(function (data) {
+          if (requestId !== catalogState.requestId) return { stale: true };
+          var raw = (data && data.items) || [];
+          var items = [];
+          for (var i = 0; i < raw.length; i += 1) items.push(normalizeCatalogItem(raw[i]));
+          var total = data && data.total !== undefined && data.total !== null ? Number(data.total) : items.length;
+          return { ok: true, loaded: true, items: items, total: total, error: null };
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+          if (requestId !== catalogState.requestId) return { stale: true };
+          return { ok: false, loaded: true, items: [], total: 0, error: error };
+        });
+      }
+
+      function applyCatalogResult(result) {
+        if (!result || result.stale) return;
+        catalogState.loading = false;
+        catalogState.loaded = true;
+        catalogState.ok = Boolean(result.ok);
+        catalogState.error = result.error || null;
+        if (!result.ok) {
+          catalogState.items = [];
+          catalogState.total = 0;
+          return;
+        }
+        catalogState.items = result.items || [];
+        catalogState.total = Number(result.total || 0);
+        for (var i = 0; i < catalogState.items.length; i += 1) {
+          var category = catalogState.items[i].category;
+          if (category) catalogState.categories[category] = true;
+        }
+        var maxOffset = catalogState.total > 0
+          ? Math.floor((catalogState.total - 1) / catalogState.limit) * catalogState.limit
+          : 0;
+        if (catalogState.offset > maxOffset) {
+          catalogState.offset = maxOffset;
+          setTimeout(function () { reloadCatalog(); }, 0);
+        }
+      }
+
+      function reloadCatalog() {
+        return fetchCatalog().then(function (result) {
+          applyCatalogResult(result);
+          renderCatalog();
+          return result;
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+        });
+      }
+
+      function fetchCatalogForRefresh() {
+        if (catalogHasDialogOpen() || catalogDebounceTimer) return Promise.resolve();
+        return fetchCatalog().then(function (result) {
+          applyCatalogResult(result);
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+        });
+      }
+
+      function catalogKindBadge(kind) {
+        var map = {
+          producto: ["Producto", "ok"],
+          servicio: ["Servicio", "pey"],
+          platillo: ["Platillo", "warn"]
+        };
+        var item = map[kind] || [kind || "—", "muted"];
+        return '<span class="badge ' + item[1] + '">' + escapeHtml(item[0]) + '</span>';
+      }
+
+      function catalogStockCell(item) {
+        if (item.kind !== "producto") return '<span class="muted">—</span>';
+        if (item.unlimitedStock) return '<span class="muted">Sin límite</span>';
+        return '<span class="mono">' + escapeHtml(quantity(item.stockMilli, item.unit)) + '</span>';
+      }
+
+      function catalogRow(item) {
+        var id = String(item.id);
+        var busy = Boolean(catalogDeleteOps[id]);
+        var aliases = item.aliases.length
+          ? '<div class="catalog-sub">' + escapeHtml(item.aliases.join(", ")) + '</div>'
+          : "";
+        var duration = item.durationMinutes
+          ? '<span class="mono">' + escapeHtml(String(item.durationMinutes)) + ' min</span>'
+          : '<span class="muted">—</span>';
+        return '<tr>' +
+          '<td><div class="catalog-name">' + escapeHtml(item.name) + '</div>' + aliases + '</td>' +
+          '<td>' + catalogKindBadge(item.kind) + '</td>' +
+          '<td class="catalog-cat">' + escapeHtml(item.category || "—") + '</td>' +
+          '<td>' + escapeHtml(unitLabel(item.unit)) + '</td>' +
+          '<td class="right mono">' + escapeHtml(money(item.priceCents)) + '</td>' +
+          '<td class="right">' + catalogStockCell(item) + '</td>' +
+          '<td class="right">' + duration + '</td>' +
+          '<td><div class="inv-actions">' +
+            '<button type="button" class="set-btn" data-catalog-action="edit" data-catalog-id="' + escapeHtml(id) + '">Editar</button>' +
+            '<button type="button" class="ticket-btn danger" data-catalog-action="delete" data-catalog-id="' + escapeHtml(id) + '"' + (busy ? " disabled" : "") + '>Borrar</button>' +
+          '</div></td>' +
+          '</tr>';
+      }
+
+      function renderCatalogCategories() {
+        var names = Object.keys(catalogState.categories);
+        names.sort(function (a, b) { return a.localeCompare(b, "es"); });
+        var html = "";
+        for (var i = 0; i < names.length; i += 1) {
+          html += '<option value="' + escapeHtml(names[i]) + '"></option>';
+        }
+        document.getElementById("catalog-categories").innerHTML = html;
+      }
+
+      function renderCatalog() {
+        var state = catalogState;
+        renderCatalogCategories();
+        var body = document.getElementById("catalog-body");
+        var sub = document.getElementById("catalog-sub");
+        var pagerText = document.getElementById("catalog-pager-text");
+        var prev = document.getElementById("catalog-prev");
+        var next = document.getElementById("catalog-next");
+        if (!state.loaded && !state.loading) {
+          sub.textContent = "Búsqueda y paginación · catálogos grandes";
+          pagerText.textContent = "—";
+          prev.disabled = true;
+          next.disabled = true;
+          body.innerHTML = '<tr><td colspan="8" class="empty">Cargando catálogo…</td></tr>';
+          return;
+        }
+        if (state.loaded && !state.ok) {
+          sub.textContent = "Catálogo fuera de línea; el resto de la consola sigue";
+          pagerText.textContent = "—";
+          prev.disabled = true;
+          next.disabled = true;
+          body.innerHTML = '<tr><td colspan="8" class="empty">' +
+            escapeHtml("No se pudo leer el catálogo: " + ((state.error && state.error.message) || "error de red") + ". Se reintenta solo.") +
+            '</td></tr>';
+          return;
+        }
+        var shown = (state.items || []).length;
+        var from = shown ? state.offset + 1 : 0;
+        var to = state.offset + shown;
+        var pages = Math.max(1, Math.ceil(state.total / state.limit));
+        sub.textContent = state.total + (state.total === 1 ? " artículo" : " artículos") +
+          (state.loading ? " · actualizando…" : " · búsqueda y paginación del servidor");
+        pagerText.textContent = state.total
+          ? "Mostrando " + from + "–" + to + " de " + state.total + " · página " + (Math.floor(state.offset / state.limit) + 1) + " de " + pages
+          : "Sin resultados";
+        prev.disabled = state.offset <= 0;
+        next.disabled = !state.total || state.offset + state.limit >= state.total;
+        if (!shown) {
+          body.innerHTML = '<tr><td colspan="8" class="empty">' +
+            (state.total ? "No hay artículos en esta página." : "No hay artículos que coincidan. Ajusta la búsqueda o crea uno nuevo.") +
+            '</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < state.items.length; i += 1) html += catalogRow(state.items[i]);
+        body.innerHTML = html;
+      }
+
+      function findCatalogItem(productId) {
+        var key = String(productId);
+        for (var i = 0; i < catalogState.items.length; i += 1) {
+          if (String(catalogState.items[i].id) === key) return catalogState.items[i];
+        }
+        return null;
+      }
+
+      function setCatalogStockState() {
+        var kindField = document.getElementById("catalog-kind-field");
+        var unlimited = document.getElementById("catalog-unlimited");
+        var stockInput = document.getElementById("catalog-stock");
+        var unit = document.getElementById("catalog-unit").value;
+        if (kindField.value !== "producto") {
+          unlimited.checked = true;
+          unlimited.disabled = true;
+          stockInput.disabled = true;
+        } else {
+          unlimited.disabled = false;
+          stockInput.disabled = unlimited.checked;
+        }
+        document.getElementById("catalog-stock-unit").textContent = unitLabel(unit);
+      }
+
+      function openCatalogDialog(item) {
+        var dialog = document.getElementById("catalog-dialog");
+        var errorBox = document.getElementById("catalog-form-error");
+        catalogEditingId = item && item.id !== undefined && item.id !== null ? item.id : null;
+        document.getElementById("catalog-dialog-title").textContent = catalogEditingId === null ? "Nuevo artículo" : "Editar artículo";
+        document.getElementById("catalog-name").value = item ? item.name : "";
+        document.getElementById("catalog-price").value = item ? priceInputValue(item.priceCents) : "";
+        document.getElementById("catalog-unit").value = item ? item.unit : "pieza";
+        document.getElementById("catalog-kind-field").value = item && item.kind ? item.kind : "producto";
+        document.getElementById("catalog-category-field").value = item ? item.category : catalogState.category;
+        document.getElementById("catalog-stock").value = item && item.kind === "producto" && !item.unlimitedStock ? qtyInputValue(item.stockMilli) : "";
+        document.getElementById("catalog-duration").value = item && item.durationMinutes !== null ? String(item.durationMinutes) : "";
+        document.getElementById("catalog-aliases").value = item ? item.aliases.join(", ") : "";
+        document.getElementById("catalog-unlimited").checked = item ? Boolean(item.unlimitedStock) : false;
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+        setCatalogStockState();
+        if (!dialog.hasAttribute("open")) {
+          if (typeof dialog.showModal === "function") dialog.showModal();
+          else dialog.setAttribute("open", "");
+        }
+        setTimeout(function () { document.getElementById("catalog-name").focus(); }, 30);
+      }
+
+      function closeCatalogDialog() {
+        var dialog = document.getElementById("catalog-dialog");
+        catalogEditingId = null;
+        if (!dialog) return;
+        if (typeof dialog.close === "function" && dialog.hasAttribute("open")) dialog.close();
+        else dialog.removeAttribute("open");
+      }
+
+      function showCatalogFormError(message) {
+        var errorBox = document.getElementById("catalog-form-error");
+        errorBox.hidden = false;
+        errorBox.textContent = message;
+        return null;
+      }
+
+      function saveCatalogItem() {
+        if (catalogSaving) return;
+        var name = document.getElementById("catalog-name").value.trim();
+        var price = parseMoneyCents(document.getElementById("catalog-price").value, true);
+        var unit = unitValue(document.getElementById("catalog-unit").value);
+        var kind = document.getElementById("catalog-kind-field").value;
+        var category = document.getElementById("catalog-category-field").value.trim();
+        var durationText = document.getElementById("catalog-duration").value.trim();
+        var unlimited = document.getElementById("catalog-unlimited").checked || kind !== "producto";
+        var stockMilli = 0;
+        var errorBox = document.getElementById("catalog-form-error");
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+        if (!name) return showCatalogFormError("Escribe el nombre del artículo.");
+        if (price === null) return showCatalogFormError("Escribe un precio válido, por ejemplo 18 o 18.50.");
+        var duration = null;
+        if (durationText) {
+          if (!onlyDigits(durationText)) return showCatalogFormError("La duración debe ser un número entero de minutos.");
+          duration = Number(durationText);
+        }
+        if (!unlimited) {
+          var stock = parseQtyMilli(document.getElementById("catalog-stock").value);
+          if (stock === null || stock < 0) return showCatalogFormError("Escribe un stock válido o marca «Sin límite».");
+          stockMilli = stock;
+        }
+        var aliases = [];
+        var aliasParts = document.getElementById("catalog-aliases").value.split(",");
+        for (var i = 0; i < aliasParts.length; i += 1) {
+          var alias = aliasParts[i].trim();
+          if (alias && aliases.indexOf(alias) === -1) aliases.push(alias);
+        }
+        var editingId = catalogEditingId;
+        var payload = {
+          name: name,
+          unit: unit,
+          priceCents: price,
+          aliases: aliases,
+          stockMilli: stockMilli,
+          unlimitedStock: unlimited,
+          kind: kind,
+          category: category || null,
+          durationMinutes: duration
+        };
+        var path = editingId === null ? "/api/catalog" : "/api/catalog/" + encodeURIComponent(String(editingId));
+        var method = editingId === null ? "POST" : "PATCH";
+        var saveButton = document.getElementById("catalog-save");
+        catalogSaving = true;
+        saveButton.disabled = true;
+        saveButton.textContent = "Guardando…";
+        consoleFetch(path, { method: method, employeeId: EMPLOYEE_ID, body: JSON.stringify(payload) }).then(function () {
+          closeCatalogDialog();
+          showToast(editingId === null ? "Artículo agregado al catálogo." : "Artículo actualizado.");
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            showCatalogFormError(error.message || "No se pudo guardar el artículo.");
+          }
+        }).then(function () {
+          catalogSaving = false;
+          saveButton.disabled = false;
+          saveButton.textContent = "Guardar";
+          reloadCatalog().catch(function (error) {
+            if (error && error.message === "AUTH") return;
+          });
+        });
+      }
+
+      function deleteCatalogItem(item) {
+        if (!item) return;
+        var key = String(item.id);
+        if (catalogDeleteOps[key]) return;
+        if (!window.confirm("¿Borrar «" + item.name + "» del catálogo? Esta acción no se puede deshacer.")) return;
+        catalogDeleteOps[key] = true;
+        renderCatalog();
+        consoleFetch("/api/catalog/" + encodeURIComponent(key), { method: "DELETE", employeeId: EMPLOYEE_ID }).then(function () {
+          showToast("Artículo borrado del catálogo.");
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            showToast(error.message || "No se pudo borrar el artículo.");
+          }
+        }).then(function () {
+          delete catalogDeleteOps[key];
+          reloadCatalog().catch(function (error) {
+            if (error && error.message === "AUTH") return;
+          });
+        });
+      }
+
+      /* ---------- v3 · gastos ---------- */
+
+      function normalizeExpense(raw) {
+        var item = raw || {};
+        return {
+          id: item.id,
+          amountCents: Number(item.amountCents || 0),
+          note: item.note ? String(item.note) : "",
+          createdAt: epochValue(item.createdAt),
+          employeeId: item.employeeId !== undefined && item.employeeId !== null ? item.employeeId : null,
+          employeeName: item.employeeName || item.reportedByName || "",
+          employeeNickname: item.employeeNickname || ""
+        };
+      }
+
+      function fetchExpenses() {
+        return consoleFetch("/api/expenses?limit=50", { employeeId: EMPLOYEE_ID }).then(function (data) {
+          var raw = (data && data.items) || [];
+          var items = [];
+          for (var i = 0; i < raw.length; i += 1) items.push(normalizeExpense(raw[i]));
+          items.sort(function (a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); });
+          var total = data && data.totalTodayCents !== undefined && data.totalTodayCents !== null ? Number(data.totalTodayCents) : null;
+          return { ok: true, loaded: true, items: items, totalTodayCents: total, error: null };
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+          return { ok: false, loaded: true, items: [], totalTodayCents: null, error: error };
+        });
+      }
+
+      function expenseIsToday(expense) {
+        if (!expense || !expense.createdAt) return false;
+        try {
+          return new Date(expense.createdAt * 1000).toDateString() === new Date().toDateString();
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function expensesTotalToday() {
+        if (expensesState.totalTodayCents !== null && expensesState.totalTodayCents !== undefined) {
+          return Number(expensesState.totalTodayCents);
+        }
+        var total = 0;
+        var items = expensesState.items || [];
+        for (var i = 0; i < items.length; i += 1) {
+          if (expenseIsToday(items[i])) total += Number(items[i].amountCents || 0);
+        }
+        return total;
+      }
+
+      function summaryExpensesTotal(summary) {
+        var today = summary && summary.today;
+        if (today && today.totalExpensesCents !== undefined && today.totalExpensesCents !== null) {
+          return Number(today.totalExpensesCents || 0);
+        }
+        return null;
+      }
+
+      function expenseWho(expense) {
+        if (!expense) return "—";
+        if (expense.employeeName) {
+          return expense.employeeNickname
+            ? expense.employeeName + " (" + expense.employeeNickname + ")"
+            : expense.employeeName;
+        }
+        var employee = employeeById(expense.employeeId);
+        if (employee) return employeeLabel(employee);
+        if (expense.employeeId !== null && expense.employeeId !== undefined) return "Persona #" + expense.employeeId;
+        return "—";
+      }
+
+      function renderExpenses(summary) {
+        var state = expensesState;
+        var body = document.getElementById("expenses-body");
+        var sub = document.getElementById("expenses-sub");
+        var total = summaryExpensesTotal(summary);
+        if (total === null) total = expensesTotalToday();
+        document.getElementById("expenses-total").textContent = money(total);
+        var items = state.items || [];
+        var countToday = 0;
+        for (var c = 0; c < items.length; c += 1) {
+          if (expenseIsToday(items[c])) countToday += 1;
+        }
+        document.getElementById("expenses-total-detail").textContent = countToday
+          ? countToday + (countToday === 1 ? " gasto hoy" : " gastos hoy")
+          : "Sin gastos registrados hoy";
+        if (!state.loaded) {
+          sub.textContent = "Dinero que salió hoy del negocio";
+          body.innerHTML = '<tr><td colspan="4" class="empty">Cargando gastos…</td></tr>';
+          return;
+        }
+        if (!state.ok) {
+          sub.textContent = "Gastos fuera de línea; el resto de la consola sigue";
+          body.innerHTML = '<tr><td colspan="4" class="empty">' +
+            escapeHtml("No se pudieron leer los gastos: " + ((state.error && state.error.message) || "error de red") + ". Se reintenta solo.") +
+            '</td></tr>';
+          return;
+        }
+        sub.textContent = items.length
+          ? items.length + " gastos recientes · total de hoy " + money(total)
+          : "Dinero que salió hoy del negocio";
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="4" class="empty">Sin gastos registrados. Un gasto se apunta desde aquí o desde la app.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < items.length; i += 1) {
+          var expense = items[i];
+          html += '<tr>' +
+            '<td class="mono">' + escapeHtml(expense.createdAt ? dateTimeLabel(expense.createdAt) : "—") + '</td>' +
+            '<td class="right mono">' + escapeHtml(money(expense.amountCents)) + '</td>' +
+            '<td>' + escapeHtml(expense.note || "—") + '</td>' +
+            '<td>' + escapeHtml(expenseWho(expense)) + '</td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      function saveExpense() {
+        if (expensesSaving) return;
+        var amountInput = document.getElementById("expense-amount");
+        var noteInput = document.getElementById("expense-note");
+        var errorBox = document.getElementById("expense-error");
+        var amountCents = parseMoneyCents(amountInput.value, false);
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+        if (amountCents === null) {
+          errorBox.hidden = false;
+          errorBox.textContent = "Escribe un monto en pesos mayor que cero, por ejemplo 20 o 20.50.";
+          amountInput.focus();
+          return;
+        }
+        var note = noteInput.value.trim();
+        var saveButton = document.getElementById("expense-save");
+        expensesSaving = true;
+        saveButton.disabled = true;
+        saveButton.textContent = "Guardando…";
+        consoleFetch("/api/expenses", {
+          method: "POST",
+          employeeId: EMPLOYEE_ID,
+          body: JSON.stringify({ amountCents: amountCents, note: note || undefined })
+        }).then(function () {
+          amountInput.value = "";
+          noteInput.value = "";
+          showToast("Gasto registrado: " + money(amountCents) + (note ? " · " + note : "") + ".");
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            errorBox.hidden = false;
+            errorBox.textContent = error.message || "No se pudo registrar el gasto.";
+          }
+        }).then(function () {
+          expensesSaving = false;
+          saveButton.disabled = false;
+          saveButton.textContent = "Registrar gasto";
+          refreshAll();
+        });
+      }
+
+      /* ---------- v3 · tareas del día ---------- */
+
+      function normalizeTask(raw) {
+        var item = raw || {};
+        var assigned = item.assignedEmployeeId;
+        if (assigned === undefined) assigned = item.assigned_employee_id;
+        var active = item.active;
+        if (active === undefined || active === null) active = true;
+        return {
+          id: item.id,
+          key: item.key ? String(item.key) : "",
+          title: item.title ? String(item.title) : "Tarea",
+          assignedEmployeeId: assigned === undefined || assigned === null ? null : assigned,
+          active: Boolean(active)
+        };
+      }
+
+      function fetchTasks() {
+        return consoleFetch("/api/tasks", { employeeId: EMPLOYEE_ID }).then(function (data) {
+          var raw = (data && data.items) || [];
+          var items = [];
+          for (var i = 0; i < raw.length; i += 1) items.push(normalizeTask(raw[i]));
+          return { ok: true, loaded: true, items: items, error: null };
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+          return { ok: false, loaded: true, items: [], error: error };
+        });
+      }
+
+      function fetchEmployeesForTasks() {
+        return consoleFetch("/api/employees", { employeeId: EMPLOYEE_ID }).then(function (data) {
+          var raw = (data && data.items) || [];
+          var items = [];
+          for (var i = 0; i < raw.length; i += 1) {
+            var employee = raw[i] || {};
+            items.push({
+              id: employee.id,
+              name: employee.name || "",
+              nickname: employee.nickname || "",
+              role: employee.role || "",
+              active: employee.active !== undefined ? Boolean(employee.active) : true
+            });
+          }
+          employeesForTasks = items;
+          return { ok: true, items: items };
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+          employeesForTasks = [];
+          return { ok: false, items: [] };
+        });
+      }
+
+      function findTask(taskId) {
+        var key = String(taskId);
+        for (var i = 0; i < tasksState.items.length; i += 1) {
+          if (String(tasksState.items[i].id) === key) return tasksState.items[i];
+        }
+        return null;
+      }
+
+      function taskEmployeeOptions(selectedId) {
+        var selected = selectedId === null || selectedId === undefined ? "" : String(selectedId);
+        var html = '<option value=""' + (selected === "" ? " selected" : "") + '>Sin asignar</option>';
+        var list = taskEmployees();
+        var found = false;
+        for (var i = 0; i < list.length; i += 1) {
+          var employee = list[i];
+          var value = String(employee.id);
+          if (value === selected) found = true;
+          var label = employeeLabel(employee);
+          if (employee.active === false) label += " · inactivo";
+          html += '<option value="' + escapeHtml(value) + '"' + (value === selected ? " selected" : "") + '>' + escapeHtml(label) + '</option>';
+        }
+        if (selected && !found) {
+          html += '<option value="' + escapeHtml(selected) + '" selected>Persona #' + escapeHtml(selected) + '</option>';
+        }
+        return html;
+      }
+
+      function renderTasks() {
+        var state = tasksState;
+        var body = document.getElementById("tasks-body");
+        var sub = document.getElementById("tasks-sub");
+        if (!state.loaded) {
+          sub.textContent = "Asigna tareas y actívalas o desactívalas";
+          body.innerHTML = '<tr><td colspan="4" class="empty">Cargando tareas…</td></tr>';
+          return;
+        }
+        if (!state.ok) {
+          sub.textContent = "Tareas fuera de línea; el resto de la consola sigue";
+          body.innerHTML = '<tr><td colspan="4" class="empty">' +
+            escapeHtml("No se pudieron leer las tareas: " + ((state.error && state.error.message) || "error de red") + ". Se reintenta solo.") +
+            '</td></tr>';
+          return;
+        }
+        var items = state.items || [];
+        var activeCount = 0;
+        var assignedCount = 0;
+        for (var i = 0; i < items.length; i += 1) {
+          if (items[i].active) activeCount += 1;
+          if (items[i].assignedEmployeeId !== null) assignedCount += 1;
+        }
+        sub.textContent = items.length
+          ? items.length + " tareas · " + activeCount + " activas · " + assignedCount + " asignadas"
+          : "Asigna tareas y actívalas o desactívalas";
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="4" class="empty">Sin tareas del día. Se crean al aplicar la plantilla del tipo de negocio.</td></tr>';
+          return;
+        }
+        var html = "";
+        for (var j = 0; j < items.length; j += 1) {
+          var task = items[j];
+          var key = String(task.id);
+          var busy = Boolean(taskOps[key]);
+          html += '<tr>' +
+            '<td><div class="task-title">' + escapeHtml(task.title) + '</div>' +
+              (task.key ? '<div class="task-key">' + escapeHtml(task.key) + '</div>' : "") + '</td>' +
+            '<td><select class="task-assign" data-task-assign="' + escapeHtml(key) + '"' + (busy ? " disabled" : "") + '>' +
+              taskEmployeeOptions(task.assignedEmployeeId) + '</select></td>' +
+            '<td>' + (task.active ? '<span class="badge ok">Activa</span>' : '<span class="badge muted">Inactiva</span>') + '</td>' +
+            '<td><div class="ticket-actions">' +
+              '<button type="button" class="ticket-btn' + (task.active ? "" : " resolve") + '" data-task-toggle="' + escapeHtml(key) + '"' + (busy ? " disabled" : "") + '>' +
+              (task.active ? "Desactivar" : "Activar") + '</button>' +
+            '</div></td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      function updateTask(task, patch, successMessage) {
+        if (!task) return;
+        var key = String(task.id);
+        if (taskOps[key]) return;
+        taskOps[key] = true;
+        renderTasks();
+        consoleFetch("/api/tasks/" + encodeURIComponent(key), {
+          method: "PATCH",
+          employeeId: EMPLOYEE_ID,
+          body: JSON.stringify(patch)
+        }).then(function () {
+          showToast(successMessage || "Tarea actualizada.");
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            showToast(error.message || "No se pudo actualizar la tarea.");
+          }
+        }).then(function () {
+          delete taskOps[key];
+          fetchTasks().then(function (result) {
+            if (result && result.loaded) {
+              tasksState = result;
+              renderTasks();
+            }
+          }).catch(function (error) {
+            if (error && error.message === "AUTH") return;
+          });
+        });
+      }
+
+      function fetchTasksForRefresh() {
+        return fetchTasks().then(function (result) {
+          if (result) tasksState = result;
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+        });
+      }
+
+      function fetchExpensesForRefresh() {
+        return fetchExpenses().then(function (result) {
+          if (result) expensesState = result;
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+        });
+      }
+
       function renderAll(summary, sales, inventory, fiado, profile, tickets) {
-        var store = (profile && profile.name) || (summary.store ? summary.store.name : "Tiendita de la Esquina");
+        var store = (profile && profile.name) || (summary.store ? summary.store.name : "Mi negocio");
+        lastSummary = summary;
         document.getElementById("store-pill").textContent = store;
         document.getElementById("demo-banner").className = (summary.today && summary.today.demoMode) ? "demo-banner show" : "demo-banner";
         document.getElementById("footer-mode").textContent = (summary.today && summary.today.demoMode) ? "Modo demo" : "Modo live";
@@ -1369,6 +2504,9 @@
         renderTopProducts(summary);
         renderEmployees(summary);
         renderInventory();
+        renderCatalog();
+        renderExpenses(summary);
+        renderTasks();
         renderFiado(fiado);
         renderStoreProfile(profile, summary);
         ticketsState = tickets || { ok: false, loaded: true, items: [], error: null };
@@ -1387,7 +2525,11 @@
           fetchInventory(),
           consoleFetch("/api/console/fiado"),
           fetchStoreProfile(),
-          fetchSupportTickets()
+          fetchSupportTickets(),
+          fetchEmployeesForTasks(),
+          fetchCatalogForRefresh(),
+          fetchTasksForRefresh(),
+          fetchExpensesForRefresh()
         ]).then(function (results) {
           renderAll(results[0], results[1], results[2], results[3], results[4], results[5]);
         }).catch(function (error) {
@@ -1458,6 +2600,104 @@
 
       document.getElementById("logout").addEventListener("click", function () {
         showLogin("");
+      });
+
+      document.getElementById("catalog-q").addEventListener("input", function () {
+        scheduleCatalogReload();
+      });
+
+      document.getElementById("catalog-category").addEventListener("input", function () {
+        scheduleCatalogReload();
+      });
+
+      document.getElementById("catalog-kind").addEventListener("change", function () {
+        if (catalogDebounceTimer) {
+          clearTimeout(catalogDebounceTimer);
+          catalogDebounceTimer = null;
+        }
+        syncCatalogFilters();
+        reloadCatalog();
+      });
+
+      document.getElementById("catalog-clear").addEventListener("click", function () {
+        document.getElementById("catalog-q").value = "";
+        document.getElementById("catalog-category").value = "";
+        document.getElementById("catalog-kind").value = "";
+        catalogState.q = "";
+        catalogState.category = "";
+        catalogState.kind = "";
+        catalogState.offset = 0;
+        reloadCatalog();
+      });
+
+      document.getElementById("catalog-prev").addEventListener("click", function () {
+        if (catalogState.offset <= 0) return;
+        catalogState.offset = Math.max(0, catalogState.offset - catalogState.limit);
+        reloadCatalog();
+      });
+
+      document.getElementById("catalog-next").addEventListener("click", function () {
+        if (catalogState.offset + catalogState.limit >= catalogState.total) return;
+        catalogState.offset += catalogState.limit;
+        reloadCatalog();
+      });
+
+      document.getElementById("catalog-body").addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("button[data-catalog-action]") : null;
+        if (!button || button.disabled) return;
+        var item = findCatalogItem(button.getAttribute("data-catalog-id"));
+        if (!item) return;
+        if (button.getAttribute("data-catalog-action") === "edit") openCatalogDialog(item);
+        else deleteCatalogItem(item);
+      });
+
+      document.getElementById("catalog-add").addEventListener("click", function () {
+        openCatalogDialog(null);
+      });
+
+      document.getElementById("catalog-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        saveCatalogItem();
+      });
+
+      document.getElementById("catalog-cancel").addEventListener("click", function () {
+        closeCatalogDialog();
+      });
+
+      document.getElementById("catalog-cancel-x").addEventListener("click", function () {
+        closeCatalogDialog();
+      });
+
+      document.getElementById("catalog-dialog").addEventListener("close", function () {
+        catalogEditingId = null;
+      });
+
+      document.getElementById("catalog-kind-field").addEventListener("change", setCatalogStockState);
+      document.getElementById("catalog-unit").addEventListener("change", setCatalogStockState);
+      document.getElementById("catalog-unlimited").addEventListener("change", function (event) {
+        document.getElementById("catalog-stock").disabled = Boolean(event.target.checked);
+      });
+
+      document.getElementById("expense-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        saveExpense();
+      });
+
+      document.getElementById("tasks-body").addEventListener("change", function (event) {
+        var select = event.target && event.target.closest ? event.target.closest("select[data-task-assign]") : null;
+        if (!select) return;
+        var task = findTask(select.getAttribute("data-task-assign"));
+        if (!task) return;
+        var value = select.value;
+        updateTask(task, { assignedEmployeeId: value === "" ? null : Number(value) }, value === "" ? "Tarea sin asignar." : "Tarea asignada.");
+      });
+
+      document.getElementById("tasks-body").addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("button[data-task-toggle]") : null;
+        if (!button || button.disabled) return;
+        var task = findTask(button.getAttribute("data-task-toggle"));
+        if (!task) return;
+        updateTask(task, { active: !task.active }, task.active ? "Tarea desactivada." : "Tarea activada.");
       });
 
       document.addEventListener("visibilitychange", function () {
