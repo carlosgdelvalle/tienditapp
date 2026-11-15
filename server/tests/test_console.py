@@ -71,7 +71,7 @@ def test_console_endpoints_require_owner_pin(client):
 
     inventory = client.get("/api/console/inventory", headers=headers)
     assert inventory.status_code == 200
-    assert len(inventory.json()["items"]) == 12
+    assert len(inventory.json()["items"]) == 13
 
     webhooks = client.get("/api/console/webhooks?limit=5", headers=headers)
     assert webhooks.status_code == 200

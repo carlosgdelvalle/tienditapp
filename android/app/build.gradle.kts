@@ -19,10 +19,10 @@ android {
         applicationId = "mx.abarpay.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.0"
-        // Fijado para la demo; si cambia el túnel, actualizar aquí y recompilar.
-        buildConfigField("String", "DEMO_SERVER", "\"https://roughly-participant-sbjct-gain.trycloudflare.com\"")
+        versionCode = 10
+        versionName = "1.0.7"
+        // Servidor HTTPS estable de Render para la demo.
+        buildConfigField("String", "DEMO_SERVER", "\"https://abarpay-api.onrender.com\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }

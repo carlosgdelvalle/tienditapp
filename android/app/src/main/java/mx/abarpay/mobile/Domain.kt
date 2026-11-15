@@ -19,7 +19,11 @@ data class Product(
     val stockMilli: Int,
     val lowStockMilli: Int = 5000,
     val quick: Boolean = false,
-)
+    val unlimitedStock: Boolean = false,
+) {
+    val isLowStock get() = !unlimitedStock && stockMilli <= lowStockMilli
+    val stockLabel get() = if (unlimitedStock) "Sin límite" else qtyText(stockMilli, unit)
+}
 
 data class Employee(val id: Int, val name: String, val role: String)
 
@@ -86,6 +90,7 @@ data class Sale(
     val settled get() = paid || status == "credit"
     val failed get() = status == "failed"
     val unresolved get() = !settled
+    val canCancelPey get() = paymentMethod == PAYMENT_PEY && status in setOf("pending", "por_conciliar", "expired")
 }
 
 data class Customer(val id: Int, val name: String, val phone: String? = null, val balanceCents: Long = 0)

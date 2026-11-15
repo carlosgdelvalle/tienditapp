@@ -26,6 +26,7 @@ Status: implementation contract for the fresh v1. The old `app/` and `prototypes
 - `lineTotalCents = round(unitPriceCents * qtyMilli / 1000)`.
 - Product `priceCents` is per unit (per piece or per kg).
 - Stock is `stockMilli`; negative stock is allowed in the demo (no guardrails), but every change must create an `inventory_movements` row.
+- `unlimitedStock=true` marks products without a finite stock balance. Sales and cancellations keep their audit movements but do not change `stockMilli`; these products are excluded from low-stock alerts and manual stock adjustments. Android and the console show "Sin límite". Existing products default to `false` through an additive database migration.
 
 ## Seed
 
@@ -44,6 +45,11 @@ Products (name, unit, price cents, stock milli, low stock milli, quick):
 - Jabón Zote, pieza, 2300, 9000, 5000, false
 - Galletas Marías, pieza, 1900, 14000, 5000, false
 - Fanta 600 ml, pieza, 1700, 12000, 5000, false
+- Tacos de pastor, pieza, 2000, 0, 0, true; `unlimitedStock=true`.
+
+The pastor product is also added once to existing demo databases on startup,
+without resetting other products or transactions. Aliases include `de pastor`,
+`al pastor`, `taco de pastor` and `tacos al pastor`.
 
 Barcodes seed: `7500000000001`→Coca-Cola, `7500000000002`→Sabritas, `7500000000003`→Pan Bimbo, `7500000000004`→Huevo, `7500000000005`→Leche.
 
@@ -56,7 +62,8 @@ employees(id INTEGER PRIMARY KEY, store_id TEXT NOT NULL, name TEXT NOT NULL,
 products(id INTEGER PRIMARY KEY, store_id TEXT NOT NULL, name TEXT NOT NULL,
          aliases TEXT NOT NULL DEFAULT '[]', unit TEXT NOT NULL CHECK(unit IN ('pieza','kg')),
          price_cents INTEGER NOT NULL, stock_milli INTEGER NOT NULL,
-         low_stock_milli INTEGER NOT NULL DEFAULT 5000, quick INTEGER NOT NULL DEFAULT 0);
+         low_stock_milli INTEGER NOT NULL DEFAULT 5000, quick INTEGER NOT NULL DEFAULT 0,
+         unlimited_stock INTEGER NOT NULL DEFAULT 0 CHECK(unlimited_stock IN (0,1)));
 barcodes(code TEXT PRIMARY KEY, product_id INTEGER NOT NULL);
 sales(id TEXT PRIMARY KEY, store_id TEXT NOT NULL, employee_id INTEGER NOT NULL,
       created_at REAL NOT NULL, status TEXT NOT NULL,
@@ -97,7 +104,7 @@ Sale statuses: `pending`, `paid_pey`, `paid_cash`, `credit`, `canceled`, `expire
 ```json
 {"store":{"id":"tiendita-esquina","name":"Tiendita de la Esquina"},
  "employees":[{"id":1,"name":"Doña Rosa","role":"owner"}],
- "products":[{"id":1,"name":"Coca-Cola 600 ml","unit":"pieza","priceCents":1800,"stockMilli":24000,"lowStockMilli":5000,"quick":true}],
+ "products":[{"id":1,"name":"Coca-Cola 600 ml","unit":"pieza","priceCents":1800,"stockMilli":24000,"lowStockMilli":5000,"quick":true,"unlimitedStock":false}],
  "demoMode":true,"ai":"local"}
 ```
 

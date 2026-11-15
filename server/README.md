@@ -10,6 +10,10 @@ Desde la raíz del repositorio:
 
 La base se crea y se siembra sola al arrancar (tienda, 3 empleados, 12 productos y 5 códigos de barras). La ruta por defecto es server/abarpay.db; se puede cambiar con ABARPAY_DB.
 
+Al iniciar se agrega una sola vez «Tacos de pastor», $20.00 MXN por pieza, con
+inventario sin límite. El dictado admite «de pastor», «al pastor» y «taco de
+pastor». La actualización conserva el catálogo y las operaciones existentes.
+
 El archivo .env de la raíz no se lee por defecto para que las pruebas y el demo no tomen credenciales reales. Si quieres cargarlo explícitamente:
 
     ABARPAY_LOAD_DOTENV=1 /tmp/abar-venv/bin/python -m uvicorn server.main:app --port 8000
@@ -19,6 +23,9 @@ Variables soportadas: PEY_API_KEY, PEY_WEBHOOK_SECRET, MODO_DEMO, OWNER_PIN, ABA
 Con MODO_DEMO=true (default) el QR de PEY se crea por $0.01 MXN; las ventas guardan el total comercial en totalCents y el cobro real en chargedCents. La consola muestra el aviso de modo demo.
 
 ## Consola
+
+Para alojamiento con disco persistente y migración de la base existente, ver
+[Despliegue en Render](../docs/despliegue-render.md) y `render.yaml`.
 
 Abre http://127.0.0.1:8000/console. El PIN sale de OWNER_PIN (default 1234) y se envía en el header X-Owner-Pin. La página es HTML/CSS/JS sin build y refresca cada 3 segundos. Es una vista de demostración para la dueña, no autenticación de producción.
 
@@ -55,6 +62,18 @@ Protegidos con X-Owner-Pin:
 
 ## Reglas de dinero y stock
 
+Android 1.0.7 agrega «Cancelar cobro» en la vista PEY con confirmación. Usa
+`POST /api/sales/{id}/cancel?pendingOnly=true`: primero consulta PEY y después
+comprueba el estado dentro de la transacción. Si ya se pagó, responde 409 y
+conserva pago e inventario. La opción anterior sin ese parámetro sigue disponible
+con su comportamiento de anulación existente.
+
+La cancelación desde el teléfono registra la venta cancelada en Abarpay; no
+revoca el QR bancario ni devuelve dinero. Un pago posterior se registra sin
+aplicar para revisión. Si no llega confirmación de cancelación, el teléfono
+conserva el cobro para consultar el estado. El servidor debe actualizarse antes
+de instalar este APK para disponer de la protección `pendingOnly`.
+
 - Todo el dinero es entero en centavos.
 - Las cantidades son mili-unidades: 1000 = una pieza o un kilo.
 - lineTotalCents = round(unitPriceCents * qtyMilli / 1000), calculado siempre con el precio de SQLite.
@@ -62,6 +81,7 @@ Protegidos con X-Owner-Pin:
 - Fiado: status credit, cargo en fiado_entries y stock descontado de inmediato.
 - PEY: status pending; el stock se descuenta únicamente cuando apply_payment verifica el pago (webhook firmado o conciliación GET).
 - Cualquier cambio de stock deja un renglón en inventory_movements. El stock negativo está permitido en la demo.
+- Los productos con unlimitedStock=true muestran «Sin límite»: no se descuenta ni repone stock, no generan alertas de existencias bajas y no aceptan ajustes manuales. Se conservan los movimientos de venta y cancelación para auditoría; esos movimientos no representan un saldo finito. La migración deja los productos existentes con unlimitedStock=false.
 - Los pagos extra sobre una venta ya pagada se guardan en payments con applied=0 y una nota; no se descartan.
 
 ## Webhook PEY

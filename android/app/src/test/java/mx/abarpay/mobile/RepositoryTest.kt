@@ -10,6 +10,49 @@ import org.junit.Test
 import java.util.concurrent.TimeUnit
 
 class RepositoryTest {
+    @Test fun simulatedCancelRestoresStockOnceAndCannotBecomePaid() = runBlocking {
+        val demo = DemoRepository()
+        val before = demo.bootstrap().products.first { it.id == 1 }.stockMilli
+        val sale = demo.create(1, listOf(CartLine(1, 1000)), PAYMENT_PEY)
+        val canceled = demo.cancel(sale.id)
+        assertEquals("canceled", canceled.status)
+        demo.cancel(sale.id)
+        demo.simulatePaid(canceled)
+        assertEquals("canceled", demo.status(sale.id).status)
+        assertEquals(before, demo.bootstrap().products.first { it.id == 1 }.stockMilli)
+    }
+
+    @Test fun cancellationUsesUnpaidOnlyServerGuard() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("""{"id":"s1","status":"canceled","paymentMethod":"pey","totalCents":2000,"chargedCents":1}"""))
+            assertEquals("canceled", repo(server).cancel("s1").status)
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("/api/sales/s1/cancel?pendingOnly=true", request.path)
+        } finally { server.shutdown() }
+    }
+
+    @Test fun failedCancellationIsNeverReportedAsCanceled() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(409).setBody("""{"detail":"Ya pagado"}"""))
+            val error = runCatching { repo(server).cancel("s1") }.exceptionOrNull()
+            assertTrue(error is ApiFailure)
+            assertEquals(409, (error as ApiFailure).code)
+            assertEquals(1, server.requestCount)
+        } finally { server.shutdown() }
+    }
+
+    @Test fun productStockFlagSupportsNewAndExistingServers() {
+        val json = JSONObject("""{"id":18,"name":"Tacos de pastor","unit":"pieza","priceCents":1000,"stockMilli":0,"unlimitedStock":true}""")
+        assertTrue(readProduct(json).unlimitedStock)
+        json.remove("unlimitedStock")
+        assertFalse(readProduct(json).unlimitedStock)
+    }
+
     private fun repo(server: MockWebServer) = ApiRepository(server.url("/").toString().trimEnd('/'))
 
     @Test fun postIsNotRetriedAfterServerReceivesItAndDisconnects() = runBlocking {

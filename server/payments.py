@@ -43,7 +43,7 @@ def decrement_inventory(
     ).fetchall()
     for item in items:
         conn.execute(
-            "UPDATE products SET stock_milli = stock_milli - ? WHERE id = ?",
+            "UPDATE products SET stock_milli = stock_milli - ? WHERE id = ? AND unlimited_stock = 0",
             (item["qty_milli"], item["product_id"]),
         )
         conn.execute(
@@ -68,7 +68,7 @@ def restore_inventory(
     ).fetchall()
     for item in items:
         conn.execute(
-            "UPDATE products SET stock_milli = stock_milli + ? WHERE id = ?",
+            "UPDATE products SET stock_milli = stock_milli + ? WHERE id = ? AND unlimited_stock = 0",
             (item["qty_milli"], item["product_id"]),
         )
         conn.execute(

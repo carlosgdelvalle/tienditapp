@@ -18,6 +18,28 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], qualifiers = "w390dp-h844dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MobileFlowTest {
+    @Test fun peyCanBeCanceledWithConfirmation() {
+        val vm = androidx.lifecycle.ViewModelProvider(compose.activity)[ShopViewModel::class.java]
+        compose.runOnIdle { vm.useSimulation() }
+        compose.waitUntil { vm.ui.value.bootstrap != null && !vm.ui.value.busy }
+        compose.runOnIdle { vm.select(vm.ui.value.bootstrap!!.employees.first()) }
+        compose.onNodeWithTag("tab-Cobrar").performClick()
+        addCokes(1)
+        compose.onNodeWithTag("abrir-pago").performClick()
+        compose.onNodeWithTag("pago-pey").performClick()
+        compose.onNodeWithText("Generar QR PEY").performScrollTo().performClick()
+        scrollTo("Cancelar cobro").performClick()
+        compose.onNodeWithText("¿Cancelar este cobro?").assertIsDisplayed()
+        screenshot("pey-cancel-confirmacion")
+        compose.onNodeWithText("Seguir esperando").performClick()
+        scrollTo("Cancelar cobro").performClick()
+        compose.onNodeWithText("Sí, cancelar cobro").performClick()
+        scrollTo("Venta cancelada").assertIsDisplayed()
+        screenshot("pey-cancelada")
+        scrollTo("Volver al carrito").performClick()
+        compose.onNodeWithTag("abrir-pago").assertExists()
+    }
+
     @get:Rule(order = 0) val cleanSession = object : ExternalResource() {
         override fun before() {
             RuntimeEnvironment.getApplication()
@@ -112,10 +134,10 @@ class MobileFlowTest {
         scrollTo("Entrar en simulación").performClick()
         compose.onNodeWithText("Hola, Lupita").assertIsDisplayed()
         compose.onNodeWithTag("tab-Inventario").performClick()
-        scrollTo("Stock: 24 pza · 24000 milli").assertIsDisplayed()
+        scrollTo("Stock: 24 pza").assertIsDisplayed()
         screenshot("08-inventario")
         compose.onNodeWithContentDescription("Sumar una unidad de Coca-Cola 600 ml").performScrollTo().performClick()
-        scrollTo("Stock: 25 pza · 25000 milli").assertIsDisplayed()
+        scrollTo("Stock: 25 pza").assertIsDisplayed()
     }
 
     @Test fun voiceAndBarcodeEntriesAreExposedWithoutCloudDependencies() {

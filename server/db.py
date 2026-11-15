@@ -179,7 +179,8 @@ CREATE TABLE IF NOT EXISTS products (
     price_cents INTEGER NOT NULL,
     stock_milli INTEGER NOT NULL,
     low_stock_milli INTEGER NOT NULL DEFAULT 5000,
-    quick INTEGER NOT NULL DEFAULT 0
+    quick INTEGER NOT NULL DEFAULT 0,
+    unlimited_stock INTEGER NOT NULL DEFAULT 0 CHECK(unlimited_stock IN (0,1))
 );
 
 CREATE TABLE IF NOT EXISTS barcodes (
@@ -332,10 +333,29 @@ def initialize_db(db_path: str | Path) -> None:
     try:
         conn.executescript(SCHEMA)
         with write_transaction(conn):
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(products)")}
+            if "unlimited_stock" not in columns:
+                conn.execute(
+                    "ALTER TABLE products ADD COLUMN unlimited_stock "
+                    "INTEGER NOT NULL DEFAULT 0 CHECK(unlimited_stock IN (0,1))"
+                )
             existing = conn.execute("SELECT COUNT(*) AS n FROM stores").fetchone()["n"]
-            if existing:
-                return
-            _seed(conn)
+            if not existing:
+                _seed(conn)
+            # Add the requested demo product once, preserving existing prices,
+            # stock balances and sale history on subsequent starts.
+            conn.execute(
+                """INSERT INTO products
+                   (store_id,name,aliases,unit,price_cents,stock_milli,
+                    low_stock_milli,quick,unlimited_stock)
+                   SELECT ?, ?, ?, 'pieza', 2000, 0, 0, 1, 1
+                   WHERE EXISTS (SELECT 1 FROM stores WHERE id = ?)
+                     AND NOT EXISTS (SELECT 1 FROM products
+                                     WHERE store_id = ? AND name = ? COLLATE NOCASE)""",
+                (STORE_ID, "Tacos de pastor", json.dumps([
+                    "de pastor", "al pastor", "taco de pastor", "tacos al pastor", "taco al pastor",
+                ]), STORE_ID, STORE_ID, "Tacos de pastor"),
+            )
     finally:
         conn.close()
 

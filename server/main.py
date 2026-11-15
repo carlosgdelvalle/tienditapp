@@ -763,11 +763,24 @@ def _install_routes(app: FastAPI) -> None:
         return _serialize_sale(conn, sale_id)
 
     @api.post("/sales/{sale_id}/cancel")
-    def cancel_sale(sale_id: str, conn: sqlite3.Connection = Depends(get_db)):
+    def cancel_sale(
+        sale_id: str,
+        pendingOnly: bool = False,
+        conn: sqlite3.Connection = Depends(get_db),
+        pey_client: Any | None = Depends(get_pey),
+    ):
+        if pendingOnly:
+            _sale_or_404(conn, sale_id)
+            _reconcile_sale(conn, sale_id, pey_client)
         with write_transaction(conn):
             sale = _require_sale(conn, sale_id)
             if sale["status"] == "canceled":
                 return sale_to_dict(conn, sale)
+            if pendingOnly and (
+                sale["payment_method"] != "pey"
+                or sale["status"] not in {"pending", "por_conciliar", "expired"}
+            ):
+                raise HTTPException(status_code=409, detail="El cobro ya no está pendiente. Consulta su estado.")
             if sale["status"] in {"paid_cash", "paid_pey", "credit"}:
                 restore_inventory(conn, sale_id, sale["employee_id"], now=_now())
             note = sale["note"]
@@ -844,7 +857,9 @@ def _install_routes(app: FastAPI) -> None:
         reason = body.reason.strip() or "ajuste"
         with write_transaction(conn):
             _require_employee(conn, body.employeeId)
-            _require_product(conn, body.productId)
+            product = _require_product(conn, body.productId)
+            if product["unlimited_stock"]:
+                raise HTTPException(status_code=400, detail="Este producto tiene inventario sin límite")
             conn.execute(
                 "UPDATE products SET stock_milli = stock_milli + ? WHERE id = ?",
                 (body.deltaMilli, body.productId),

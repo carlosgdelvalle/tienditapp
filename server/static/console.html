@@ -583,12 +583,12 @@
         var html = "";
         for (var i = 0; i < items.length; i += 1) {
           var product = items[i];
-          var low = Number(product.stockMilli) <= Number(product.lowStockMilli);
+          var low = !product.unlimitedStock && Number(product.stockMilli) <= Number(product.lowStockMilli);
           html += '<tr>' +
             '<td>' + escapeHtml(product.name) + '</td>' +
             '<td>' + escapeHtml(product.unit === "kg" ? "kg" : "pieza") + '</td>' +
             '<td class="right mono">' + escapeHtml(money(product.priceCents)) + '</td>' +
-            '<td class="right mono ' + (low ? "low-stock" : "stock-good") + '">' + escapeHtml(quantity(product.stockMilli, product.unit)) + '</td>' +
+            '<td class="right mono ' + (low ? "low-stock" : "stock-good") + '">' + escapeHtml(product.unlimitedStock ? "Sin límite" : quantity(product.stockMilli, product.unit)) + '</td>' +
             '<td>' + (low ? '<span class="badge bad">Stock bajo</span>' : '<span class="badge ok">Disponible</span>') + '</td>' +
             '</tr>';
         }

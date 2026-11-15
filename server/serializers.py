@@ -27,6 +27,7 @@ def product_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "stockMilli": row["stock_milli"],
         "lowStockMilli": row["low_stock_milli"],
         "quick": bool(row["quick"]),
+        "unlimitedStock": bool(row["unlimited_stock"]),
     }
 
 
