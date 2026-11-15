@@ -39,6 +39,15 @@ pieza y el indicador de stock sin límite. La actualización agrega el producto
 una vez a la base existente. El dictado «dos de pastor» produce dos piezas por
 $40.00. Los demás productos conservan su seguimiento de existencias.
 
+## Integración a main · 15-nov-2026
+
+`main` integra Android **1.0.7 / code 10** con la **cancelación de cobros PEY
+pendientes** (`pendingOnly=true`: concilia con PEY y rechaza con 409 si el pago
+ya llegó; no revoca el QR bancario ni reembolsa). El servicio Render sigue en el
+despliegue de la rama de tacos hasta un **redeploy manual** desde `main`;
+`autoDeploy` permanece apagado y `render.yaml` ya apunta a `main` como referencia.
+El APK instalado en el SM-A165M es 1.0.6; el release 1.0.7 está en `dist/`.
+
 ## Recursos
 
 | Ajuste | Valor |
