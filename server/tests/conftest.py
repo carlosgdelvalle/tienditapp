@@ -113,7 +113,7 @@ def staff(request: pytest.FixtureRequest, settings: Settings, db):
     fresh_seed keep the owner-only state to verify the seed itself.
     """
 
-    initialize_db(settings.db_path)
+    initialize_db(settings.db_path, seed_catalog=settings.seed_catalog)
     if request.node.get_closest_marker("fresh_seed"):
         yield
         return
@@ -142,6 +142,7 @@ def staff(request: pytest.FixtureRequest, settings: Settings, db):
 def settings(tmp_path: Path) -> Settings:
     return Settings(
         db_path=tmp_path / "abar-test.db",
+        seed_catalog=True,
         owner_pin="1234",
         modo_demo=True,
         pey_api_key="test-pey-key",

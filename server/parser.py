@@ -44,9 +44,14 @@ _WORD_PATTERN = "|".join(
     re.escape(word) for word in sorted(_WORD_NUMBERS, key=len, reverse=True)
 )
 
+# v3: service units are counted like pieces (one corte = qtyMilli 1000);
+# "corte", "sesion" and "manicure" also arrive as catalog aliases, so the
+# catalog match below wins when the phrase names a product.
 _UNIT_GROUP = (
     r"kilos?|kilogramos?|kg|gramos?|grs?|g|miligramos?|mili|"
-    r"piezas?|pzas?|pza|unidades?|litros?|l"
+    r"piezas?|pzas?|pza|unidades?|litros?|l|"
+    r"servicios?|sesion(?:es)?|turnos?|cortes?|manicures?|"
+    r"minutos?|horas?|paquetes?|combos?"
 )
 _UNIT_RE = re.compile(rf"^(?P<unit>{_UNIT_GROUP})\b", re.IGNORECASE)
 _NUMBER_RE = re.compile(
@@ -108,7 +113,24 @@ def _unit_kind(unit: str | None) -> str | None:
         return "g"
     if unit.startswith("mili"):
         return "milli"
-    if unit.startswith(("pieza", "pza", "unidad", "litro")) or unit == "l":
+    if unit.startswith(
+        (
+            "pieza",
+            "pza",
+            "unidad",
+            "litro",
+            "servicio",
+            "sesion",
+            "turno",
+            "corte",
+            "manicure",
+            "minuto",
+            "hora",
+            "paquete",
+            "combo",
+        )
+    ) or unit == "l":
+        # Services and prepared dishes are counted like pieces.
         return "count"
     return None
 
@@ -510,3 +532,272 @@ def parse_count(text: str, catalog: Iterable[dict[str, Any]]) -> dict[str, Any]:
     else:
         note = None
     return {"items": items, "note": note}
+
+
+# ---------------------------------------------------------------------------
+# Expense dictation (v3)
+# ---------------------------------------------------------------------------
+# "veinte pesos de gas" -> {"amountCents": 2000, "note": "gas"}. Digits and
+# spelled-out numbers are accepted; the amount is never saved here, the app
+# confirms and then calls POST /api/expenses. SIMULADO: no external AI.
+
+_EXPENSE_UNITS: dict[str, int] = {
+    "cero": 0,
+    "un": 1,
+    "uno": 1,
+    "una": 1,
+    "dos": 2,
+    "tres": 3,
+    "cuatro": 4,
+    "cinco": 5,
+    "seis": 6,
+    "siete": 7,
+    "ocho": 8,
+    "nueve": 9,
+    "diez": 10,
+    "once": 11,
+    "doce": 12,
+    "trece": 13,
+    "catorce": 14,
+    "quince": 15,
+    "dieciseis": 16,
+    "diecisiete": 17,
+    "dieciocho": 18,
+    "diecinueve": 19,
+    "veinte": 20,
+}
+
+for _expense_number, _expense_word in (
+    (21, "veintiuno"),
+    (22, "veintidos"),
+    (23, "veintitres"),
+    (24, "veinticuatro"),
+    (25, "veinticinco"),
+    (26, "veintiseis"),
+    (27, "veintisiete"),
+    (28, "veintiocho"),
+    (29, "veintinueve"),
+):
+    _EXPENSE_UNITS[_expense_word] = _expense_number
+
+_EXPENSE_TENS: dict[str, int] = {
+    "treinta": 30,
+    "cuarenta": 40,
+    "cincuenta": 50,
+    "sesenta": 60,
+    "setenta": 70,
+    "ochenta": 80,
+    "noventa": 90,
+}
+
+_EXPENSE_HUNDREDS: dict[str, int] = {
+    "cien": 100,
+    "ciento": 100,
+    "doscientos": 200,
+    "trescientos": 300,
+    "cuatrocientos": 400,
+    "quinientos": 500,
+    "seiscientos": 600,
+    "setecientos": 700,
+    "ochocientos": 800,
+    "novecientos": 900,
+}
+
+# "pesos" multiplies by 100; "centavos" is already the smallest unit.
+_EXPENSE_PESO_WORDS = {"pesos", "peso", "mxn", "varos", "lana"}
+_EXPENSE_CENT_WORDS = {"centavos", "centavo"}
+_EXPENSE_CURRENCY_WORDS = _EXPENSE_PESO_WORDS | _EXPENSE_CENT_WORDS
+
+_EXPENSE_TOKEN_RE = re.compile(r"\d+(?:[.,]\d+)?|[a-záéíóúüñ]+", re.IGNORECASE)
+
+# Filler that should not become the expense note.
+_EXPENSE_LEADING_WORDS = {
+    "gaste",
+    "pague",
+    "compre",
+    "registre",
+    "registrar",
+    "anota",
+    "apunta",
+    "gasto",
+    "compra",
+    "de",
+    "del",
+    "en",
+    "para",
+    "por",
+    "la",
+    "el",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+}
+
+
+def _expense_tokens(text: str) -> list[str]:
+    return _EXPENSE_TOKEN_RE.findall(text.lower())
+
+
+def _expense_number_words(tokens: list[str], start: int) -> tuple[int, int] | None:
+    """Parse a spelled number starting at start; returns (value, end)."""
+
+    total = 0
+    current = 0
+    index = start
+    matched = False
+    while index < len(tokens):
+        token = tokens[index]
+        if token in _EXPENSE_UNITS:
+            current += _EXPENSE_UNITS[token]
+        elif token in _EXPENSE_TENS:
+            current += _EXPENSE_TENS[token]
+        elif token in _EXPENSE_HUNDREDS:
+            current += _EXPENSE_HUNDREDS[token]
+        elif token == "mil":
+            current = (current or 1) * 1000
+            total += current
+            current = 0
+        else:
+            break
+        index += 1
+        matched = True
+    if not matched or total + current <= 0:
+        return None
+    return total + current, index
+
+
+def _expense_number_at(
+    tokens: list[str], start: int
+) -> tuple[Decimal, int, bool] | None:
+    """Return (value, end, has_fraction) for a digit or a spelled number."""
+
+    if start >= len(tokens):
+        return None
+    token = tokens[start]
+    if token[0].isdigit():
+        raw = token.replace(",", ".")
+        try:
+            return Decimal(raw), start + 1, "." in raw
+        except InvalidOperation:
+            return None
+    words = _expense_number_words(tokens, start)
+    if words is None:
+        return None
+    value, end = words
+    return Decimal(value), end, False
+
+
+def _expense_candidates(tokens: list[str]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    index = 0
+    while index < len(tokens):
+        number = _expense_number_at(tokens, index)
+        if number is None:
+            index += 1
+            continue
+        value, end, has_fraction = number
+        if value > 0:
+            candidates.append(
+                {
+                    "start": index,
+                    "end": end,
+                    "value": value,
+                    "has_fraction": has_fraction,
+                }
+            )
+        index = max(end, index + 1)
+    return candidates
+
+
+def _expense_currency_index(tokens: list[str], end: int) -> int | None:
+    """Currency word right after a number, allowing one "de" in between."""
+
+    if end < len(tokens) and tokens[end] in _EXPENSE_CURRENCY_WORDS:
+        return end
+    if (
+        end + 1 < len(tokens)
+        and tokens[end] in {"de", "del"}
+        and tokens[end + 1] in _EXPENSE_CURRENCY_WORDS
+    ):
+        return end + 1
+    return None
+
+
+def _expense_cents(value: Decimal, currency: str | None, has_fraction: bool) -> int:
+    if has_fraction:
+        return int((value * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    if currency in _EXPENSE_CENT_WORDS:
+        return int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    return int((value * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+def _expense_note(
+    raw_tokens: list[str], tokens: list[str], consumed: set[int]
+) -> str | None:
+    kept = [index for index in range(len(tokens)) if index not in consumed]
+    # Drop leading filler ("gasté", "de", "en", articles...).
+    while kept and tokens[kept[0]] in _EXPENSE_LEADING_WORDS:
+        kept.pop(0)
+    # Prefer the original spelling (accents) when both tokenizations align.
+    source = raw_tokens if len(raw_tokens) == len(tokens) else tokens
+    words = [source[index].strip(" .,;:") for index in kept]
+    note = " ".join(word for word in words if word).strip(" .,;:")
+    return note or None
+
+
+def parse_expense(text: str) -> dict[str, Any]:
+    """Parse a dictated expense. It never writes anything.
+
+    Returns {"amountCents": int | None, "note": str | None}. The app shows the
+    result and the person confirms before calling POST /api/expenses.
+    """
+
+    raw = (text or "").strip()
+    raw_tokens = _expense_tokens(raw)
+    normalized = normalize(raw)
+    tokens = normalized.split() if normalized else []
+    consumed: set[int] = set()
+
+    candidates = _expense_candidates(tokens)
+    chosen: dict[str, Any] | None = None
+    currency: str | None = None
+    currency_index: int | None = None
+    for candidate in candidates:
+        currency_index = _expense_currency_index(tokens, int(candidate["end"]))
+        if currency_index is not None:
+            chosen = candidate
+            currency = tokens[currency_index]
+            break
+    if chosen is None and candidates:
+        # No currency word: assume pesos and use the last number of the phrase.
+        chosen = candidates[-1]
+        currency = "pesos"
+
+    if chosen is None:
+        return {"amountCents": None, "note": _expense_note(raw_tokens, tokens, consumed)}
+
+    amount_cents = _expense_cents(
+        chosen["value"], currency, bool(chosen["has_fraction"])
+    )
+    consumed.update(range(int(chosen["start"]), int(chosen["end"])))
+    if currency_index is not None:
+        consumed.add(currency_index)
+        after = currency_index + 1
+        # "veinte pesos con cincuenta" -> 2050 (cents spoken after "con").
+        if after < len(tokens) and tokens[after] in {"con", "y"}:
+            cents = _expense_number_at(tokens, after + 1)
+            if cents is not None and cents[0] < 100:
+                # Spoken after "con", the number means cents (2050, not 7000).
+                amount_cents += int(
+                    cents[0].quantize(Decimal(1), rounding=ROUND_HALF_UP)
+                )
+                consumed.update(range(after + 1, cents[1]))
+                consumed.add(after)
+                if cents[1] < len(tokens) and tokens[cents[1]] in {"centavos", "centavo"}:
+                    consumed.add(cents[1])
+
+    note = _expense_note(raw_tokens, tokens, consumed)
+    return {"amountCents": int(amount_cents), "note": note}

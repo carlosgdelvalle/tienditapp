@@ -53,15 +53,15 @@ def create_ticket(client, *, headers=None, **body):
 
 def test_support_tickets_migration_is_additive_and_idempotent(tmp_path):
     path = tmp_path / "tickets-migration.db"
-    initialize_db(path)
+    initialize_db(path, seed_catalog=True)
 
     # Simulate a database created before the tickets section existed: the
     # additive migration must create the table again without touching data.
     with sqlite3.connect(path) as conn:
         conn.execute("DROP TABLE support_tickets")
 
-    initialize_db(path)
-    initialize_db(path)
+    initialize_db(path, seed_catalog=True)
+    initialize_db(path, seed_catalog=True)
 
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row
@@ -102,7 +102,7 @@ def test_support_tickets_migration_is_additive_and_idempotent(tmp_path):
             )
 
     # A later start keeps the existing ticket.
-    initialize_db(path)
+    initialize_db(path, seed_catalog=True)
     with sqlite3.connect(path) as conn:
         assert (
             conn.execute(

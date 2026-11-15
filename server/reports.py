@@ -29,6 +29,23 @@ def today_bounds(settings: Settings, now: float | None = None) -> tuple[float, f
     return start_local.timestamp(), end_local.timestamp()
 
 
+def today_expenses_cents(
+    conn: sqlite3.Connection,
+    settings: Settings,
+    now: float | None = None,
+) -> int:
+    """Sum of the v3 expenses registered today, in cents."""
+
+    start, end = today_bounds(settings, now)
+    row = conn.execute(
+        """SELECT COALESCE(SUM(amount_cents), 0) AS total
+           FROM expenses
+           WHERE store_id = ? AND created_at >= ? AND created_at < ?""",
+        (STORE_ID, start, end),
+    ).fetchone()
+    return int(row["total"] or 0)
+
+
 def fiado_outstanding_cents(conn: sqlite3.Connection) -> int:
     row = conn.execute(
         """SELECT COALESCE(SUM(CASE WHEN e.kind = 'charge' THEN e.amount_cents
@@ -144,5 +161,7 @@ def build_today_report(
         "pending": pending,
         "pendingCents": pending_cents,
         "fiadoOutstandingCents": fiado_outstanding_cents(conn),
+        # v3: simple expenses registered today (voice or manual).
+        "totalExpensesCents": today_expenses_cents(conn, settings, now),
         "demoMode": settings.modo_demo,
     }

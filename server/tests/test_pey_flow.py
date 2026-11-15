@@ -181,6 +181,7 @@ def test_live_mode_charges_commercial_total(tmp_path):
 
     settings = Settings(
         db_path=tmp_path / "live.db",
+        seed_catalog=True,
         owner_pin="1234",
         modo_demo=False,
         pey_api_key="test-pey-key",
@@ -221,6 +222,7 @@ def test_pey_without_configuration_returns_sale_id(client, tmp_path):
 
     settings = Settings(
         db_path=tmp_path / "no-pey.db",
+        seed_catalog=True,
         owner_pin="1234",
         pey_api_key="",
         pey_webhook_secret=TEST_SECRET,

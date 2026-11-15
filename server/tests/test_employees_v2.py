@@ -145,7 +145,7 @@ def test_invite_create_lookup_accept_flow(client, db):
     assert body["employeeId"] == employee_id
     assert body["name"] == "Beto"
     assert body["role"] == "employee"
-    assert body["storeName"] == "Tiendita de la Esquina"
+    assert body["storeName"] == "Mi negocio"
     assert body["businessType"] == ""
     assert body["canSell"] is True
     assert body["canFiado"] is False

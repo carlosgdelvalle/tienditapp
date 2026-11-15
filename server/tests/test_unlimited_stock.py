@@ -71,8 +71,8 @@ def test_legacy_database_migration_preserves_catalog(tmp_path):
         conn.execute("INSERT INTO stores VALUES ('tiendita-esquina', 'Existente')")
         conn.execute("INSERT INTO products (id,store_id,name,unit,price_cents,stock_milli) "
                      "VALUES (42,'tiendita-esquina','Existente','pieza',123,7000)")
-    initialize_db(path)
-    initialize_db(path)
+    initialize_db(path, seed_catalog=True)
+    initialize_db(path, seed_catalog=True)
     with sqlite3.connect(path) as conn:
         assert conn.execute("SELECT id,price_cents,stock_milli,unlimited_stock FROM products WHERE id=42").fetchall() == [(42, 123, 7000, 0)]
         assert conn.execute("SELECT COUNT(*) FROM products WHERE name='Tacos de pastor'").fetchone()[0] == 1

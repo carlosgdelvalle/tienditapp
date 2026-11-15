@@ -60,8 +60,8 @@ def test_legacy_database_keeps_employees_and_gets_new_columns(tmp_path):
     path = tmp_path / "legacy-v2.db"
     build_legacy_db(path)
 
-    initialize_db(path)
-    initialize_db(path)
+    initialize_db(path, seed_catalog=True)
+    initialize_db(path, seed_catalog=True)
 
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row
@@ -110,8 +110,8 @@ def test_legacy_database_keeps_employees_and_gets_new_columns(tmp_path):
 
 def test_new_database_seed_is_idempotent(tmp_path):
     path = tmp_path / "nueva-v2.db"
-    initialize_db(path)
-    initialize_db(path)
+    initialize_db(path, seed_catalog=True)
+    initialize_db(path, seed_catalog=True)
 
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row

@@ -23,7 +23,7 @@ def test_health_and_bootstrap(client):
     body = response.json()
     assert body["store"] == {
         "id": "tiendita-esquina",
-        "name": "Tiendita de la Esquina",
+        "name": "Mi negocio",
         "businessType": "",
         "ownerName": "Doña Rosa",
     }

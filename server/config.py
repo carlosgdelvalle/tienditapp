@@ -68,6 +68,7 @@ class Settings:
     """Immutable settings snapshot for one application instance."""
 
     db_path: Path = DEFAULT_DB_PATH
+    seed_catalog: bool = False
     owner_pin: str = "1234"
     modo_demo: bool = True
     pey_api_key: str = field(default="", repr=False)

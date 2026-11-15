@@ -23,7 +23,7 @@ def test_profile_defaults_and_update(client, db):
     assert default.status_code == 200
     assert default.json() == {
         "storeId": "tiendita-esquina",
-        "name": "Tiendita de la Esquina",
+        "name": "Mi negocio",
         "businessType": "",
         "ownerName": "Doña Rosa",
     }
@@ -70,7 +70,7 @@ def test_profile_partial_update_keeps_other_fields(client):
     )
     body = client.get("/api/store/profile").json()
     assert body["businessType"] == "Fondita"
-    assert body["name"] == "Tiendita de la Esquina"
+    assert body["name"] == "Mi negocio"
     assert body["ownerName"] == "Doña Rosa"
 
 

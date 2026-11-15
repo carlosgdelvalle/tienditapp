@@ -24,10 +24,13 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from .catalog_templates import business_template
 from .config import Settings
 from .db import (
     DEFAULT_BUSINESS_TYPE,
     DEFAULT_OWNER_NAME,
+    PRODUCT_KINDS,
+    PRODUCT_UNITS,
     STORE_ID,
     connect,
     initialize_db,
@@ -35,15 +38,18 @@ from .db import (
     store_settings_row,
     write_transaction,
 )
-from .parser import line_total_cents, parse_count, parse_text
+from .parser import line_total_cents, normalize, parse_count, parse_expense, parse_text
 from .payments import apply_payment, restore_inventory, decrement_inventory
 from .pey import PeyClient, PeyError, PeyTimeout, payload_cents, verify_webhook
-from .reports import build_today_report, fiado_outstanding_cents
+from .reports import build_today_report, fiado_outstanding_cents, today_expenses_cents
 from .serializers import (
+    catalog_item_to_dict,
     customer_balance_cents,
     customer_to_dict,
+    day_task_to_dict,
     employee_summary_to_dict,
     employee_to_dict,
+    expense_to_dict,
     product_to_dict,
     sale_to_dict,
     store_to_dict,
@@ -93,7 +99,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> Iterator[None]:
-        initialize_db(app.state.settings.db_path)
+        initialize_db(app.state.settings.db_path, seed_catalog=app.state.settings.seed_catalog)
         yield
         client = app.state.pey
         if client is not None and hasattr(client, "close"):
@@ -258,6 +264,54 @@ class SupportTicketIn(BaseModel):
 class SupportTicketPatchIn(BaseModel):
     status: Literal["open", "resolved"] | None = None
     note: str | None = None
+
+
+# v3 catalog, templates, day tasks and expenses -----------------------------
+
+
+class CatalogItemIn(BaseModel):
+    name: str
+    unit: str
+    priceCents: int
+    aliases: list[str] | None = None
+    stockMilli: int | None = None
+    unlimitedStock: bool | None = None
+    kind: str | None = None
+    category: str | None = None
+    durationMinutes: int | None = None
+    quick: bool | None = None
+
+
+class CatalogItemPatchIn(BaseModel):
+    name: str | None = None
+    unit: str | None = None
+    priceCents: int | None = None
+    aliases: list[str] | None = None
+    stockMilli: int | None = None
+    unlimitedStock: bool | None = None
+    kind: str | None = None
+    category: str | None = None
+    durationMinutes: int | None = None
+    quick: bool | None = None
+
+
+class TemplateApplyIn(BaseModel):
+    businessType: str
+
+
+class TaskPatchIn(BaseModel):
+    assignedEmployeeId: int | None = None
+    active: bool | None = None
+    title: str | None = None
+
+
+class ExpenseIn(BaseModel):
+    amountCents: int
+    note: str | None = None
+
+
+class ExpenseVoiceIn(BaseModel):
+    text: str
 
 
 # ---------------------------------------------------------------------------
@@ -476,6 +530,146 @@ def _catalog_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             (STORE_ID,),
         ).fetchall()
     ]
+
+
+def _validate_product_unit(unit: str | None) -> str:
+    value = (unit or "").strip().lower()
+    if value not in PRODUCT_UNITS:
+        raise HTTPException(
+            status_code=400,
+            detail="Unidad no válida. Usa: " + ", ".join(PRODUCT_UNITS),
+        )
+    return value
+
+
+def _validate_product_kind(kind: str | None) -> str:
+    value = (kind or "producto").strip().lower()
+    if value not in PRODUCT_KINDS:
+        raise HTTPException(
+            status_code=400,
+            detail="Tipo no válido. Usa: " + ", ".join(PRODUCT_KINDS),
+        )
+    return value
+
+
+def _catalog_search_text(row: sqlite3.Row) -> str:
+    """Accent/hyphen-insensitive text used by the catalog search."""
+
+    names = [str(row["name"] or "")]
+    raw_aliases = row["aliases"]
+    if isinstance(raw_aliases, str):
+        try:
+            raw_aliases = json.loads(raw_aliases)
+        except (TypeError, ValueError):
+            raw_aliases = []
+    if isinstance(raw_aliases, list):
+        names.extend(str(alias) for alias in raw_aliases)
+    return normalize(" ".join(names)).replace("-", " ")
+
+
+def _catalog_item_values(body: CatalogItemIn) -> dict[str, Any]:
+    """Validate a new catalog item and return the DB column values."""
+
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+    unit = _validate_product_unit(body.unit)
+    kind = _validate_product_kind(body.kind)
+    if body.priceCents < 0:
+        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
+    stock = 0 if body.stockMilli is None else int(body.stockMilli)
+    if stock < 0:
+        raise HTTPException(status_code=400, detail="El stock no puede ser negativo")
+    duration = body.durationMinutes
+    if duration is not None and duration < 0:
+        raise HTTPException(
+            status_code=400, detail="La duración no puede ser negativa"
+        )
+    unlimited = body.unlimitedStock
+    if unlimited is None:
+        # Services and dishes do not carry inventory by default.
+        unlimited = kind != "producto"
+    category = (body.category or "").strip() or None
+    aliases = [str(alias).strip() for alias in (body.aliases or []) if str(alias).strip()]
+    return {
+        "name": name,
+        "unit": unit,
+        "kind": kind,
+        "price_cents": int(body.priceCents),
+        "stock_milli": 0 if unlimited else stock,
+        "unlimited_stock": 1 if unlimited else 0,
+        "low_stock_milli": 0 if unlimited else 5000,
+        "category": category,
+        "duration_minutes": duration,
+        "aliases": aliases,
+        "quick": 1 if body.quick else 0,
+    }
+
+
+def _insert_catalog_item(
+    conn: sqlite3.Connection, values: dict[str, Any]
+) -> int:
+    cursor = conn.execute(
+        """INSERT INTO products
+               (store_id, name, aliases, unit, price_cents, stock_milli,
+                low_stock_milli, quick, unlimited_stock, kind, category,
+                duration_minutes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            STORE_ID,
+            values["name"],
+            json.dumps(values["aliases"], ensure_ascii=False),
+            values["unit"],
+            values["price_cents"],
+            values["stock_milli"],
+            values["low_stock_milli"],
+            values["quick"],
+            values["unlimited_stock"],
+            values["kind"],
+            values["category"],
+            values["duration_minutes"],
+        ),
+    )
+    return int(cursor.lastrowid)
+
+
+def _catalog_item_row(
+    conn: sqlite3.Connection, product_id: int
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM products WHERE id = ? AND store_id = ?",
+        (product_id, STORE_ID),
+    ).fetchone()
+
+
+# v3 day tasks --------------------------------------------------------------
+
+
+def _day_task_row(
+    conn: sqlite3.Connection, task_id: int
+) -> sqlite3.Row | None:
+    return conn.execute(
+        """SELECT t.*, e.name AS assigned_employee_name
+           FROM day_tasks t
+           LEFT JOIN employees e ON e.id = t.assigned_employee_id
+           WHERE t.id = ? AND t.store_id = ?""",
+        (task_id, STORE_ID),
+    ).fetchone()
+
+
+# v3 expenses ---------------------------------------------------------------
+
+
+def _expense_row(
+    conn: sqlite3.Connection, expense_id: int
+) -> sqlite3.Row | None:
+    return conn.execute(
+        """SELECT x.*, e.name AS employee_name
+           FROM expenses x
+           LEFT JOIN employees e ON e.id = x.employee_id
+           WHERE x.id = ? AND x.store_id = ?""",
+        (expense_id, STORE_ID),
+    ).fetchone()
 
 
 def _inventory_value_cents(price_cents: int, stock_milli: int) -> int:
@@ -1097,6 +1291,350 @@ def _install_routes(app: FastAPI) -> None:
     ):
         # SIMULADO: only interprets the phrase; the app confirms and calls /set.
         return parse_count(body.text, _catalog_rows(conn))
+
+
+    # v3 catalog ------------------------------------------------------------
+
+    @api.get("/catalog")
+    def list_catalog(
+        q: str | None = None,
+        category: str | None = None,
+        kind: str | None = None,
+        limit: int = Query(default=50, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+        conn: sqlite3.Connection = Depends(get_db),
+    ):
+        # Public like bootstrap: the app needs the catalog after onboarding.
+        kind_value: str | None = None
+        if kind is not None and kind.strip():
+            kind_value = _validate_product_kind(kind)
+        category_value = (category or "").strip() or None
+        query = "SELECT * FROM products WHERE store_id = ?"
+        params: list[Any] = [STORE_ID]
+        if kind_value is not None:
+            query += " AND kind = ?"
+            params.append(kind_value)
+        if category_value is not None:
+            query += " AND category = ? COLLATE NOCASE"
+            params.append(category_value)
+        rows = conn.execute(
+            query + " ORDER BY name COLLATE NOCASE ASC, id ASC", params
+        ).fetchall()
+        needle = normalize(q or "").replace("-", " ").strip() if q else ""
+        if needle:
+            rows = [row for row in rows if needle in _catalog_search_text(row)]
+        total = len(rows)
+        page = rows[offset : offset + limit]
+        return {
+            "items": [catalog_item_to_dict(row) for row in page],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    @api.post("/catalog")
+    def create_catalog_item(
+        body: CatalogItemIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        values = _catalog_item_values(body)
+        with write_transaction(conn):
+            product_id = _insert_catalog_item(conn, values)
+        return catalog_item_to_dict(_require_product(conn, product_id))
+
+    @api.patch("/catalog/{product_id}")
+    def patch_catalog_item(
+        product_id: int,
+        body: CatalogItemPatchIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        product = _require_product(conn, product_id)
+        fields = body.model_fields_set
+        updates: dict[str, Any] = {}
+        if "name" in fields:
+            name = (body.name or "").strip()
+            if not name:
+                raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+            updates["name"] = name
+        if "unit" in fields:
+            updates["unit"] = _validate_product_unit(body.unit)
+        if "kind" in fields:
+            updates["kind"] = _validate_product_kind(body.kind)
+        if "priceCents" in fields:
+            if body.priceCents is None or int(body.priceCents) < 0:
+                raise HTTPException(
+                    status_code=400, detail="El precio no puede ser negativo"
+                )
+            updates["price_cents"] = int(body.priceCents)
+        if "durationMinutes" in fields:
+            duration = body.durationMinutes
+            if duration is not None and duration < 0:
+                raise HTTPException(
+                    status_code=400, detail="La duración no puede ser negativa"
+                )
+            updates["duration_minutes"] = duration
+        if "category" in fields:
+            updates["category"] = (body.category or "").strip() or None
+        if "aliases" in fields:
+            aliases = [
+                str(alias).strip()
+                for alias in (body.aliases or [])
+                if str(alias).strip()
+            ]
+            updates["aliases"] = json.dumps(aliases, ensure_ascii=False)
+        if "quick" in fields:
+            updates["quick"] = 1 if body.quick else 0
+        if "stockMilli" in fields:
+            if body.stockMilli is None or int(body.stockMilli) < 0:
+                raise HTTPException(
+                    status_code=400, detail="El stock no puede ser negativo"
+                )
+            updates["stock_milli"] = int(body.stockMilli)
+            if "unlimitedStock" not in fields:
+                updates["unlimited_stock"] = 0
+        if "unlimitedStock" in fields:
+            unlimited = bool(body.unlimitedStock)
+            updates["unlimited_stock"] = 1 if unlimited else 0
+            if unlimited:
+                updates["stock_milli"] = 0
+        elif "kind" in fields and updates["kind"] != "producto":
+            # A service/dish has no inventory unless the owner says otherwise.
+            updates["unlimited_stock"] = 1
+            updates["stock_milli"] = 0
+        if updates:
+            assignments = ", ".join(f"{column} = ?" for column in updates)
+            with write_transaction(conn):
+                conn.execute(
+                    f"UPDATE products SET {assignments} WHERE id = ? AND store_id = ?",
+                    (*updates.values(), product_id, STORE_ID),
+                )
+        updated = _catalog_item_row(conn, product_id)
+        assert updated is not None
+        return catalog_item_to_dict(updated)
+
+    @api.delete("/catalog/{product_id}")
+    def delete_catalog_item(
+        product_id: int,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        with write_transaction(conn):
+            _require_product(conn, product_id)
+            sales_count = conn.execute(
+                "SELECT COUNT(*) AS n FROM sale_items WHERE product_id = ?",
+                (product_id,),
+            ).fetchone()["n"]
+            movements = conn.execute(
+                "SELECT COUNT(*) AS n FROM inventory_movements WHERE product_id = ?",
+                (product_id,),
+            ).fetchone()["n"]
+            if sales_count or movements:
+                raise HTTPException(
+                    status_code=409,
+                    detail="No se puede borrar: el producto tiene ventas o movimientos",
+                )
+            # A barcode only points at the product; drop it with the product.
+            conn.execute("DELETE FROM barcodes WHERE product_id = ?", (product_id,))
+            conn.execute(
+                "DELETE FROM products WHERE id = ? AND store_id = ?",
+                (product_id, STORE_ID),
+            )
+        return {"ok": True, "id": product_id}
+
+    @api.post("/catalog/templates/apply")
+    def apply_catalog_template(
+        body: TemplateApplyIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        template = business_template(body.businessType)
+        if template is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Tipo de negocio no válido. Usa: tiendita, tortilleria, taqueria, "
+                "comida-corrida, peluqueria, estetica, fondita u otro",
+            )
+        with write_transaction(conn):
+            existing = conn.execute(
+                "SELECT COUNT(*) AS n FROM products WHERE store_id = ?", (STORE_ID,)
+            ).fetchone()["n"]
+            if existing:
+                raise HTTPException(
+                    status_code=409,
+                    detail="La tienda ya tiene catálogo; la plantilla solo aplica a un negocio nuevo",
+                )
+            items_created = 0
+            for item in template["items"]:
+                _insert_catalog_item(
+                    conn,
+                    {
+                        "name": item["name"],
+                        "unit": item["unit"],
+                        "kind": item["kind"],
+                        "price_cents": item["priceCents"],
+                        "stock_milli": item["stockMilli"],
+                        "unlimited_stock": 1 if item["unlimitedStock"] else 0,
+                        "low_stock_milli": item["lowStockMilli"],
+                        "category": item["category"],
+                        "duration_minutes": item["durationMinutes"],
+                        "aliases": item["aliases"],
+                        "quick": 1 if item["quick"] else 0,
+                    },
+                )
+                items_created += 1
+            tasks_created = 0
+            for task in template["tasks"]:
+                cursor = conn.execute(
+                    """INSERT INTO day_tasks
+                           (store_id, key, title, assigned_employee_id, active)
+                       VALUES (?, ?, ?, NULL, 1)
+                       ON CONFLICT(store_id, key) DO NOTHING""",
+                    (STORE_ID, task["key"], task["title"]),
+                )
+                if cursor.rowcount:
+                    tasks_created += 1
+        return {
+            "businessType": template["businessType"],
+            "applied": True,
+            "itemsCreated": items_created,
+            "tasksCreated": tasks_created,
+            "source": template["source"],
+        }
+
+    # v3 day tasks ----------------------------------------------------------
+
+    @api.get("/tasks")
+    def list_tasks(
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        employee = _optional_employee(conn, x_employee_id)
+        query = """SELECT t.*, e.name AS assigned_employee_name
+                   FROM day_tasks t
+                   LEFT JOIN employees e ON e.id = t.assigned_employee_id
+                   WHERE t.store_id = ?"""
+        params: list[Any] = [STORE_ID]
+        if employee is not None and employee["role"] != "owner":
+            # An employee only sees their own active, assigned tasks.
+            query += " AND t.assigned_employee_id = ? AND t.active = 1"
+            params.append(employee["id"])
+        query += " ORDER BY t.id ASC"
+        rows = conn.execute(query, params).fetchall()
+        return {"items": [day_task_to_dict(row) for row in rows]}
+
+    @api.patch("/tasks/{task_id}")
+    def patch_task(
+        task_id: int,
+        body: TaskPatchIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        if _day_task_row(conn, task_id) is None:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+        fields = body.model_fields_set
+        updates: dict[str, Any] = {}
+        if "assignedEmployeeId" in fields:
+            if body.assignedEmployeeId is None:
+                updates["assigned_employee_id"] = None
+            else:
+                assigned = _employee_row(
+                    conn, int(body.assignedEmployeeId), only_active=True
+                )
+                if assigned is None:
+                    raise HTTPException(status_code=400, detail=INVALID_EMPLOYEE_DETAIL)
+                updates["assigned_employee_id"] = int(body.assignedEmployeeId)
+        if "active" in fields:
+            if body.active is None:
+                raise HTTPException(
+                    status_code=400, detail="active debe ser verdadero o falso"
+                )
+            updates["active"] = 1 if body.active else 0
+        if "title" in fields:
+            title = (body.title or "").strip()
+            if not title:
+                raise HTTPException(
+                    status_code=400, detail="El título no puede estar vacío"
+                )
+            updates["title"] = title
+        if updates:
+            assignments = ", ".join(f"{column} = ?" for column in updates)
+            with write_transaction(conn):
+                conn.execute(
+                    f"UPDATE day_tasks SET {assignments} WHERE id = ? AND store_id = ?",
+                    (*updates.values(), task_id, STORE_ID),
+                )
+        row = _day_task_row(conn, task_id)
+        assert row is not None
+        return day_task_to_dict(row)
+
+    # v3 expenses -----------------------------------------------------------
+
+    @api.post("/expenses")
+    def create_expense(
+        body: ExpenseIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        # Any active employee can register an expense; no header keeps the
+        # open v1 behavior for scripts and the console.
+        employee = _optional_employee(conn, x_employee_id)
+        if body.amountCents <= 0:
+            raise HTTPException(
+                status_code=400, detail="El gasto debe ser mayor que cero"
+            )
+        note = (body.note or "").strip() or None
+        with write_transaction(conn):
+            cursor = conn.execute(
+                """INSERT INTO expenses
+                       (store_id, employee_id, amount_cents, note, created_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (
+                    STORE_ID,
+                    employee["id"] if employee is not None else None,
+                    int(body.amountCents),
+                    note,
+                    _now(),
+                ),
+            )
+            expense_id = int(cursor.lastrowid)
+        row = _expense_row(conn, expense_id)
+        assert row is not None
+        return expense_to_dict(row)
+
+    @api.post("/expenses/voice")
+    def expense_voice(body: ExpenseVoiceIn):
+        # SIMULADO: only interprets the phrase. The app confirms and then calls
+        # POST /api/expenses; nothing is saved here.
+        return parse_expense(body.text)
+
+    @api.get("/expenses")
+    def list_expenses(
+        limit: int = Query(default=50, ge=1, le=500),
+        conn: sqlite3.Connection = Depends(get_db),
+        settings: Settings = Depends(get_settings),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        rows = conn.execute(
+            """SELECT x.*, e.name AS employee_name
+               FROM expenses x
+               LEFT JOIN employees e ON e.id = x.employee_id
+               WHERE x.store_id = ?
+               ORDER BY x.created_at DESC, x.id DESC
+               LIMIT ?""",
+            (STORE_ID, limit),
+        ).fetchall()
+        return {
+            "items": [expense_to_dict(row) for row in rows],
+            "totalTodayCents": today_expenses_cents(conn, settings),
+        }
 
     @api.post("/cart/parse")
     def cart_parse(body: CartParseIn, conn: sqlite3.Connection = Depends(get_db)):

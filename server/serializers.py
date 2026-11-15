@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
@@ -41,6 +42,69 @@ def product_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "lowStockMilli": row["low_stock_milli"],
         "quick": bool(row["quick"]),
         "unlimitedStock": bool(row["unlimited_stock"]),
+    }
+
+
+def _aliases(row: sqlite3.Row) -> list[str]:
+    raw = row["aliases"] if "aliases" in row.keys() else "[]"
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            raw = []
+    if not isinstance(raw, list):
+        return []
+    return [str(alias) for alias in raw if str(alias).strip()]
+
+
+def catalog_item_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    """v3 catalog item: stock plus the new kind/category/duration fields."""
+
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "unit": row["unit"],
+        "priceCents": row["price_cents"],
+        "stockMilli": row["stock_milli"],
+        "lowStockMilli": row["low_stock_milli"],
+        "quick": bool(row["quick"]),
+        "unlimitedStock": bool(row["unlimited_stock"]),
+        "kind": row["kind"],
+        "category": row["category"],
+        "durationMinutes": row["duration_minutes"],
+        "aliases": _aliases(row),
+    }
+
+
+def day_task_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    """v3 day task. The row may carry assigned_employee_name from the join."""
+
+    keys = row.keys()
+    return {
+        "id": row["id"],
+        "key": row["key"],
+        "title": row["title"],
+        "assignedEmployeeId": row["assigned_employee_id"],
+        "assignedEmployeeName": (
+            row["assigned_employee_name"]
+            if "assigned_employee_name" in keys
+            else None
+        ),
+        "active": bool(row["active"]),
+    }
+
+
+def expense_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    keys = row.keys()
+    return {
+        "id": row["id"],
+        "amountCents": row["amount_cents"],
+        "note": row["note"],
+        "employeeId": row["employee_id"],
+        "employeeName": (
+            row["employee_name"] if "employee_name" in keys else None
+        ),
+        "createdAt": row["created_at"],
     }
 
 
