@@ -133,7 +133,7 @@ private fun EmployeeRow(employee: Employee, busy: Boolean, vm: ShopViewModel) {
         SwitchRow("Puede editar inventario", employee.canInventory, busy, "perm-" + employee.id + "-inventory") {
             vm.patchEmployee(employee.id, canInventory = it)
         }
-        SwitchRow("Activo en la tienda", employee.active, busy, "perm-" + employee.id + "-active") {
+        SwitchRow("Activo en el negocio", employee.active, busy, "perm-" + employee.id + "-active") {
             vm.patchEmployee(employee.id, active = it)
         }
     }
@@ -195,7 +195,7 @@ private fun InviteQrDialog(invite: Invite, storeName: String, onDismiss: () -> U
             putExtra(Intent.EXTRA_SUBJECT, "Invitación a Abarpay")
             putExtra(
                 Intent.EXTRA_TEXT,
-                "Únete al equipo de " + (storeName.ifBlank { "la tienda" }) + " en Abarpay: " + invite.url,
+                "Únete al equipo de " + (storeName.ifBlank { "el negocio" }) + " en Abarpay: " + invite.url,
             )
         }
         runCatching { context.startActivity(Intent.createChooser(send, "Compartir invitación")) }
@@ -251,7 +251,7 @@ internal fun InviteAcceptScreen(s: ShopState, vm: ShopViewModel) {
             info != null -> {
                 item {
                     Panel {
-                        Text(info.storeName.ifBlank { "La tienda" }, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(info.storeName.ifBlank { "El negocio" }, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         if (info.businessType.isNotBlank()) {
                             Text(info.businessType, color = Muted, fontSize = 13.sp)
                         }
@@ -267,7 +267,7 @@ internal fun InviteAcceptScreen(s: ShopState, vm: ShopViewModel) {
                     OutlinedTextField(
                         nickname, { nickname = it },
                         Modifier.fillMaxWidth().testTag("invite-nickname"),
-                        label = { Text("¿Cómo te dicen en la tienda?") },
+                        label = { Text("¿Cómo te dicen en el negocio?") },
                         singleLine = true,
                         enabled = !s.busy,
                         shape = RoundedCornerShape(16.dp),

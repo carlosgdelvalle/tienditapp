@@ -17,7 +17,7 @@ class OnboardingFirstLaunchUiTest : AppUiTest() {
         scrollToTag("meta-2").performClick()
         scrollToTag("onboarding-dueno").performTextInput("Doña Rosa")
         scrollToTag("onboarding-negocio").performTextInput("Tiendita de la Esquina")
-        scrollToTag("tipo-Tiendita").performClick()
+        scrollToTag("tipo-tiendita").performClick()
         scrollToTag("onboarding-listo").assertIsEnabled()
         scrollToTag("onboarding-listo").performClick()
         compose.waitUntil(15_000) { model().ui.value.onboarded && !model().ui.value.busy }

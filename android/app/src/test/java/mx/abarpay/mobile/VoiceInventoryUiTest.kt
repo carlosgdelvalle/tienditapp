@@ -15,8 +15,8 @@ class VoiceInventoryUiTest : AppUiTest() {
         compose.onNodeWithTag("voice-qty-1").assertExists()
         compose.onNodeWithTag("voice-guardar").performClick()
         compose.waitUntil(15_000) { model().ui.value.voice == null && !model().ui.value.busy }
-        scrollToText("Stock: 12 pza")
-        compose.onNodeWithText("Stock: 12 pza").assertExists()
+        scrollToText("12 unidades disponibles")
+        compose.onNodeWithText("12 unidades disponibles").assertExists()
         assertEquals(12000, model().ui.value.bootstrap?.products?.first { it.id == 1 }?.stockMilli)
     }
 }

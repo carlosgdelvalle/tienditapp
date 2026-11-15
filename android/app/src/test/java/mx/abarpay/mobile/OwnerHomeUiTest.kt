@@ -19,6 +19,6 @@ class OwnerHomeUiTest : AppUiTest() {
         compose.onNodeWithText("Fiado de clientes").assertDoesNotExist()
         compose.onNodeWithTag("abrir-ajustes").performClick()
         compose.onNodeWithText("Ajustes").assertExists()
-        compose.onNodeWithText("Tu tienda").assertExists()
+        compose.onNodeWithText("Tu negocio").assertExists()
     }
 }

@@ -25,9 +25,23 @@ data class Product(
     val lowStockMilli: Int = 5000,
     val quick: Boolean = false,
     val unlimitedStock: Boolean = false,
+    // Contrato v3 · catálogo generalizado: tipo de artículo, categoría, duración y alias.
+    val kind: String = KIND_PRODUCTO,
+    val category: String? = null,
+    val durationMinutes: Int? = null,
+    val aliases: List<String> = emptyList(),
 ) {
     val isLowStock get() = !unlimitedStock && stockMilli <= lowStockMilli
     val stockLabel get() = if (unlimitedStock) "Sin límite" else qtyText(stockMilli, unit)
+    /** Servicios y platillos no llevan inventario: nunca muestran controles de stock. */
+    val tracksStock get() = kind == KIND_PRODUCTO && !unlimitedStock
+    /** Etiqueta del catálogo/venta: «24 unidades disponibles» o «Sin límite». */
+    val availableLabel get() = when {
+        !tracksStock -> "Sin límite"
+        unit == "pieza" && stockMilli == 1000 -> "1 unidad disponible"
+        unit == "pieza" -> qtyNumber(stockMilli) + " unidades disponibles"
+        else -> qtyText(stockMilli, unit) + " disponibles"
+    }
 }
 
 data class Employee(
@@ -84,6 +98,8 @@ data class Report(
     val pending: Int = 0,
     val fiadoOutstandingCents: Long = 0,
     val demoMode: Boolean = false,
+    // Contrato v3 · gastos del día (botón «Registrar gasto»).
+    val totalExpensesCents: Long = 0,
 )
 
 data class Sale(
@@ -128,16 +144,34 @@ fun money(cents: Long): String = NumberFormat.getCurrencyInstance(Locale.forLang
     .format(BigDecimal.valueOf(cents, 2))
 
 /** 1000 milli = one piece or one kilogram. 500 milli prints as 0.5 kg. */
-fun qtyText(qtyMilli: Int, unit: String): String {
+fun qtyText(qtyMilli: Int, unit: String): String = qtyNumber(qtyMilli) + " " + unitLabel(unit)
+
+/** Solo el número de la cantidad (sin unidad): 12000 -> "12", 1500 -> "1.5". */
+fun qtyNumber(qtyMilli: Int): String {
     val sign = if (qtyMilli < 0) "-" else ""
     val abs = kotlin.math.abs(qtyMilli)
     val whole = abs / 1000
     val rem = abs % 1000
-    val number = if (rem == 0) "$sign$whole" else {
+    return if (rem == 0) "$sign$whole" else {
         val frac = rem.toString().padStart(3, '0').trimEnd('0')
         "$sign$whole.$frac"
     }
-    return if (unit == "kg") "$number kg" else "$number pza"
+}
+
+/** Etiqueta corta de la unidad para badges y textos. */
+fun unitLabel(unit: String): String = when (unit) {
+    "pieza" -> "pza"
+    "kg" -> "kg"
+    "g" -> "g"
+    "litro" -> "L"
+    "servicio" -> "servicio"
+    "sesion" -> "sesión"
+    "turno" -> "turno"
+    "minuto" -> "min"
+    "hora" -> "hora"
+    "paquete" -> "paquete"
+    "combo" -> "combo"
+    else -> unit.ifBlank { "pza" }
 }
 
 /** Mirrors the server formula: lineTotalCents = round(unitPriceCents * qtyMilli / 1000). */
@@ -151,7 +185,7 @@ fun changeQuantity(cart: List<CartLine>, id: Int, deltaMilli: Int): List<CartLin
 }
 
 /** One-tap decrement never sends a half-kilo line below zero. */
-fun decrementStep(qtyMilli: Int): Int = -minOf(1000, qtyMilli)
+fun decrementStep(qtyMilli: Int, step: Int = 1000): Int = -minOf(step, qtyMilli)
 
 fun cartEstimate(cart: List<CartLine>, products: List<Product>): Long = cart.sumOf { line ->
     val product = products.firstOrNull { it.id == line.productId } ?: error("Actualiza el catálogo")
@@ -292,8 +326,45 @@ val OWNER_GOALS = listOf(
     "Ver estadísticas avanzadas",
 )
 
-/** Tipos de negocio del onboarding: chips de una sola elección. */
-val BUSINESS_TYPES = listOf("Tiendita", "Abarrotes", "Miscelánea", "Fondita", "Otro")
+/**
+ * Tipos de negocio del onboarding v3: chips de una sola elección.
+ * [BusinessTypeOption.key] es el valor que acepta POST /api/catalog/templates/apply.
+ * Miscelánea usa la plantilla genérica ("otro") porque el contrato del servidor
+ * solo define tiendita, tortilleria, taqueria, comida-corrida, peluqueria,
+ * estetica, fondita y otro.
+ */
+data class BusinessTypeOption(val label: String, val key: String)
+
+val BUSINESS_TYPES = listOf(
+    BusinessTypeOption("Tiendita/Abarrotes", "tiendita"),
+    BusinessTypeOption("Miscelánea", "miscelanea"),
+    BusinessTypeOption("Tortillería", "tortilleria"),
+    BusinessTypeOption("Taquería", "taqueria"),
+    BusinessTypeOption("Comida corrida", "comida-corrida"),
+    BusinessTypeOption("Peluquería/Barbería", "peluqueria"),
+    BusinessTypeOption("Estética de uñas", "estetica"),
+    BusinessTypeOption("Fondita", "fondita"),
+    BusinessTypeOption("Otro", "otro"),
+)
+
+val BUSINESS_TYPE_LABELS: List<String> = BUSINESS_TYPES.map { it.label }
+
+/** Tipo de negocio → plantilla que entiende el servidor (Miscelánea → «otro»). */
+fun templateBusinessType(businessType: String): String {
+    val key = BUSINESS_TYPES.firstOrNull { it.label == businessType || it.key == businessType }?.key
+        ?: return "otro"
+    // Miscelánea no está en el enum del servidor: usa la plantilla genérica.
+    return if (key == "miscelanea") "otro" else key
+}
+
+/** Paso «¿Qué vendes?»: multi-select guardado en las preferencias del teléfono. */
+data class SellsOption(val label: String, val key: String)
+
+val SELLS_OPTIONS = listOf(
+    SellsOption("Productos", "productos"),
+    SellsOption("Servicios", "servicios"),
+    SellsOption("Comida preparada y bebidas", "comida"),
+)
 
 data class StoreProfile(
     val storeId: String = "",
@@ -452,3 +523,279 @@ fun canReportTicket(sale: Sale): Boolean =
 fun ticketMessage(ticket: SupportTicket): String =
     if (ticket.alreadyOpen) "Ya existe el ticket #" + ticket.id
     else "Ticket #" + ticket.id + " creado"
+
+
+// ---------------------------------------------------------------------------
+// Contrato v3 · catálogo generalizado, tareas, gastos y comprobante
+// ---------------------------------------------------------------------------
+
+const val KIND_PRODUCTO = "producto"
+const val KIND_SERVICIO = "servicio"
+const val KIND_PLATILLO = "platillo"
+
+val PRODUCT_KINDS = listOf(KIND_PRODUCTO, KIND_SERVICIO, KIND_PLATILLO)
+
+/** Unidades que acepta POST/PATCH /api/catalog (CHECK ampliado del contrato v3). */
+val PRODUCT_UNITS = listOf(
+    "pieza", "kg", "g", "litro", "servicio", "sesion", "turno",
+    "minuto", "hora", "paquete", "combo",
+)
+
+fun kindLabel(kind: String): String = when (kind) {
+    KIND_SERVICIO -> "Servicio"
+    KIND_PLATILLO -> "Platillo"
+    else -> "Producto"
+}
+
+fun catalogUnitLabel(unit: String): String = unitLabel(unit)
+
+/** Los servicios y platillos no llevan inventario ni controles de stock. */
+fun kindTracksStock(kind: String): Boolean = kind == KIND_PRODUCTO
+
+/** Copy v3: «Tu negocio» (nunca «Tu tiendita») y «Inventario bajo» (no «Stock bajo»). */
+const val COPY_HOME_TITLE = "Tu negocio"
+const val COPY_LOW_STOCK = "Inventario bajo"
+
+fun stockBadge(product: Product): String = product.availableLabel
+
+/**
+ * Presets de cantidad por unidad, en mili-unidades (1000 = 1 unidad).
+ * servicio/sesión/turno/combo → 1,2,3; kg → 250g/500g/1kg/2kg;
+ * minuto → 30/60/90. pieza/g/paquete usan botones +1/−1.
+ */
+val QUANTITY_PRESETS: Map<String, List<Int>> = mapOf(
+    "servicio" to listOf(1000, 2000, 3000),
+    "sesion" to listOf(1000, 2000, 3000),
+    "turno" to listOf(1000, 2000, 3000),
+    "combo" to listOf(1000, 2000, 3000),
+    "kg" to listOf(250, 500, 1000, 2000),
+    "minuto" to listOf(30_000, 60_000, 90_000),
+)
+
+fun quantityPresets(unit: String): List<Int>? = QUANTITY_PRESETS[unit]
+
+/** Tamaño de un toque de +/−: siempre una unidad (1000 milli = 1 pieza, g, kg, paquete…). */
+fun quantityStep(unit: String): Int {
+    require(unit.isNotBlank()) { "Unidad vacía" }
+    return 1000
+}
+
+/**
+ * Etiqueta del preset: en kg los cuartos se muestran como gramos
+ * (250 g, 500 g, 1 kg, 2 kg), como pide el contrato v3.
+ */
+fun quantityPresetLabel(qtyMilli: Int, unit: String): String =
+    if (unit == "kg" && qtyMilli in 1..999) qtyMilli.toString() + " g" else qtyText(qtyMilli, unit)
+
+/** Página del catálogo: el servidor puede paginar y la app filtra en local. */
+data class CatalogPage(val items: List<Product> = emptyList(), val total: Int = 0)
+
+/** Formulario de alta/edición del catálogo (contrato v3). */
+data class CatalogDraft(
+    val name: String = "",
+    val unit: String = "pieza",
+    val priceCents: Long = 0,
+    val aliases: List<String> = emptyList(),
+    val stockMilli: Int? = null,
+    val unlimitedStock: Boolean = false,
+    val kind: String = KIND_PRODUCTO,
+    val category: String? = null,
+    val durationMinutes: Int? = null,
+    val quick: Boolean = false,
+) {
+    val tracksStock get() = kindTracksStock(kind) && !unlimitedStock
+}
+
+fun catalogDraft(product: Product): CatalogDraft = CatalogDraft(
+    name = product.name,
+    unit = product.unit,
+    priceCents = product.priceCents,
+    aliases = product.aliases,
+    stockMilli = product.stockMilli,
+    unlimitedStock = product.unlimitedStock || !kindTracksStock(product.kind),
+    kind = product.kind,
+    category = product.category,
+    durationMinutes = product.durationMinutes,
+    quick = product.quick,
+)
+
+/** Nombre y precio son obligatorios; el resto tiene valores sensatos. */
+fun catalogDraftReady(draft: CatalogDraft): Boolean = draft.name.isNotBlank() && draft.priceCents > 0
+
+fun aliasesFrom(raw: String): List<String> =
+    raw.split(',', ';').map { it.trim() }.filter { it.isNotBlank() }.distinct()
+
+fun aliasesText(aliases: List<String>): String = aliases.joinToString(", ")
+
+fun catalogCategories(products: List<Product>): List<String> =
+    products.mapNotNull { it.category?.takeIf { c -> c.isNotBlank() } }
+        .distinct().sortedBy { it.lowercase() }
+
+fun catalogMatches(product: Product, query: String, category: String?, kind: String?): Boolean {
+    if (category != null && product.category != category) return false
+    if (kind != null && product.kind != kind) return false
+    val q = query.trim().lowercase()
+    if (q.isBlank()) return true
+    return product.name.lowercase().contains(q) || product.aliases.any { it.lowercase().contains(q) }
+}
+
+/** Rápidos primero y luego por nombre: el catálogo grande se ordena en la app. */
+fun sortedCatalog(products: List<Product>): List<Product> =
+    products.sortedWith(compareByDescending<Product> { it.quick }.thenBy { it.name.lowercase() })
+
+fun catalogItemSubtitle(product: Product): String = buildList {
+    add(kindLabel(product.kind) + " · " + money(product.priceCents) + " · " + unitLabel(product.unit))
+    product.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+    if (product.tracksStock) add(qtyText(product.stockMilli, product.unit) + " disponibles")
+    product.durationMinutes?.let { add(it.toString() + " min") }
+}.joinToString(" · ")
+
+internal fun catalogCompare(a: Product, b: Product): Int = a.name.compareTo(b.name, ignoreCase = true)
+
+// --- Tareas del día ---------------------------------------------------------
+
+/** Tarea fija del tipo de negocio; solo se muestra si está asignada y activa. */
+data class DayTask(
+    val id: Int,
+    val key: String = "",
+    val title: String = "",
+    val assignedEmployeeId: Int? = null,
+    val active: Boolean = true,
+) {
+    val assigned get() = assignedEmployeeId != null
+}
+
+/** Un empleado SOLO ve sus tareas asignadas y activas; el dueño ve todas. */
+fun tasksFor(tasks: List<DayTask>?, employee: Employee?): List<DayTask> {
+    val all = tasks.orEmpty()
+    if (employee == null || employee.isOwner) return all
+    return all.filter { it.active && it.assignedEmployeeId == employee.id }
+}
+
+fun taskAssigneeName(task: DayTask, team: List<Employee>?): String =
+    team?.firstOrNull { it.id == task.assignedEmployeeId }?.displayName ?: "Sin asignar"
+
+fun assignableEmployees(team: List<Employee>?): List<Employee> =
+    team.orEmpty().filter { it.active && !it.isOwner }
+
+// --- Gastos -----------------------------------------------------------------
+
+data class Expense(
+    val id: Int,
+    val amountCents: Long,
+    val note: String? = null,
+    val createdAt: Double = 0.0,
+    val employeeId: Int? = null,
+    val employeeName: String? = null,
+)
+
+/** Resultado del dictado de gastos; amountCents = 0 significa «no entendí el monto». */
+data class ExpenseDraft(val amountCents: Long = 0, val note: String? = null)
+
+fun expenseReady(amountCents: Long?): Boolean = (amountCents ?: 0) > 0
+
+fun expenseLabel(expense: Expense): String {
+    val note = expense.note?.takeIf { it.isNotBlank() }
+    return money(expense.amountCents) + (note?.let { " · " + it } ?: "")
+}
+
+fun expenseRegisteredMessage(amountCents: Long, note: String?): String {
+    val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+    return "Gasto registrado: " + money(amountCents) + (cleanNote?.let { " · " + it } ?: "")
+}
+
+fun expenseVoiceMessage(draft: ExpenseDraft): String {
+    if (draft.amountCents <= 0) return draft.note ?: "No entendí el monto. Escríbelo a mano."
+    val note = draft.note?.takeIf { it.isNotBlank() }
+    return "Entendí: " + money(draft.amountCents) + (note?.let { " · " + it } ?: "")
+}
+
+private val expenseNumberWords = mapOf(
+    "un" to 100L, "uno" to 100L, "una" to 100L, "dos" to 200L, "tres" to 300L,
+    "cuatro" to 400L, "cinco" to 500L, "seis" to 600L, "siete" to 700L,
+    "ocho" to 800L, "nueve" to 900L, "diez" to 1000L, "once" to 1100L,
+    "doce" to 1200L, "trece" to 1300L, "catorce" to 1400L, "quince" to 1500L,
+    "dieciseis" to 1600L, "dieciséis" to 1600L, "diecisiete" to 1700L,
+    "dieciocho" to 1800L, "diecinueve" to 1900L, "veinte" to 2000L,
+    "treinta" to 3000L, "cuarenta" to 4000L, "cincuenta" to 5000L,
+    "sesenta" to 6000L, "setenta" to 7000L, "ochenta" to 8000L,
+    "noventa" to 9000L, "cien" to 10000L, "ciento" to 10000L,
+    "doscientos" to 20000L, "trescientos" to 30000L, "cuatrocientos" to 40000L,
+    "quinientos" to 50000L, "seiscientos" to 60000L, "setecientos" to 70000L,
+    "ochocientos" to 80000L, "novecientos" to 90000L, "mil" to 100000L,
+)
+
+private val expenseStopWords = setOf(
+    "pesos", "peso", "de", "del", "en", "para", "por", "el", "la", "los", "las",
+    "un", "una", "gaste", "gasté", "gasto", "compre", "compré", "pague", "pagué",
+    "fue", "son", "es", "y", "con", "a",
+)
+
+/**
+ * Parser LOCAL del dictado de gastos (simulación sin red). En API el servidor
+ * manda: POST /api/expenses/voice. «veinte pesos de gas» → 2000, nota «gas».
+ */
+fun parseExpenseVoice(text: String): ExpenseDraft? {
+    val clean = text.trim().lowercase(Locale.ROOT)
+    if (clean.isBlank()) return null
+    val digits = Regex("(\\d{1,7}(?:[.,]\\d{1,2})?)").find(clean)?.groupValues?.get(1)
+    val amountCents = if (digits != null) {
+        parseCashCents(digits)
+    } else {
+        val words = clean.split(Regex("[^a-záéíóúüñ]+")).filter { it.isNotBlank() }
+        // «veinte» o «ciento cincuenta»: se suman los números seguidos.
+        var total = 0L
+        var found = false
+        for (word in words) {
+            val value = expenseNumberWords[word] ?: continue
+            total += value
+            found = true
+        }
+        if (found) total else null
+    } ?: return null
+    if (amountCents <= 0) return null
+    val noteWords = clean.split(Regex("[^a-záéíóúüñ0-9]+"))
+        .filter { it.isNotBlank() && !expenseStopWords.contains(it) && !it.all { ch -> ch.isDigit() } &&
+            expenseNumberWords[it] == null && !it.matches(Regex("\\d+[.,]?\\d*")) }
+    val note = noteWords.joinToString(" ").trim().takeIf { it.isNotBlank() }
+    return ExpenseDraft(amountCents, note)
+}
+
+// --- Comprobante ------------------------------------------------------------
+
+data class ReceiptLine(val label: String, val value: String)
+
+/** Filas del comprobante que se comparte como imagen o PDF. */
+fun receiptRows(storeName: String, sale: Sale): List<ReceiptLine> = buildList {
+    add(ReceiptLine("Negocio", storeName.ifBlank { "Mi negocio" }))
+    add(ReceiptLine("Venta", sale.id))
+    add(ReceiptLine("Forma de pago", methodLabel(sale.paymentMethod)))
+    add(ReceiptLine("Estado", statusLabel(sale.status)))
+    add(ReceiptLine("Total", money(sale.totalCents)))
+    if (sale.paymentMethod == PAYMENT_PEY && sale.chargedCents != sale.totalCents) {
+        add(ReceiptLine("Monto cobrado", money(sale.chargedCents)))
+    }
+    if (sale.paymentMethod == PAYMENT_CASH) {
+        sale.cashReceivedCents?.let { add(ReceiptLine("Recibido", money(it))) }
+        sale.changeCents?.let { add(ReceiptLine("Cambio", money(it))) }
+    }
+    sale.customerName?.let { add(ReceiptLine("Cliente", it)) }
+    sale.txId?.let { add(ReceiptLine("Folio PEY", it)) }
+    sale.note?.takeIf { it.isNotBlank() }?.let { add(ReceiptLine("Nota", it)) }
+}
+
+fun receiptHeadline(sale: Sale): String = "Comprobante de venta"
+
+/** Solo las ventas asentadas (efectivo, fiado o PEY pagada) se comparten. */
+fun canShareReceipt(sale: Sale): Boolean = sale.settled
+
+fun receiptFileName(sale: Sale): String =
+    "comprobante-" + sale.id.replace(Regex("[^A-Za-z0-9_-]"), "_")
+
+
+/** Texto editable del monto en pesos: 2000 → "20", 2050 → "20.50". */
+fun cashInputText(cents: Long): String {
+    val pesos = cents / 100
+    val resto = (cents % 100).toInt()
+    return if (resto == 0) pesos.toString() else String.format(Locale.ROOT, "%d.%02d", pesos, resto)
+}

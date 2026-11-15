@@ -117,6 +117,7 @@ class Settings:
 
         return cls(
             db_path=db_path,
+            seed_catalog=_env_bool("SEED_CATALOG", False),
             owner_pin=owner_pin,
             modo_demo=_env_bool("MODO_DEMO", True),
             pey_api_key=pey_api_key,

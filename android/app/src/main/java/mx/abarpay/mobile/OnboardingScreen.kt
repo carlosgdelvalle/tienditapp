@@ -55,12 +55,14 @@ import androidx.core.content.ContextCompat
 @Composable
 internal fun OnboardingScreen(s: ShopState, vm: ShopViewModel) {
     var goalsText by rememberSaveable { mutableStateOf("") }
+    var sellsText by rememberSaveable { mutableStateOf("") }
     var ownerName by rememberSaveable { mutableStateOf("") }
     var storeName by rememberSaveable { mutableStateOf("") }
     var businessType by rememberSaveable { mutableStateOf("") }
     var photo by remember { mutableStateOf<Bitmap?>(null) }
     val context = LocalContext.current
     val selectedGoals = goalsText.split("|").map { it.trim() }.filter { it.isNotBlank() }
+    val selectedSells = sellsText.split("|").map { it.trim() }.filter { it.isNotBlank() }
 
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
         if (bitmap != null) photo = bitmap
@@ -83,16 +85,29 @@ internal fun OnboardingScreen(s: ShopState, vm: ShopViewModel) {
         val next = if (goal in selectedGoals) selectedGoals - goal else selectedGoals + goal
         goalsText = next.joinToString("|")
     }
+    fun toggleSell(label: String) {
+        val next = if (label in selectedSells) selectedSells - label else selectedSells + label
+        sellsText = next.joinToString("|")
+    }
 
     val ready = onboardingReady(ownerName, storeName, businessType) && !s.busy
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Text("Bienvenido a Abarpay", fontSize = 27.sp, fontWeight = FontWeight.Bold)
-            MutedText("Configura tu tienda en un minuto. Este paso es solo para el dueño y no se repite.")
+            MutedText("Configura tu negocio en un minuto. Este paso es solo para el dueño y no se repite.")
         }
         item {
-            SectionLabel("¿Qué quieres lograr?")
-            MutedText("Elige todas las metas que quieras. Se guardan solo en este teléfono.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel("¿Qué quieres lograr?")
+                Spacer(Modifier.weight(1f))
+                // v3: las metas son opcionales; «Omitir» deja la selección vacía.
+                TextButton(
+                    onClick = { goalsText = "" },
+                    enabled = !s.busy,
+                    modifier = Modifier.testTag("metas-omitir"),
+                ) { Text("Omitir") }
+            }
+            MutedText("Elige todas las metas que quieras o toca Omitir. Se guardan solo en este teléfono.")
         }
         items(OWNER_GOALS.size) { index ->
             val goal = OWNER_GOALS[index]
@@ -120,7 +135,7 @@ internal fun OnboardingScreen(s: ShopState, vm: ShopViewModel) {
             OutlinedTextField(
                 storeName, { storeName = it },
                 Modifier.fillMaxWidth().testTag("onboarding-negocio"),
-                label = { Text("Nombre de la tienda") },
+                label = { Text("Nombre de tu negocio") },
                 singleLine = true,
                 enabled = !s.busy,
                 shape = RoundedCornerShape(16.dp),
@@ -131,11 +146,26 @@ internal fun OnboardingScreen(s: ShopState, vm: ShopViewModel) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BUSINESS_TYPES.forEach { type ->
                     FilterChip(
-                        selected = businessType == type,
-                        onClick = { businessType = type },
+                        selected = businessType == type.label,
+                        onClick = { businessType = type.label },
                         enabled = !s.busy,
-                        label = { Text(type) },
-                        modifier = Modifier.testTag("tipo-" + type),
+                        label = { Text(type.label) },
+                        modifier = Modifier.testTag("tipo-" + type.key),
+                    )
+                }
+            }
+        }
+        item {
+            SectionLabel("¿Qué vendes?")
+            MutedText("Elige todo lo que aplique. La app lo guarda en este teléfono para tu catálogo.")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SELLS_OPTIONS.forEach { option ->
+                    FilterChip(
+                        selected = option.label in selectedSells,
+                        onClick = { toggleSell(option.label) },
+                        enabled = !s.busy,
+                        label = { Text(option.label) },
+                        modifier = Modifier.testTag("vende-" + option.key),
                     )
                 }
             }
@@ -168,13 +198,15 @@ internal fun OnboardingScreen(s: ShopState, vm: ShopViewModel) {
         }
         item {
             Button(
-                onClick = { vm.finishOnboarding(selectedGoals, ownerName, storeName, businessType, photo) },
+                onClick = {
+                    vm.finishOnboarding(selectedGoals, ownerName, storeName, businessType, photo, selectedSells)
+                },
                 enabled = ready,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("onboarding-listo"),
                 shape = RoundedCornerShape(16.dp),
             ) { Text("Empezar", fontSize = 17.sp) }
             if (!ready) {
-                MutedText("Escribe el nombre del dueño, el de tu tienda y elige el tipo de negocio.", 12)
+                MutedText("Escribe el nombre del dueño, el de tu negocio y elige el tipo de negocio.", 12)
             }
         }
     }

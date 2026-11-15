@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -209,7 +210,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                         { Icon(Icons.Outlined.Check, null, Modifier.size(16.dp)) }
                     } else null,
                 )
-                Text("Los más vendidos de la tienda", color = Muted, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                Text("Los más vendidos del negocio", color = Muted, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterVertically))
             }
         }
         if (visible.isEmpty()) item { Text("No encontramos productos con ese nombre.") }
@@ -219,15 +220,15 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(product.name, fontWeight = FontWeight.SemiBold)
-                        Text("${money(product.priceCents)} · ${qtyText(1000, product.unit)}", color = Muted, fontSize = 12.sp)
+                        Text("${money(product.priceCents)} · " + qtyText(1000, product.unit), color = Muted, fontSize = 12.sp)
                         Text(
-                            "Stock ${product.stockLabel}" + if (product.isLowStock) " · bajo" else "",
+                            product.availableLabel + if (product.isLowStock) " · " + COPY_LOW_STOCK else "",
                             color = if (product.isLowStock) Amber else Muted,
                             fontSize = 11.sp,
                         )
                     }
                     IconButton(
-                        onClick = { vm.quantity(product.id, decrementStep(qty)) },
+                        onClick = { vm.quantity(product.id, decrementStep(qty, quantityStep(product.unit))) },
                         enabled = qty > 0 && !s.busy,
                     ) { Icon(Icons.Outlined.Remove, "Quitar ${product.name}") }
                     Text(
@@ -238,9 +239,24 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                         fontSize = 13.sp,
                     )
                     IconButton(
-                        onClick = { vm.quantity(product.id, 1000) },
+                        onClick = { vm.quantity(product.id, quantityStep(product.unit)) },
                         enabled = !s.busy,
                     ) { Icon(Icons.Outlined.Add, "Agregar ${product.name}") }
+                }
+                quantityPresets(product.unit)?.let { presets ->
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        presets.forEach { target ->
+                            OutlinedButton(
+                                onClick = { vm.quantity(product.id, target - qty) },
+                                enabled = !s.busy && target != qty,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.testTag("preset-" + product.id + "-" + target),
+                            ) { Text(quantityPresetLabel(target, product.unit)) }
+                        }
+                    }
                 }
             }
         }
@@ -267,7 +283,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { vm.quantity(product.id, decrementStep(line.qtyMilli)) },
+                        onClick = { vm.quantity(product.id, decrementStep(line.qtyMilli, quantityStep(product.unit))) },
                         enabled = !s.busy,
                     ) { Icon(Icons.Outlined.RemoveCircleOutline, "Quitar una unidad de ${product.name}") }
                     Text(
@@ -276,7 +292,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                         textAlign = TextAlign.Center,
                     )
                     IconButton(
-                        onClick = { vm.quantity(product.id, 1000) },
+                        onClick = { vm.quantity(product.id, quantityStep(product.unit)) },
                         enabled = !s.busy,
                     ) { Icon(Icons.Outlined.AddCircleOutline, "Agregar una unidad de ${product.name}") }
                 }
@@ -474,6 +490,7 @@ private fun CartActionBar(count: Int, total: Long, onCobrar: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QuantityDialog(
     product: Product,
@@ -481,37 +498,36 @@ private fun QuantityDialog(
     onDismiss: () -> Unit,
     onSet: (Int) -> Unit,
 ) {
+    // Presets por unidad (contrato v3): 1/2/3 en servicios, 250 g a 2 kg, 30/60/90 min.
+    val step = quantityStep(product.unit)
+    val presets = quantityPresets(product.unit)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(product.name) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Cantidad actual: ${qtyText(currentMilli, product.unit)}", fontWeight = FontWeight.SemiBold)
-                if (product.unit == "kg") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(250, 500, 1000, 2000).forEach { target ->
-                            OutlinedButton(onClick = { onSet(target) }, enabled = target != currentMilli) {
-                                Text(qtyText(target, product.unit))
-                            }
+                Text("Cantidad actual: " + qtyText(currentMilli, product.unit), fontWeight = FontWeight.SemiBold)
+                presets?.let { values ->
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        values.forEach { target ->
+                            OutlinedButton(
+                                onClick = { onSet(target) },
+                                enabled = target != currentMilli,
+                                modifier = Modifier.testTag("cantidad-preset-" + target),
+                            ) { Text(quantityPresetLabel(target, product.unit)) }
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(onClick = { onSet(currentMilli - 100) }, enabled = currentMilli >= 100) {
-                            Text("−100 g")
-                        }
-                        OutlinedButton(onClick = { onSet(currentMilli + 100) }) {
-                            Text("+100 g")
-                        }
-                    }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        OutlinedButton(onClick = { onSet(currentMilli - 1000) }, enabled = currentMilli > 0) {
-                            Text("−1 pza")
-                        }
-                        OutlinedButton(onClick = { onSet(currentMilli + 1000) }) {
-                            Text("+1 pza")
-                        }
-                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { onSet((currentMilli - step).coerceAtLeast(0)) },
+                        enabled = currentMilli > 0,
+                        modifier = Modifier.testTag("cantidad-menos"),
+                    ) { Text("−" + quantityPresetLabel(step, product.unit)) }
+                    OutlinedButton(
+                        onClick = { onSet(currentMilli + step) },
+                        modifier = Modifier.testTag("cantidad-mas"),
+                    ) { Text("+" + quantityPresetLabel(step, product.unit)) }
                 }
             }
         },
@@ -575,6 +591,7 @@ internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
     val sale = s.sale ?: return
     var confirmCancel by remember(sale.id) { mutableStateOf(false) }
     var reportOpen by remember(sale.id) { mutableStateOf(false) }
+    var receiptOpen by remember(sale.id) { mutableStateOf(false) }
     if (reportOpen) {
         var note by remember { mutableStateOf("") }
         AlertDialog(
@@ -609,6 +626,41 @@ internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
                 ) { Text("Crear ticket") }
             },
             dismissButton = { TextButton(onClick = { reportOpen = false }) { Text("Cancelar") } },
+        )
+    }
+    if (receiptOpen) {
+        val context = LocalContext.current
+        val storeName = s.bootstrap?.store?.name ?: s.profile?.name ?: "Mi negocio"
+        AlertDialog(
+            onDismissRequest = { receiptOpen = false },
+            title = { Text(receiptHeadline(sale)) },
+            text = {
+                Column(Modifier.width(260.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    receiptRows(storeName, sale).forEach { row -> InfoRow(row.label, row.value) }
+                    MutedText("Comparte la imagen o el PDF del comprobante.", 12)
+                }
+            },
+            confirmButton = {
+                Column(Modifier.width(220.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            receiptOpen = false
+                            shareReceipt(context, sale, storeName, pdf = false)?.let(vm::message)
+                        },
+                        enabled = !s.busy,
+                        modifier = Modifier.fillMaxWidth().testTag("compartir-imagen"),
+                    ) { Text("Compartir imagen") }
+                    OutlinedButton(
+                        onClick = {
+                            receiptOpen = false
+                            shareReceipt(context, sale, storeName, pdf = true)?.let(vm::message)
+                        },
+                        enabled = !s.busy,
+                        modifier = Modifier.fillMaxWidth().testTag("compartir-pdf"),
+                    ) { Text("Compartir PDF") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { receiptOpen = false }) { Text("Cerrar") } },
         )
     }
     if (confirmCancel && sale.canCancelPey) {
@@ -767,6 +819,19 @@ internal fun SaleScreen(s: ShopState, vm: ShopViewModel) {
                         enabled = !s.busy,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("reportar-problema"),
                     ) { Text("Reportar problema") }
+                }
+            }
+        }
+        if (canShareReceipt(sale)) {
+            item {
+                OutlinedButton(
+                    onClick = { receiptOpen = true },
+                    enabled = !s.busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("compartir-comprobante"),
+                ) {
+                    Icon(Icons.Outlined.Share, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Compartir comprobante")
                 }
             }
         }

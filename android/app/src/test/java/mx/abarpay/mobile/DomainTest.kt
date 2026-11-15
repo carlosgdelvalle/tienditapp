@@ -182,7 +182,14 @@ class DomainTest {
         assertFalse(onboardingReady("Rosa", "  ", "Tiendita"))
         assertFalse(onboardingReady("Rosa", "Tiendita", ""))
         assertEquals(4, OWNER_GOALS.size)
-        assertEquals(listOf("Tiendita", "Abarrotes", "Miscelánea", "Fondita", "Otro"), BUSINESS_TYPES)
+        // Contrato v3: la lista de tipos se amplía y usa etiquetas largas.
+        assertEquals(
+            listOf(
+                "Tiendita/Abarrotes", "Miscelánea", "Tortillería", "Taquería", "Comida corrida",
+                "Peluquería/Barbería", "Estética de uñas", "Fondita", "Otro",
+            ),
+            BUSINESS_TYPE_LABELS,
+        )
     }
 
     @Test fun quantityInputRoundTripsBetweenMilliAndText() {

@@ -122,16 +122,19 @@ internal fun InventoryScreen(s: ShopState, vm: ShopViewModel) {
                         Text(p.name, fontWeight = FontWeight.Bold)
                         Text(money(p.priceCents) + " · " + qtyText(1000, p.unit), color = Muted, fontSize = 12.sp)
                         Text(
-                            "Stock: " + p.stockLabel,
+                            p.availableLabel + if (low) " · " + COPY_LOW_STOCK else "",
                             color = if (low) Amber else Muted,
                             fontSize = 12.sp,
                         )
+                        Text(kindLabel(p.kind), color = Muted, fontSize = 11.sp)
                     }
-                    IconButton(onClick = { vm.adjust(p.id, -1000) }, enabled = !s.busy && !p.unlimitedStock) {
-                        Icon(Icons.Outlined.RemoveCircleOutline, "Restar una unidad de " + p.name)
-                    }
-                    IconButton(onClick = { vm.adjust(p.id, 1000) }, enabled = !s.busy && !p.unlimitedStock) {
-                        Icon(Icons.Outlined.AddCircleOutline, "Sumar una unidad de " + p.name)
+                    if (p.tracksStock) {
+                        IconButton(onClick = { vm.adjust(p.id, -quantityStep(p.unit)) }, enabled = !s.busy) {
+                            Icon(Icons.Outlined.RemoveCircleOutline, "Restar una unidad de " + p.name)
+                        }
+                        IconButton(onClick = { vm.adjust(p.id, quantityStep(p.unit)) }, enabled = !s.busy) {
+                            Icon(Icons.Outlined.AddCircleOutline, "Sumar una unidad de " + p.name)
+                        }
                     }
                 }
             }
@@ -201,7 +204,7 @@ internal fun ReportsScreen(s: ShopState, vm: ShopViewModel) {
     }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Title("Reportes · hoy") }
-        item { MutedText("Día de la tienda: Ciudad de México") }
+        item { MutedText("Día del negocio: Ciudad de México") }
         item {
             Panel {
                 Text("Venta total del día")
@@ -213,6 +216,7 @@ internal fun ReportsScreen(s: ShopState, vm: ShopViewModel) {
                 InfoRow("Fiado", money(r.fiadoCents))
                 InfoRow("Fiado por cobrar", money(r.fiadoOutstandingCents))
                 HorizontalDivider()
+                InfoRow("Gastos de hoy", money(r.totalExpensesCents))
                 InfoRow("Ventas", "${r.salesCount}")
                 InfoRow("Cobros por conciliar", "${r.pending}")
             }
@@ -242,7 +246,7 @@ internal fun ReportsScreen(s: ShopState, vm: ShopViewModel) {
         }
         item {
             Panel {
-                Text("Stock bajo", fontWeight = FontWeight.Bold)
+                Text(COPY_LOW_STOCK, fontWeight = FontWeight.Bold)
                 if (r.lowStock.isEmpty()) Text("Sin alertas de stock.")
                 r.lowStock.forEach { InfoRow(it.name, qtyText(it.stockMilli, it.unit)) }
             }
@@ -407,7 +411,7 @@ internal fun SettingsScreen(s: ShopState, vm: ShopViewModel, close: () -> Unit) 
         s.profile?.let { profile ->
             item {
                 Panel {
-                    Text("Tu tienda", fontWeight = FontWeight.Bold)
+                    Text("Tu negocio", fontWeight = FontWeight.Bold)
                     InfoRow("Negocio", profile.name.ifBlank { s.bootstrap?.store?.name.orEmpty() })
                     InfoRow("Tipo", profile.businessType.ifBlank { "Sin definir" })
                     InfoRow("Dueño", profile.ownerName.ifBlank { "Sin definir" })
@@ -466,7 +470,7 @@ internal fun SettingsScreen(s: ShopState, vm: ShopViewModel, close: () -> Unit) 
                 ) { Text("Usar simulación sin conexión (solo debug)") }
             }
         }
-        item { TextButton(onClick = close) { Text("Volver a la tienda") } }
+        item { TextButton(onClick = close) { Text("Volver al inicio") } }
     }
 }
 
@@ -490,7 +494,7 @@ internal fun UncertainScreen(saleId: String?) {
 @Composable
 internal fun ConnectingScreen(s: ShopState, vm: ShopViewModel, openSettings: () -> Unit) {
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Title("Conectando con tu tienda…")
+        Title("Conectando con tu negocio…")
         MutedText(if (s.simulated) "Preparando el modo simulación." else "Consultando ${s.server}.")
         OutlinedButton(onClick = vm::refresh, enabled = !s.busy) { Text("Reintentar") }
         TextButton(onClick = openSettings) { Text("Revisar conexión") }

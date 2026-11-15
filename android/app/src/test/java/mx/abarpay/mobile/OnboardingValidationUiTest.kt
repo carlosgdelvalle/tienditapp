@@ -14,7 +14,7 @@ class OnboardingValidationUiTest : AppUiTest() {
         scrollToTag("onboarding-dueno").performTextInput("Rosa")
         scrollToTag("onboarding-negocio").performTextInput("La Esquina")
         scrollToTag("onboarding-listo").assertIsNotEnabled()
-        scrollToTag("tipo-Abarrotes").performClick()
+        scrollToTag("tipo-tiendita").performClick()
         scrollToTag("onboarding-listo").assertIsEnabled()
         val prefs = model().getApplication<Application>().getSharedPreferences("abarpay_owner", 0)
         assertFalse(prefs.getBoolean("onboarded_owner", false))

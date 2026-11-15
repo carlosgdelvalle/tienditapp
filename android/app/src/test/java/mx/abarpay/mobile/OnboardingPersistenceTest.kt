@@ -34,7 +34,7 @@ class OnboardingPersistenceTest {
             goals = listOf("Controlar lo que me deben", "Ver estadísticas avanzadas"),
             ownerName = "Doña Rosa",
             storeName = "La Esquina del Barrio",
-            businessType = "Abarrotes",
+            businessType = "Tiendita/Abarrotes",
             photo = null,
         )
         idle()

@@ -9,6 +9,7 @@ import okhttp3.RequestBody
 import okio.BufferedSink
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -43,6 +44,24 @@ interface ShopRepository {
     suspend fun inventory(): InventorySnapshot
     suspend fun inventorySet(productId: Int, qtyMilli: Int, note: String? = null): Product
     suspend fun inventoryVoice(text: String): VoiceResult
+    // Contrato v3 · catálogo generalizado, plantillas, tareas del día y gastos.
+    suspend fun catalog(query: String? = null, category: String? = null, kind: String? = null, limit: Int = 500, offset: Int = 0): CatalogPage
+    suspend fun createCatalogItem(draft: CatalogDraft): Product
+    suspend fun updateCatalogItem(id: Int, draft: CatalogDraft): Product
+    suspend fun deleteCatalogItem(id: Int)
+    /** SOLO aplica si la tienda aún no tiene catálogo; el servidor responde 409 si ya hay. */
+    suspend fun applyTemplate(businessType: String)
+    suspend fun tasks(): List<DayTask>
+    suspend fun patchTask(
+        id: Int,
+        assignedEmployeeId: Int? = null,
+        clearAssignee: Boolean = false,
+        active: Boolean? = null,
+        title: String? = null,
+    ): DayTask
+    suspend fun expenses(limit: Int = 50): List<Expense>
+    suspend fun addExpense(amountCents: Long, note: String? = null): Expense
+    suspend fun expenseVoice(text: String): ExpenseDraft
     suspend fun parse(text: String): ParseResult
     suspend fun lookup(code: String): Product
     suspend fun link(code: String, productId: Int): Product
@@ -84,7 +103,59 @@ internal fun readProduct(j: JSONObject) = Product(
     lowStockMilli = j.optInt("lowStockMilli", 5000),
     quick = j.optBoolean("quick"),
     unlimitedStock = j.optBoolean("unlimitedStock", false),
+    kind = j.optString("kind", KIND_PRODUCTO).ifBlank { KIND_PRODUCTO },
+    category = j.nullableString("category"),
+    durationMinutes = j.nullableInt("durationMinutes"),
+    aliases = j.optJSONArray("aliases")?.strings().orEmpty(),
 )
+
+/** Lee la página del catálogo v3; acepta {items,total} o una lista suelta ya envuelta. */
+internal fun readCatalog(j: JSONObject) = CatalogPage(
+    items = j.optJSONArray("items")?.objects()?.map(::readProduct).orEmpty(),
+    total = if (j.has("total")) j.optInt("total") else j.optJSONArray("items")?.length() ?: 0,
+)
+
+internal fun readTask(j: JSONObject) = DayTask(
+    id = j.optInt("id"),
+    key = j.optString("key"),
+    title = j.optString("title").ifBlank { j.optString("name") },
+    assignedEmployeeId = j.nullableInt("assignedEmployeeId") ?: j.nullableInt("assigned_employee_id"),
+    active = j.optBoolean("active", true),
+)
+
+internal fun readExpense(j: JSONObject) = Expense(
+    id = j.optInt("id"),
+    amountCents = j.optLong("amountCents"),
+    note = j.nullableString("note"),
+    createdAt = j.optDouble("createdAt", 0.0),
+    employeeId = j.nullableInt("employeeId"),
+    employeeName = j.nullableString("employeeName") ?: j.nullableString("reportedByName"),
+)
+
+internal fun readExpenseVoice(j: JSONObject) = ExpenseDraft(
+    amountCents = if (j.has("amountCents") && !j.isNull("amountCents")) j.optLong("amountCents") else 0L,
+    note = j.nullableString("note"),
+)
+
+/** Cuerpo de alta/edición tal como lo pide el contrato v3 (nombre, precio, unidad, kind…). */
+internal fun catalogBody(draft: CatalogDraft, includeNulls: Boolean = true) = JSONObject()
+    .put("name", draft.name.trim())
+    .put("unit", draft.unit)
+    .put("priceCents", draft.priceCents)
+    .put("aliases", JSONArray(draft.aliases))
+    .put("stockMilli", draft.stockMilli ?: 0)
+    .put("unlimitedStock", draft.unlimitedStock || !kindTracksStock(draft.kind))
+    .put("kind", draft.kind)
+    .apply {
+        if (includeNulls) {
+            put("category", draft.category ?: JSONObject.NULL)
+            put("durationMinutes", draft.durationMinutes ?: JSONObject.NULL)
+        } else {
+            draft.category?.let { put("category", it) }
+            draft.durationMinutes?.let { put("durationMinutes", it) }
+        }
+    }
+    .put("quick", draft.quick)
 
 
 internal fun readEmployee(j: JSONObject) = Employee(
@@ -220,6 +291,7 @@ internal fun readReport(j: JSONObject) = Report(
     pending = j.optInt("pending"),
     fiadoOutstandingCents = j.optLong("fiadoOutstandingCents"),
     demoMode = j.optBoolean("demoMode"),
+    totalExpensesCents = j.optLong("totalExpensesCents"),
 )
 
 /** Parsea el ticket de soporte con campos opcionales: ningún dato faltante rompe el teléfono. */
@@ -366,7 +438,12 @@ class ApiRepository(private val base: String) : ShopRepository {
                 }
                 val raw = source?.readUtf8().orEmpty()
                 val json = if (raw.isBlank()) JSONObject() else runCatching { JSONObject(raw) }
-                    .getOrElse { JSONObject().put("detail", raw.take(300)) }
+                    .getOrElse {
+                        // Algunos endpoints v3 (tareas, gastos) pueden responder una lista
+                        // suelta; la app la envuelve como {items:[...]} sin tronar.
+                        runCatching { JSONObject().put("items", JSONArray(raw)) }
+                            .getOrElse { JSONObject().put("detail", raw.take(300)) }
+                    }
                 response.code to json
             }
         }
@@ -454,6 +531,74 @@ class ApiRepository(private val base: String) : ShopRepository {
     override suspend fun inventoryVoice(text: String): VoiceResult =
         readVoice(request("/api/inventory/voice", JSONObject().put("text", text)))
 
+    // --- Contrato v3 · catálogo, plantillas, tareas y gastos -----------------
+
+    override suspend fun catalog(
+        query: String?,
+        category: String?,
+        kind: String?,
+        limit: Int,
+        offset: Int,
+    ): CatalogPage {
+        val params = mutableListOf<Pair<String, String>>()
+        query?.trim()?.takeIf { it.isNotBlank() }?.let { params += "q" to it }
+        category?.takeIf { it.isNotBlank() }?.let { params += "category" to it }
+        kind?.takeIf { it.isNotBlank() }?.let { params += "kind" to it }
+        params += "limit" to limit.coerceIn(1, 500).toString()
+        params += "offset" to offset.coerceAtLeast(0).toString()
+        val qs = params.joinToString("&") { (key, value) ->
+            key + "=" + URLEncoder.encode(value, "UTF-8")
+        }
+        return readCatalog(request("/api/catalog?" + qs))
+    }
+
+    override suspend fun createCatalogItem(draft: CatalogDraft): Product =
+        readProduct(request("/api/catalog", catalogBody(draft)))
+
+    override suspend fun updateCatalogItem(id: Int, draft: CatalogDraft): Product =
+        readProduct(request("/api/catalog/" + id, catalogBody(draft), "PATCH"))
+
+    override suspend fun deleteCatalogItem(id: Int) {
+        request("/api/catalog/" + id, null, "DELETE")
+    }
+
+    override suspend fun applyTemplate(businessType: String) {
+        request("/api/catalog/templates/apply", JSONObject().put("businessType", businessType))
+    }
+
+    override suspend fun tasks(): List<DayTask> =
+        request("/api/tasks").optJSONArray("items")?.objects()?.map(::readTask).orEmpty()
+
+    override suspend fun patchTask(
+        id: Int,
+        assignedEmployeeId: Int?,
+        clearAssignee: Boolean,
+        active: Boolean?,
+        title: String?,
+    ): DayTask {
+        val body = JSONObject()
+        when {
+            clearAssignee -> body.put("assignedEmployeeId", JSONObject.NULL)
+            assignedEmployeeId != null -> body.put("assignedEmployeeId", assignedEmployeeId)
+        }
+        if (active != null) body.put("active", active)
+        if (title != null) body.put("title", title)
+        return readTask(request("/api/tasks/" + id, body, "PATCH"))
+    }
+
+    override suspend fun expenses(limit: Int): List<Expense> =
+        request("/api/expenses?limit=" + limit.coerceIn(1, 500))
+            .optJSONArray("items")?.objects()?.map(::readExpense).orEmpty()
+
+    override suspend fun addExpense(amountCents: Long, note: String?): Expense {
+        val body = JSONObject().put("amountCents", amountCents)
+        if (!note.isNullOrBlank()) body.put("note", note)
+        return readExpense(request("/api/expenses", body))
+    }
+
+    override suspend fun expenseVoice(text: String): ExpenseDraft =
+        readExpenseVoice(request("/api/expenses/voice", JSONObject().put("text", text)))
+
     override suspend fun parse(text: String): ParseResult =
         readParse(request("/api/cart/parse", JSONObject().put("text", text)))
 
@@ -520,9 +665,13 @@ class ApiRepository(private val base: String) : ShopRepository {
 // Offline demo repository: same shapes, no network, no real QR
 // ---------------------------------------------------------------------------
 
-class DemoRepository : ShopRepository {
-    private var store = Store("tiendita-esquina", "Tiendita de la Esquina", "Tiendita", "Doña Rosa")
-    private var profile = StoreProfile("tiendita-esquina", "Tiendita de la Esquina", "Tiendita", "Doña Rosa")
+class DemoRepository(
+    seed: List<Product> = demoSeed(),
+    taskSeed: List<DayTask> = demoTaskSeed(),
+) : ShopRepository {
+    // Demo genérica (contrato v3): «Mi negocio», no una tienda con nombre propio.
+    private var store = Store("mi-negocio", "Mi negocio", "Tiendita/Abarrotes", "Doña Rosa")
+    private var profile = StoreProfile("mi-negocio", "Mi negocio", "Tiendita/Abarrotes", "Doña Rosa")
     private var acting: Int? = null
     private var photoDataUrl: String? = null
 
@@ -537,7 +686,13 @@ class DemoRepository : ShopRepository {
     private val invites = mutableMapOf("INVITACION-DEMO" to 4)
     private val acceptedTokens = mutableSetOf<String>()
     private val lastUpdate = mutableMapOf<Int, Movement>()
-    private var products = demoSeed()
+    private var products: List<Product> = seed.toList()
+    private var nextProductId = (products.maxOfOrNull { it.id } ?: 0) + 1
+    // Contrato v3: tareas del día, gastos y catálogo también viven en la simulación.
+    private val dayTasks = taskSeed.toMutableList()
+    private var nextTaskId = (dayTasks.maxOfOrNull { it.id } ?: 0) + 1
+    private val expenses = mutableListOf<Expense>()
+    private var nextExpenseId = 1
 
     private data class Movement(val at: Double, val name: String, val nickname: String?)
 
@@ -718,6 +873,150 @@ class DemoRepository : ShopRepository {
         )
     }
 
+    // --- Contrato v3 · catálogo, plantillas, tareas y gastos -----------------
+
+    override suspend fun catalog(
+        query: String?,
+        category: String?,
+        kind: String?,
+        limit: Int,
+        offset: Int,
+    ): CatalogPage {
+        val filtered = products.filter { catalogMatches(it, query.orEmpty(), category, kind) }
+        return CatalogPage(
+            items = filtered.drop(offset.coerceAtLeast(0)).take(limit.coerceIn(1, 500)),
+            total = filtered.size,
+        )
+    }
+
+    override suspend fun createCatalogItem(draft: CatalogDraft): Product {
+        ownerActor()
+        validateCatalogDraft(draft)
+        val unlimited = draft.unlimitedStock || !kindTracksStock(draft.kind)
+        val product = Product(
+            id = nextProductId++,
+            name = draft.name.trim(),
+            unit = draft.unit,
+            priceCents = draft.priceCents,
+            stockMilli = if (unlimited) 0 else (draft.stockMilli ?: 0),
+            quick = draft.quick,
+            unlimitedStock = unlimited,
+            kind = draft.kind,
+            category = draft.category?.trim()?.takeIf { it.isNotBlank() },
+            durationMinutes = draft.durationMinutes,
+            aliases = draft.aliases,
+        )
+        products += product
+        return product
+    }
+
+    override suspend fun updateCatalogItem(id: Int, draft: CatalogDraft): Product {
+        ownerActor()
+        validateCatalogDraft(draft)
+        val current = products.firstOrNull { it.id == id }
+            ?: throw ApiFailure(404, "Ese artículo ya no está en el catálogo")
+        val unlimited = draft.unlimitedStock || !kindTracksStock(draft.kind)
+        val updated = current.copy(
+            name = draft.name.trim(),
+            unit = draft.unit,
+            priceCents = draft.priceCents,
+            stockMilli = if (unlimited) 0 else (draft.stockMilli ?: current.stockMilli),
+            quick = draft.quick,
+            unlimitedStock = unlimited,
+            kind = draft.kind,
+            category = draft.category?.trim()?.takeIf { it.isNotBlank() },
+            durationMinutes = draft.durationMinutes,
+            aliases = draft.aliases,
+        )
+        products = products.map { if (it.id == id) updated else it }
+        return updated
+    }
+
+    override suspend fun deleteCatalogItem(id: Int) {
+        ownerActor()
+        products.firstOrNull { it.id == id } ?: throw ApiFailure(404, "Ese artículo ya no está en el catálogo")
+        // Igual que el servidor: 409 si el artículo ya tiene ventas o movimientos.
+        val hasSales = saleLines.values.any { lines -> lines.any { it.productId == id } }
+        val hasMovements = lastUpdate.containsKey(id)
+        if (hasSales || hasMovements) {
+            throw ApiFailure(409, "No se puede borrar: tiene ventas o movimientos")
+        }
+        products = products.filterNot { it.id == id }
+    }
+
+    /**
+     * El demo SIMULA un negocio nuevo: reproduce el catálogo y las tareas fijas
+     * del tipo elegido, sin red. En API el servidor responde 409 si ya había
+     * catálogo y la app lo ignora.
+     */
+    override suspend fun applyTemplate(businessType: String) {
+        ownerActor()
+        val key = templateBusinessType(businessType)
+        val items = demoTemplateItems(key)
+        if (items.isEmpty()) throw ApiFailure(400, "No hay plantilla para ese tipo de negocio")
+        products = items.toMutableList()
+        nextProductId = (products.maxOfOrNull { it.id } ?: 0) + 1
+        dayTasks.clear()
+        demoTemplateTasks(key).forEachIndexed { index, task ->
+            dayTasks += DayTask(index + 1, task.key, task.title, assignedEmployeeId = null, active = true)
+        }
+        nextTaskId = dayTasks.size + 1
+    }
+
+    override suspend fun tasks(): List<DayTask> {
+        val actor = actor()
+        return if (actor != null && !actor.isOwner) {
+            dayTasks.filter { it.active && it.assignedEmployeeId == actor.id }
+        } else {
+            dayTasks.toList()
+        }
+    }
+
+    override suspend fun patchTask(
+        id: Int,
+        assignedEmployeeId: Int?,
+        clearAssignee: Boolean,
+        active: Boolean?,
+        title: String?,
+    ): DayTask {
+        ownerActor()
+        val current = dayTasks.firstOrNull { it.id == id } ?: throw ApiFailure(404, "Tarea desconocida")
+        val updated = current.copy(
+            title = title?.takeIf { it.isNotBlank() } ?: current.title,
+            assignedEmployeeId = when {
+                clearAssignee -> null
+                assignedEmployeeId != null -> assignedEmployeeId
+                else -> current.assignedEmployeeId
+            },
+            active = active ?: current.active,
+        )
+        dayTasks[dayTasks.indexOf(current)] = updated
+        return updated
+    }
+
+    override suspend fun expenses(limit: Int): List<Expense> {
+        ownerActor()
+        return expenses.sortedByDescending { it.createdAt }.take(limit.coerceIn(1, 500))
+    }
+
+    override suspend fun addExpense(amountCents: Long, note: String?): Expense {
+        require(amountCents > 0) { "Escribe un monto mayor a cero" }
+        val actor = actor()
+        val expense = Expense(
+            id = nextExpenseId++,
+            amountCents = amountCents,
+            note = note?.trim()?.takeIf { it.isNotBlank() },
+            createdAt = System.currentTimeMillis() / 1000.0,
+            employeeId = actor?.id,
+            employeeName = actor?.displayName ?: store.ownerName,
+        )
+        expenses += expense
+        return expense
+    }
+
+    override suspend fun expenseVoice(text: String): ExpenseDraft =
+        parseExpenseVoice(text) ?: ExpenseDraft(0, "No entendí el monto")
+
     override suspend fun report(): Report {
         val actor = actor()
         if (actor != null && !actor.isOwner) throw ApiFailure(403, "Solo el dueño ve reportes")
@@ -747,6 +1046,7 @@ class DemoRepository : ShopRepository {
             pending = sales.values.count { it.paymentMethod == PAYMENT_PEY && it.status == "pending" },
             fiadoOutstandingCents = customers.sumOf { it.balanceCents },
             demoMode = true,
+            totalExpensesCents = expenses.filter { isTodaySeconds(it.createdAt) }.sumOf { it.amountCents },
         )
     }
 
@@ -905,20 +1205,31 @@ class DemoRepository : ShopRepository {
     }
 }
 
-private fun demoSeed() = listOf(
-    Product(1, "Coca-Cola 600 ml", "pieza", 1800, 24000, 5000, true),
-    Product(2, "Sabritas sal 45 g", "pieza", 2200, 18000, 5000, true),
-    Product(3, "Pan Bimbo grande", "pieza", 4800, 6000, 5000, true),
-    Product(4, "Huevo (kg)", "kg", 4500, 10000, 5000, true),
-    Product(5, "Leche Lala 1 L", "pieza", 3100, 12000, 5000, true),
-    Product(6, "Agua Bonafont 1 L", "pieza", 1500, 20000, 5000, true),
-    Product(7, "Maruchan camarón", "pieza", 1600, 30000, 5000, true),
-    Product(8, "Gansito", "pieza", 1700, 15000, 5000, true),
-    Product(9, "Tortillas (kg)", "kg", 2600, 8000, 5000, false),
-    Product(10, "Jabón Zote", "pieza", 2300, 9000, 5000, false),
-    Product(11, "Galletas Marías", "pieza", 1900, 14000, 5000, false),
-    Product(12, "Fanta 600 ml", "pieza", 1700, 12000, 5000, false),
-)
+/** Tareas fijas del demo para probar «solo las asignadas» sin red. */
+private fun demoTaskSeed(): List<DayTask> {
+    val template = demoTemplateTasks("tiendita")
+    return listOf(
+        DayTask(1, template[0].key, template[0].title, assignedEmployeeId = 2, active = true),
+        DayTask(2, template[1].key, template[1].title, assignedEmployeeId = null, active = true),
+        DayTask(3, template[2].key, template[2].title, assignedEmployeeId = 3, active = true),
+        DayTask(4, template[3].key, template[3].title, assignedEmployeeId = 2, active = false),
+    )
+}
+
+private fun validateCatalogDraft(draft: CatalogDraft) {
+    require(draft.name.isNotBlank()) { "Escribe el nombre del artículo" }
+    require(draft.priceCents > 0) { "Escribe un precio mayor a cero" }
+    require(PRODUCT_UNITS.contains(draft.unit)) { "Unidad no válida" }
+    require(PRODUCT_KINDS.contains(draft.kind)) { "Tipo de artículo no válido" }
+}
+
+private fun isTodaySeconds(seconds: Double): Boolean {
+    if (seconds <= 0.0) return false
+    val then = java.util.Calendar.getInstance().apply { timeInMillis = (seconds * 1000).toLong() }
+    val now = java.util.Calendar.getInstance()
+    return then.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR) &&
+        then.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR)
+}
 
 internal fun recoverJournal(raw: String?, creating: Boolean): Pair<Sale?, Boolean> {
     if (raw == null) return null to creating

@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.sp
     dialog?.let { title ->
         AlertDialog(onDismissRequest = { dialog = null }, title = { Text(title) }, text = {
             Text(if (title == "Registro simulado")
-                "No se creó una cuenta ni una tienda. Abriremos la Tiendita de la Esquina con el perfil ficticio del dueño."
+                "No se creó una cuenta ni un negocio. Abriremos el negocio de ejemplo con el perfil ficticio del dueño."
             else "No conectamos con $title ni verificamos una identidad. Solo abriremos el perfil de ejemplo elegido.")
         }, confirmButton = { TextButton(onClick = { dialog = null; person?.let(enter) }, enabled = person != null && !state.busy) { Text("Continuar en simulación") } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Volver") } })
@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.sp
                     Icon(Icons.Outlined.Storefront, null, Modifier.padding(14.dp).size(34.dp), tint = MaterialTheme.colorScheme.primary)
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(if (register) "Tu tiendita empieza aquí" else "Tu tienda, contigo", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Text(if (register) "Tu negocio empieza aquí" else "Tu negocio, contigo", fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Text("Cobros, inventario y equipo", fontSize = 13.sp, color = Color(0xFF666680))
                 }
             }
@@ -69,12 +69,12 @@ import androidx.compose.ui.unit.sp
         }
         if (register) {
             item { MockField("Nombre del dueño", "Dueña de ejemplo", Icons.Outlined.Person) }
-            item { MockField("Nombre de tu tienda", "Tiendita de la Esquina", Icons.Outlined.Storefront) }
+            item { MockField("Nombre de tu negocio", "Mi negocio del barrio", Icons.Outlined.Storefront) }
         }
-        item { MockField("Correo de ejemplo", if (owner) "duena@tiendita.example" else "empleado@tiendita.example", Icons.Outlined.MailOutline) }
+        item { MockField("Correo de ejemplo", if (owner) "duena@negocio.example" else "empleado@negocio.example", Icons.Outlined.MailOutline) }
         item { MockField("Contraseña de ejemplo", "DEMO-SIN-CLAVE", Icons.Outlined.Lock, password = true) }
         if (!owner && !register) item {
-            MockField("Invitación de tu dueño", "TIENDITA-DEMO", Icons.Outlined.ConfirmationNumber)
+            MockField("Invitación de tu dueño", "INVITACION-DEMO", Icons.Outlined.ConfirmationNumber)
             Text(
                 "Código ficticio. En la app real la invitación llega por enlace o QR y eliges tu apodo al aceptarla.",
                 fontSize = 12.sp,
@@ -83,7 +83,7 @@ import androidx.compose.ui.unit.sp
         item {
             Button(onClick = { if (register) dialog = "Registro simulado" else person?.let(enter) },
                 enabled = person != null && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) {
-                Text(if (register) "Simular registro de mi tienda" else "Entrar en simulación", fontSize = 16.sp)
+                Text(if (register) "Simular registro de mi negocio" else "Entrar en simulación", fontSize = 16.sp)
             }
             Text(if (register) "No se guardan datos ni se crean cuentas. Después podrás explorar el ejemplo del dueño."
                 else "Este acceso no autentica. Solo abre la demostración sin conexión.", fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
@@ -101,13 +101,13 @@ import androidx.compose.ui.unit.sp
                 }
             }
             item {
-                TextButton(onClick = { owner = true; register = true }, modifier = Modifier.fillMaxWidth()) { Text("¿Tienes una tienda? Crear cuenta demo") }
+                TextButton(onClick = { owner = true; register = true }, modifier = Modifier.fillMaxWidth()) { Text("¿Tienes un negocio? Crear cuenta demo") }
             }
         } else item {
             Surface(color = Color(0xFFEADFFF), shape = RoundedCornerShape(18.dp)) {
                 Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Outlined.Group, null)
-                    Text("El dueño dará acceso a su equipo desde la app. Este registro solo muestra el recorrido; no crea una tienda ni invita empleados.", fontSize = 13.sp)
+                    Text("El dueño dará acceso a su equipo desde la app. Este registro solo muestra el recorrido; no crea un negocio ni invita empleados.", fontSize = 13.sp)
                 }
             }
         }

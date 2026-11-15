@@ -138,10 +138,10 @@ class MobileFlowTest {
         scrollTo("Entrar en simulación").performClick()
         compose.onNodeWithText("Hola, Lupita").assertIsDisplayed()
         compose.onNodeWithTag("tab-Inventario").performClick()
-        scrollTo("Stock: 24 pza").assertIsDisplayed()
+        scrollTo("24 unidades disponibles").assertIsDisplayed()
         screenshot("08-inventario")
         compose.onNodeWithContentDescription("Sumar una unidad de Coca-Cola 600 ml").performScrollTo().performClick()
-        scrollTo("Stock: 25 pza").assertIsDisplayed()
+        scrollTo("25 unidades disponibles").assertIsDisplayed()
     }
 
     @Test fun voiceAndBarcodeEntriesAreExposedWithoutCloudDependencies() {

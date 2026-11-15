@@ -13,17 +13,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PointOfSale
+import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,7 +46,7 @@ import androidx.compose.ui.unit.sp
 internal fun HomeScreen(s: ShopState, vm: ShopViewModel, openSettings: () -> Unit) {
     val employee = s.employee
     if (employee != null && !employee.isOwner) {
-        EmployeeHome(s, employee)
+        EmployeeHome(s, employee, vm)
         return
     }
     OwnerHome(s, vm, employee, openSettings)
@@ -56,14 +58,22 @@ private fun OwnerHome(s: ShopState, vm: ShopViewModel, employee: Employee?, open
     val lowStock = s.bootstrap?.products.orEmpty().filter { it.isLowStock }
     val pending = pendingInvites(s.team)
     val recent = recentAdjustments(s.inventory)
+    var expenseOpen by rememberSaveable { mutableStateOf(false) }
+    if (expenseOpen) {
+        RegisterExpenseDialog(
+            busy = s.busy,
+            draft = s.expenseDraft,
+            onVoice = vm::expenseVoice,
+            onDismiss = { expenseOpen = false; vm.clearExpenseDraft() },
+            onSave = { cents, note -> expenseOpen = false; vm.addExpense(cents, note) },
+        )
+    }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Hola, " + (employee?.name ?: "dueño"), color = Muted, fontSize = 13.sp)
-                    Title(
-                        employee?.nickname?.takeIf { it.isNotBlank() }?.let { "Hola, " + it } ?: "Tu tiendita",
-                    )
+                    Title(COPY_HOME_TITLE)
                 }
                 IconButton(
                     onClick = openSettings,
@@ -102,7 +112,7 @@ private fun OwnerHome(s: ShopState, vm: ShopViewModel, employee: Employee?, open
                     modifier = Modifier.weight(1f),
                 )
                 StatusCard(
-                    label = "Stock bajo",
+                    label = COPY_LOW_STOCK,
                     value = lowStock.size.toString(),
                     detail = "Productos por reponer",
                     tag = "card-stock",
@@ -122,12 +132,38 @@ private fun OwnerHome(s: ShopState, vm: ShopViewModel, employee: Employee?, open
         }
         item {
             Panel {
+                Text("Herramientas", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { vm.openCatalog() },
+                        enabled = !s.busy,
+                        modifier = Modifier.weight(1f).testTag("abrir-catalogo"),
+                    ) { Text("Catálogo") }
+                    OutlinedButton(
+                        onClick = { vm.openTasks() },
+                        enabled = !s.busy,
+                        modifier = Modifier.weight(1f).testTag("abrir-tareas"),
+                    ) { Text("Tareas del día") }
+                }
+                OutlinedButton(
+                    onClick = { expenseOpen = true },
+                    enabled = !s.busy,
+                    modifier = Modifier.fillMaxWidth().testTag("registrar-gasto"),
+                ) {
+                    Icon(Icons.Outlined.ReceiptLong, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Registrar gasto")
+                }
+            }
+        }
+        item {
+            Panel {
                 Text("Actividades", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 if (lowStock.isEmpty() && pending == 0 && recent.isEmpty()) {
                     MutedText("Sin novedades por ahora. Actualiza para ver los últimos movimientos.")
                 }
                 lowStock.take(3).forEach { product ->
-                    ActivityRow("Stock bajo", product.name + " · " + product.stockLabel)
+                    ActivityRow(COPY_LOW_STOCK, product.name + " · " + product.availableLabel)
                 }
                 if (pending > 0) {
                     ActivityRow(
@@ -179,12 +215,21 @@ private fun ActivityRow(title: String, detail: String) {
     }
 }
 
-/** Inicio del empleado: tareas sencillas y los permisos que tiene en esta tienda. */
+/** Inicio del empleado: SOLO sus tareas asignadas y los permisos de este negocio. */
 @Composable
-private fun EmployeeHome(s: ShopState, employee: Employee) {
-    var countInventory by rememberSaveable { mutableStateOf(false) }
-    var cleanStore by rememberSaveable { mutableStateOf(false) }
+private fun EmployeeHome(s: ShopState, employee: Employee, vm: ShopViewModel) {
+    var expenseOpen by rememberSaveable { mutableStateOf(false) }
     val lowStock = s.bootstrap?.products.orEmpty().filter { it.isLowStock }
+    val tasks = tasksFor(s.tasks, employee)
+    if (expenseOpen) {
+        RegisterExpenseDialog(
+            busy = s.busy,
+            draft = s.expenseDraft,
+            onVoice = vm::expenseVoice,
+            onDismiss = { expenseOpen = false; vm.clearExpenseDraft() },
+            onSave = { cents, note -> expenseOpen = false; vm.addExpense(cents, note) },
+        )
+    }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Text("Hola, " + employee.name, color = Muted, fontSize = 13.sp)
@@ -192,21 +237,40 @@ private fun EmployeeHome(s: ShopState, employee: Employee) {
         }
         item {
             Panel {
-                Text("Tareas de la tienda", fontWeight = FontWeight.Bold)
-                TaskRow("Contar inventario", countInventory, enabled = employee.canInventory) { countInventory = it }
-                TaskRow("Limpiar tienda", cleanStore) { cleanStore = it }
+                Text("Tareas del negocio", fontWeight = FontWeight.Bold)
+                if (tasks.isEmpty()) {
+                    MutedText("No tienes tareas asignadas para hoy. El dueño puede asignarte desde su teléfono.")
+                }
+                tasks.forEach { task ->
+                    Row(Modifier.fillMaxWidth().testTag("tarea-empleado-" + task.id), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.CheckCircle, null, Modifier.size(18.dp), tint = Green)
+                        Spacer(Modifier.width(10.dp))
+                        Text(task.title, Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = { expenseOpen = true },
+                enabled = !s.busy,
+                modifier = Modifier.fillMaxWidth().testTag("registrar-gasto"),
+            ) {
+                Icon(Icons.Outlined.ReceiptLong, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Registrar gasto")
             }
         }
         item {
             Panel {
-                Text("Stock bajo", fontWeight = FontWeight.Bold)
-                if (lowStock.isEmpty()) MutedText("Sin alertas de stock. Buen trabajo.")
+                Text(COPY_LOW_STOCK, fontWeight = FontWeight.Bold)
+                if (lowStock.isEmpty()) MutedText("Sin alertas de inventario. Buen trabajo.")
                 lowStock.take(6).forEach { product ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Inventory2, null, Modifier.size(18.dp), tint = Amber)
                         Spacer(Modifier.width(10.dp))
                         Text(product.name, Modifier.weight(1f), fontSize = 14.sp)
-                        Text(product.stockLabel, color = Amber, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(product.availableLabel, color = Amber, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 if (lowStock.isNotEmpty() && employee.canInventory) {
@@ -224,17 +288,6 @@ private fun EmployeeHome(s: ShopState, employee: Employee) {
                 InfoRow("Reportes", "Solo el dueño")
                 MutedText("Si necesitas otro permiso, pídeselo al dueño desde su teléfono.", 12)
             }
-        }
-    }
-}
-
-@Composable
-private fun TaskRow(label: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked, { onChange(it) }, enabled = enabled, modifier = Modifier.testTag("tarea-" + label))
-        Column(Modifier.weight(1f)) {
-            Text(label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            if (!enabled) Text("Tu perfil no tiene permiso de inventario", color = Muted, fontSize = 11.sp)
         }
     }
 }

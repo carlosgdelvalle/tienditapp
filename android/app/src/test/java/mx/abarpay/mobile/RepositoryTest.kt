@@ -502,7 +502,7 @@ class RepositoryTest {
         assertTrue(demo.employees().any { it.name == "Juan" && !it.active })
         val info = demo.inviteInfo(invite.token)
         assertEquals("Juan", info.name)
-        assertEquals("Tiendita de la Esquina", info.storeName)
+        assertEquals("Mi negocio", info.storeName)
         assertFalse(info.canFiado)
         assertTrue(info.canInventory)
         val accepted = demo.acceptInvite(invite.token, "Juancho")

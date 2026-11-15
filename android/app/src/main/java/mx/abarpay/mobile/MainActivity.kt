@@ -112,12 +112,14 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
     }
 
     BackHandler(
-        enabled = settings || s.teamOpen || s.inviteToken != null || s.customerDetail != null ||
-            s.sale != null || s.uncertain || s.tab != TAB_HOME,
+        enabled = settings || s.teamOpen || s.catalogOpen || s.tasksOpen || s.inviteToken != null ||
+            s.customerDetail != null || s.sale != null || s.uncertain || s.tab != TAB_HOME,
     ) {
         when {
             s.inviteToken != null -> vm.dismissInvite()
             settings -> settings = false
+            s.catalogOpen -> vm.closeCatalog()
+            s.tasksOpen -> vm.closeTasks()
             s.teamOpen -> vm.closeTeam()
             s.customerDetail != null -> vm.closeCustomer()
             s.sale != null || s.uncertain ->
@@ -131,7 +133,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
         bottomBar = {
             val tabs = tabsFor(s.employee)
             val showTabs = !settings && s.employee != null && s.sale == null && !s.uncertain &&
-                !s.teamOpen && s.inviteToken == null
+                !s.teamOpen && !s.catalogOpen && !s.tasksOpen && s.inviteToken == null
             if (showTabs) {
                 NavigationBar(containerColor = Color.White) {
                     tabs.forEach { label ->
@@ -171,6 +173,8 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                     !s.busy && (s.uncertain || (!s.simulated && s.server.isBlank())) -> UncertainScreen(s.sale?.id)
                     s.sale != null -> SaleScreen(s, vm)
                     s.bootstrap == null -> ConnectingScreen(s, vm) { settings = true }
+                    s.catalogOpen -> CatalogScreen(s, vm)
+                    s.tasksOpen -> TasksScreen(s, vm)
                     s.teamOpen -> TeamScreen(s, vm)
                     s.employee == null && !s.onboarded -> OnboardingScreen(s, vm)
                     s.employee == null && s.simulated -> AccessMockups(s, vm::select)

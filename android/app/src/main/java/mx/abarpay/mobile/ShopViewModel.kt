@@ -45,6 +45,13 @@ data class ShopState(
     val inventory: InventorySnapshot? = null,
     val supportTicket: SupportTicket? = null,
     val linkedEmployeeId: Int? = null,
+    // Contrato v3 · generalización a negocios pequeños.
+    val ownerSells: List<String> = emptyList(),
+    val catalog: CatalogPage? = null,
+    val catalogOpen: Boolean = false,
+    val tasks: List<DayTask>? = null,
+    val tasksOpen: Boolean = false,
+    val expenseDraft: ExpenseDraft? = null,
 )
 
 class ShopViewModel(app: Application) : AndroidViewModel(app) {
@@ -67,9 +74,13 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         val linked = ownerPrefs.getInt("employee_id", 0).takeIf { it > 0 }
         val goals = ownerPrefs.getString("owner_goals", "").orEmpty()
             .split("|").map { it.trim() }.filter { it.isNotBlank() }
+        // «¿Qué vendes?» del onboarding v3: solo se guarda en este teléfono.
+        val sells = ownerPrefs.getString("owner_sells", "").orEmpty()
+            .split("|").map { it.trim() }.filter { it.isNotBlank() }
         val identity = ShopState(
             onboarded = onboarded || linked != null,
             ownerGoals = goals,
+            ownerSells = sells,
             linkedEmployeeId = linked,
         )
         val server = if (BuildConfig.DEBUG) prefs.getString("server", "").orEmpty() else BuildConfig.DEMO_SERVER
@@ -135,6 +146,8 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         val profile = if (isOwner) runCatching { repo.profile() }.getOrNull() else null
         val team = if (isOwner) runCatching { repo.employees() }.getOrNull() else null
         val inventory = if (canUseInventory(employee)) runCatching { repo.inventory() }.getOrNull() else null
+        // Tareas del día: el servidor solo manda las asignadas cuando hay X-Employee-Id.
+        val tasks = runCatching { repo.tasks() }.getOrNull()
         state.update {
             it.copy(
                 bootstrap = bootstrap,
@@ -145,6 +158,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 profile = if (isOwner) profile ?: it.profile else null,
                 team = if (isOwner) team ?: it.team else null,
                 inventory = if (canUseInventory(employee)) inventory ?: it.inventory else null,
+                tasks = if (isOwner || employee != null) tasks ?: it.tasks else it.tasks,
                 tab = if (employee != null && !canUseTabs(employee, it.tab)) TAB_HOME else it.tab,
             )
         }
@@ -156,6 +170,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         val report = if (canUseReports(employee)) runCatching { repo.report() }.getOrNull() else null
         val customers = runCatching { repo.customers() }.getOrNull()
         val inventory = if (canUseInventory(employee)) runCatching { repo.inventory() }.getOrNull() else null
+        val tasks = runCatching { repo.tasks() }.getOrNull()
         state.update {
             val fresh = bootstrap?.let { b -> employee?.let { e -> b.employees.firstOrNull { it.id == e.id } ?: e } }
             val actor = fresh ?: it.employee
@@ -165,6 +180,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 report = if (canUseReports(actor)) report ?: it.report else null,
                 customers = customers ?: it.customers,
                 inventory = if (canUseInventory(actor)) inventory ?: it.inventory else null,
+                tasks = tasks ?: it.tasks,
             )
         }
     }
@@ -178,8 +194,10 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         server = server,
         onboarded = state.value.onboarded,
         ownerGoals = state.value.ownerGoals,
+        ownerSells = state.value.ownerSells,
         linkedEmployeeId = state.value.linkedEmployeeId,
         profile = state.value.profile,
+        tasks = state.value.tasks,
     )
 
     fun connect(server: String) = work {
@@ -223,7 +241,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         state.update {
             it.copy(
                 employee = employee, tab = TAB_HOME, message = null, customerDetail = null,
-                teamOpen = false, invite = null,
+                teamOpen = false, invite = null, catalogOpen = false, tasksOpen = false,
             )
         }
         refresh()
@@ -234,7 +252,10 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         if (!current.simulated || current.busy || current.sale != null || current.uncertain || current.cart.isNotEmpty()) return
         repo.actAs(null)
         state.update {
-            it.copy(employee = null, tab = TAB_HOME, message = null, customer = null, customerDetail = null)
+            it.copy(
+                employee = null, tab = TAB_HOME, message = null, customer = null, customerDetail = null,
+                catalogOpen = false, tasksOpen = false,
+            )
         }
     }
 
@@ -248,25 +269,36 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         storeName: String,
         businessType: String,
         photo: Bitmap?,
+        sells: List<String> = emptyList(),
     ) = work {
-        check(onboardingReady(ownerName, storeName, businessType)) { "Completa el nombre del dueño, la tienda y el tipo de negocio" }
+        check(onboardingReady(ownerName, storeName, businessType)) {
+            "Completa el nombre del dueño, el negocio y el tipo de negocio"
+        }
         val updated = repo.updateProfile(
             name = storeName.trim(),
             businessType = businessType,
             ownerName = ownerName.trim(),
         )
+        var notice: String? = null
         if (photo != null) {
             val dataUrl = withContext(Dispatchers.Default) { storePhotoDataUrl(photo) }
             runCatching { repo.uploadPhoto(dataUrl) }.onFailure { failure ->
-                state.update {
-                    it.copy(message = "Tu tienda quedó guardada. La foto no se pudo subir: " + (failure.message ?: ""))
-                }
+                notice = "Tu negocio quedó guardado. La foto no se pudo subir: " + (failure.message ?: "")
+            }
+        }
+        // v3: la plantilla del tipo de negocio solo aplica si la tienda aún no tenía
+        // catálogo. Un 409 significa justo eso: se ignora y se conserva el catálogo.
+        runCatching { repo.applyTemplate(templateBusinessType(businessType)) }.onFailure { failure ->
+            if (!(failure is ApiFailure && failure.code == 409)) {
+                notice = notice ?: ("Tu negocio quedó guardado. La plantilla no se pudo aplicar: " +
+                    (failure.message ?: "revisa la conexión"))
             }
         }
         check(
             ownerPrefs.edit()
                 .putBoolean("onboarded_owner", true)
                 .putString("owner_goals", goals.joinToString("|"))
+                .putString("owner_sells", sells.joinToString("|"))
                 .commit()
         ) { "No se pudo guardar el onboarding en este teléfono" }
         // En API el onboarding enlaza al dueño con este teléfono; no vuelve a preguntar «¿Quién cobra hoy?».
@@ -279,9 +311,11 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 onboarded = true,
                 ownerGoals = goals,
+                ownerSells = sells,
                 linkedEmployeeId = owner?.id ?: it.linkedEmployeeId,
                 employee = owner ?: it.employee,
                 profile = updated,
+                message = notice ?: it.message,
                 bootstrap = it.bootstrap?.copy(
                     store = it.bootstrap.store.copy(
                         name = updated.name,
@@ -292,6 +326,109 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         loadAll()
+    }
+
+    // -----------------------------------------------------------------------
+    // Catálogo del dueño (contrato v3 · pantalla desde Inicio, no una pestaña)
+    // -----------------------------------------------------------------------
+
+    fun openCatalog() = work {
+        check(state.value.employee?.isOwner != false) { "Solo el dueño edita el catálogo" }
+        val page = repo.catalog(limit = 500)
+        state.update { it.copy(catalog = page, catalogOpen = true, message = null) }
+    }
+
+    fun closeCatalog() {
+        state.update { it.copy(catalogOpen = false, message = null) }
+    }
+
+    fun saveCatalogItem(id: Int?, draft: CatalogDraft) = work {
+        check(catalogDraftReady(draft)) { "Escribe el nombre y un precio mayor a cero" }
+        val saved = if (id == null) repo.createCatalogItem(draft) else repo.updateCatalogItem(id, draft)
+        state.update { s ->
+            val current = s.catalog?.items.orEmpty()
+            val next = if (current.any { it.id == saved.id }) {
+                current.map { if (it.id == saved.id) saved else it }
+            } else current + saved
+            s.copy(
+                catalog = CatalogPage(sortedCatalog(next), maxOf(next.size, s.catalog?.total ?: next.size)),
+                message = if (id == null) "Agregado al catálogo: " + saved.name
+                else "Catálogo actualizado: " + saved.name,
+            )
+        }
+        runCatching { repo.catalog(limit = 500) }.getOrNull()?.let { page ->
+            state.update { it.copy(catalog = page) }
+        }
+        loadSummary()
+    }
+
+    fun deleteCatalogItem(id: Int) = work {
+        repo.deleteCatalogItem(id)
+        state.update { s ->
+            val remaining = s.catalog?.items.orEmpty().filterNot { it.id == id }
+            s.copy(
+                catalog = CatalogPage(sortedCatalog(remaining), maxOf(0, (s.catalog?.total ?: remaining.size) - 1)),
+                message = "Artículo borrado del catálogo.",
+            )
+        }
+        runCatching { repo.catalog(limit = 500) }.getOrNull()?.let { page ->
+            state.update { it.copy(catalog = page) }
+        }
+        loadSummary()
+    }
+
+    // -----------------------------------------------------------------------
+    // Tareas del día (dueño asigna; el empleado solo ve las suyas)
+    // -----------------------------------------------------------------------
+
+    fun openTasks() = work {
+        check(state.value.employee?.isOwner != false) { "Solo el dueño asigna tareas" }
+        val tasks = repo.tasks()
+        state.update { it.copy(tasks = tasks, tasksOpen = true, message = null) }
+    }
+
+    fun closeTasks() {
+        state.update { it.copy(tasksOpen = false, message = null) }
+    }
+
+    fun assignTask(id: Int, employeeId: Int?) = work {
+        val updated = repo.patchTask(id, assignedEmployeeId = employeeId, clearAssignee = employeeId == null)
+        state.update { s -> s.copy(tasks = s.tasks?.map { if (it.id == updated.id) updated else it }) }
+    }
+
+    fun setTaskActive(id: Int, active: Boolean) = work {
+        val updated = repo.patchTask(id, active = active)
+        state.update { s -> s.copy(tasks = s.tasks?.map { if (it.id == updated.id) updated else it }) }
+    }
+
+    // -----------------------------------------------------------------------
+    // Gastos (dueño y empleado; dictado opcional)
+    // -----------------------------------------------------------------------
+
+    fun expenseVoice(text: String) = work {
+        check(text.isNotBlank()) { "No escuchamos nada. Intenta de nuevo." }
+        val draft = try {
+            repo.expenseVoice(text.trim())
+        } catch (e: ApiFailure) {
+            if (e.code == 400 || e.code == 422) ExpenseDraft(0, "No entendí el monto. Escríbelo a mano.")
+            else throw e
+        }
+        if (draft.amountCents <= 0) {
+            message(draft.note ?: "No entendí el monto. Escríbelo a mano.")
+        } else {
+            state.update { it.copy(expenseDraft = draft, message = expenseVoiceMessage(draft)) }
+        }
+    }
+
+    fun clearExpenseDraft() {
+        state.update { it.copy(expenseDraft = null) }
+    }
+
+    fun addExpense(amountCents: Long, note: String?) = work {
+        check(amountCents > 0) { "Escribe un monto mayor a cero" }
+        val expense = repo.addExpense(amountCents, note?.trim()?.takeIf { it.isNotBlank() })
+        state.update { it.copy(expenseDraft = null, message = expenseRegisteredMessage(expense.amountCents, expense.note)) }
+        loadSummary()
     }
 
     // -----------------------------------------------------------------------
@@ -472,7 +609,9 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             message("Tu perfil no tiene acceso a la pestaña " + value + ".")
             return
         }
-        state.update { it.copy(tab = value, message = null, teamOpen = false) }
+        state.update {
+            it.copy(tab = value, message = null, teamOpen = false, catalogOpen = false, tasksOpen = false)
+        }
         refresh()
     }
 

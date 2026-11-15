@@ -33,7 +33,7 @@ class InviteCustomSchemeUiTest {
             }
             val prefs = ownerPrefs!!
             compose.waitUntil(15_000) { compose.onAllNodesWithText("Ponle tu apodo").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText("Tiendita de la Esquina").assertExists()
+            compose.onNodeWithText("Mi negocio").assertExists()
             compose.onNodeWithTag("invite-nickname").performTextInput("Fer")
             compose.onNodeWithTag("aceptar-invitacion").performClick()
             compose.waitUntil(15_000) { prefs.getInt("employee_id", 0) == 4 }
