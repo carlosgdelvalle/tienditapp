@@ -91,3 +91,14 @@ Header opcional `X-Employee-Id` (int). Regla: si el header viene, el servidor lo
 ## Reglas de casa (AGENTS)
 
 Nada de credenciales en chats/commits. Sin pagos reales (solo FakePey SIMULADO). Etiquetas y textos en español. No editar bases de producción; las pruebas usan bases temporales.
+
+## Tickets de soporte (cobros no confirmados) · 15-nov
+
+Decisión: los pendientes/por conciliar ya no son una alarma en el teléfono; son un rastro de eventos en la consola. Si un cobro queda en el limbo, la persona en la tienda crea un ticket en nuestra propia base (sin email/WhatsApp).
+
+- Tabla `support_tickets (id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES stores(id), sale_id TEXT REFERENCES sales(id), note TEXT, status TEXT NOT NULL CHECK(status IN ('open','resolved')), created_at REAL NOT NULL, resolved_at REAL)`.
+- `POST /api/support/tickets` body `{saleId?, note?}`: crea ticket `tkt_<hex>` con contexto automático (estado, totalCents, chargedCents, peyTxId de la venta y nombre del empleado que reporta desde el header `X-Employee-Id`). Sin `saleId` la nota es obligatoria. Si ya hay un ticket abierto para esa venta, devuelve el mismo ticket con `alreadyOpen:true` (200). Responde `{id, saleId, saleStatus, saleTotalCents, chargedCents, peyTxId, note, status, createdAt, reportedByName, alreadyOpen}`.
+- `GET /api/support/tickets?status=open|resolved|all` (owner): `{items:[...]}` ordenado por created_at desc.
+- `PATCH /api/support/tickets/{id}` (owner) body `{status?, note?}`: actualiza; al resolver pone `resolved_at`.
+- Android: la tarjeta «Pendientes» del Inicio del dueño se reemplaza por «Cobrado hoy» (collectedCents). En la pantalla de venta PEY `por_conciliar` (no asentada) aparece el botón «Reportar problema» → diálogo con nota opcional → `POST /api/support/tickets` → mensaje «Ticket #… creado» o «Ya existe el ticket #…». Expired/canceled quedan como estados normales sin acción.
+- Consola: sección «Tickets de soporte» (tabla con ticket, venta, estado, reportado por, nota, fecha; botones Resolver/Reabrir vía PATCH) y tabla «Eventos PEY» con las ventas PEY recientes de cualquier estado (folio, estado, monto, hora) como rastro de eventos, resaltando pendientes/por_conciliar.
