@@ -6,8 +6,8 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,8 +33,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
@@ -46,8 +46,13 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
     var customerOpen by rememberSaveable { mutableStateOf(false) }
     var quantityProductId by rememberSaveable { mutableStateOf<Int?>(null) }
     var paySheetOpen by rememberSaveable { mutableStateOf(false) }
+    var cartSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var category by rememberSaveable { mutableStateOf<String?>(null) }
+    var undo by remember { mutableStateOf<UndoAdd?>(null) }
+    var flash by remember { mutableStateOf<FlashAdd?>(null) }
+    var undoToken by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
+    val feedback = rememberCartFeedback()
 
     val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -71,17 +76,83 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
     }
 
     LaunchedEffect(s.cart.isEmpty()) {
-        if (s.cart.isEmpty()) cashInput = ""
+        if (s.cart.isEmpty()) {
+            cashInput = ""
+            undo = null
+            flash = null
+        }
+    }
+    // El aviso «Deshacer» vive ~4 s: quita la última unidad agregada.
+    LaunchedEffect(undo) {
+        val pending = undo ?: return@LaunchedEffect
+        delay(4_000)
+        if (undo == pending) undo = null
+    }
+    // La fila recién agregada parpadea con el acento ~800 ms.
+    LaunchedEffect(flash) {
+        if (flash == null) return@LaunchedEffect
+        delay(800)
+        flash = null
     }
 
     val products = s.bootstrap?.products.orEmpty()
-    val visible = products.filter {
+    val matched = products.filter {
         (search.isBlank() || it.name.contains(search, ignoreCase = true)) && (!quickOnly || it.quick)
     }
+    val categories = products.map { productCategory(it) }.distinct().sortedBy { it.lowercase() }
+    val visible = matched.filter { category == null || productCategory(it) == category }
+    // Rápidos primero; el resto, agrupado por categoría con encabezados pegajosos.
+    val quickVisible = visible.filter { it.quick }
+    val byCategory = visible.filterNot { it.quick }
+        .groupBy { productCategory(it) }
+        .toSortedMap(compareBy<String> { if (it == "Otro") 1 else 0 }.thenBy { it.lowercase() })
     val total = runCatching { cartEstimate(s.cart, products) }.getOrDefault(0)
     val itemCount = s.cart.sumOf { maxOf(1, it.qtyMilli / 1000) }
-    val canPay = s.cart.isNotEmpty() && !s.busy && s.sale == null &&
-        (s.paymentMethod != PAYMENT_FIADO || s.customer != null)
+    val cartLines = s.cart.mapNotNull { line ->
+        products.firstOrNull { it.id == line.productId }?.let { product -> product to line }
+    }
+
+    fun showAdded(product: Product, deltaMilli: Int) {
+        if (deltaMilli <= 0) return
+        undoToken += 1
+        undo = UndoAdd(product.id, deltaMilli, undoToken)
+        flash = FlashAdd(product.id, undoToken)
+    }
+
+    fun addProduct(product: Product) {
+        feedback.added()
+        val delta = quantityStep(product.unit)
+        vm.quantity(product.id, delta)
+        showAdded(product, delta)
+    }
+
+    fun removeProduct(product: Product, qtyMilli: Int) {
+        feedback.removed()
+        undo = null
+        vm.quantity(product.id, decrementStep(qtyMilli, quantityStep(product.unit)))
+    }
+
+    fun setProductQty(product: Product, currentMilli: Int, targetMilli: Int) {
+        val delta = targetMilli - currentMilli
+        if (delta == 0) return
+        if (delta > 0) feedback.added() else feedback.removed()
+        vm.quantity(product.id, delta)
+        if (delta > 0) showAdded(product, delta)
+    }
+
+    val catalogRow: @Composable (Product) -> Unit = { product ->
+        val qty = s.cart.find { it.productId == product.id }?.qtyMilli ?: 0
+        CatalogProductRow(
+            product = product,
+            qtyMilli = qty,
+            flashing = flash?.productId == product.id,
+            busy = s.busy,
+            onAdd = { addProduct(product) },
+            onRemove = { removeProduct(product, qty) },
+            onOpenQuantity = { quantityProductId = product.id },
+            onSetPreset = { target -> setProductQty(product, qty, target) },
+        )
+    }
 
     if (customerOpen) {
         AddCustomerDialog(
@@ -108,7 +179,7 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                 product = product,
                 currentMilli = current,
                 onDismiss = { quantityProductId = null },
-                onSet = { target -> vm.quantity(product.id, target - current) },
+                onSet = { target -> setProductQty(product, current, target) },
             )
         }
     }
@@ -120,189 +191,170 @@ internal fun CheckoutScreen(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-        item { Title("Cobrar") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
-                    onClick = scan,
-                    enabled = !s.busy,
-                    modifier = Modifier.weight(1f).heightIn(min = 64.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Icon(Icons.Outlined.QrCodeScanner, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Escanear código")
-                }
-                OutlinedButton(
-                    onClick = { dictate() },
-                    enabled = !s.busy,
-                    modifier = Modifier.weight(1f).heightIn(min = 64.dp),
-                ) {
-                    Icon(Icons.Outlined.Mic, "Dictar venta")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Dictar")
-                }
-            }
-        }
-        item { MutedText("Escanea o dicta la venta. El teclado es opcional; los precios y el total los pone el servidor.") }
-        item {
-            TextButton(
-                onClick = { textOpen = !textOpen },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Outlined.Keyboard, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(if (textOpen) "Ocultar venta por texto" else "Escribir venta o código")
-            }
-        }
-        if (textOpen) {
+            item { Title("Cobrar") }
             item {
-                OutlinedTextField(
-                    text, { text = it },
-                    Modifier.fillMaxWidth(),
-                    label = { Text("Escribe la venta") },
-                    placeholder = { Text("Ej. dos cocas y medio kilo de tortillas") },
-                    enabled = !s.busy,
-                    shape = RoundedCornerShape(16.dp),
-                )
-            }
-            item {
-                Button(
-                    onClick = { vm.parse(text) },
-                    enabled = text.isNotBlank() && !s.busy,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) { Text("Agregar desde texto") }
-            }
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        code, { code = it },
-                        Modifier.weight(1f),
-                        label = { Text("O escribe el código") },
-                        singleLine = true,
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = scan,
                         enabled = !s.busy,
-                    )
-                    TextButton(onClick = { vm.lookup(code) }, enabled = code.isNotBlank() && !s.busy) {
-                        Text("Buscar")
-                    }
-                }
-            }
-        }
-        item { SectionLabel("Catálogo") }
-        item {
-            OutlinedTextField(
-                search, { search = it },
-                Modifier.fillMaxWidth(),
-                placeholder = { Text("Buscar producto") },
-                leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-            )
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = quickOnly,
-                    onClick = { quickOnly = !quickOnly },
-                    label = { Text("Rápidos") },
-                    leadingIcon = if (quickOnly) {
-                        { Icon(Icons.Outlined.Check, null, Modifier.size(16.dp)) }
-                    } else null,
-                )
-                Text("Los más vendidos del negocio", color = Muted, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterVertically))
-            }
-        }
-        if (visible.isEmpty()) item { Text("No encontramos productos con ese nombre.") }
-        items(visible, key = { "product-${it.id}" }) { product ->
-            val qty = s.cart.find { it.productId == product.id }?.qtyMilli ?: 0
-            Panel {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(product.name, fontWeight = FontWeight.SemiBold)
-                        Text("${money(product.priceCents)} · " + qtyText(1000, product.unit), color = Muted, fontSize = 12.sp)
-                        Text(
-                            product.availableLabel + if (product.isLowStock) " · " + COPY_LOW_STOCK else "",
-                            color = if (product.isLowStock) Amber else Muted,
-                            fontSize = 11.sp,
-                        )
-                    }
-                    IconButton(
-                        onClick = { vm.quantity(product.id, decrementStep(qty, quantityStep(product.unit))) },
-                        enabled = qty > 0 && !s.busy,
-                    ) { Icon(Icons.Outlined.Remove, "Quitar ${product.name}") }
-                    Text(
-                        qtyText(qty, product.unit),
-                        Modifier.widthIn(min = 44.dp).clickable { quantityProductId = product.id },
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                    )
-                    IconButton(
-                        onClick = { vm.quantity(product.id, quantityStep(product.unit)) },
-                        enabled = !s.busy,
-                    ) { Icon(Icons.Outlined.Add, "Agregar ${product.name}") }
-                }
-                quantityPresets(product.unit)?.let { presets ->
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 64.dp),
+                        shape = RoundedCornerShape(16.dp),
                     ) {
-                        presets.forEach { target ->
-                            OutlinedButton(
-                                onClick = { vm.quantity(product.id, target - qty) },
-                                enabled = !s.busy && target != qty,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                modifier = Modifier.testTag("preset-" + product.id + "-" + target),
-                            ) { Text(quantityPresetLabel(target, product.unit)) }
+                        Icon(Icons.Outlined.QrCodeScanner, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Escanear código")
+                    }
+                    OutlinedButton(
+                        onClick = { dictate() },
+                        enabled = !s.busy,
+                        modifier = Modifier.weight(1f).heightIn(min = 64.dp),
+                    ) {
+                        Icon(Icons.Outlined.Mic, "Dictar venta")
+                        Spacer(Modifier.width(6.dp))
+                        Text("Dictar")
+                    }
+                }
+            }
+            item { MutedText("Escanea o dicta la venta. El teclado es opcional; los precios y el total los pone el servidor.") }
+            item {
+                TextButton(
+                    onClick = { textOpen = !textOpen },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Outlined.Keyboard, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (textOpen) "Ocultar venta por texto" else "Escribir venta o código")
+                }
+            }
+            if (textOpen) {
+                item {
+                    OutlinedTextField(
+                        text, { text = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Escribe la venta") },
+                        placeholder = { Text("Ej. dos cocas y medio kilo de tortillas") },
+                        enabled = !s.busy,
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                }
+                item {
+                    Button(
+                        onClick = { vm.parse(text) },
+                        enabled = text.isNotBlank() && !s.busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) { Text("Agregar desde texto") }
+                }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            code, { code = it },
+                            Modifier.weight(1f),
+                            label = { Text("O escribe el código") },
+                            singleLine = true,
+                            enabled = !s.busy,
+                        )
+                        TextButton(onClick = { vm.lookup(code) }, enabled = code.isNotBlank() && !s.busy) {
+                            Text("Buscar")
                         }
                     }
                 }
             }
-        }
-        item { SectionLabel("Carrito") }
-        if (s.cart.isEmpty()) {
-            item { Text("El carrito está vacío. Agrega productos por texto, voz o código.") }
-        }
-        items(s.cart, key = { "cart-${it.productId}" }) { line ->
-            val product = products.firstOrNull { it.id == line.productId } ?: return@items
-            Panel {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(product.name, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "${qtyText(line.qtyMilli, product.unit)} × ${money(product.priceCents)}",
-                            color = Muted,
-                            fontSize = 12.sp,
+            item { SectionLabel("Catálogo") }
+            item {
+                OutlinedTextField(
+                    search, { search = it },
+                    Modifier.fillMaxWidth(),
+                    placeholder = { Text("Buscar producto") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp),
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = quickOnly,
+                        onClick = { quickOnly = !quickOnly },
+                        label = { Text("Rápidos") },
+                        leadingIcon = if (quickOnly) {
+                            { Icon(Icons.Outlined.Check, null, Modifier.size(16.dp)) }
+                        } else null,
+                    )
+                    Text("Los más vendidos del negocio", color = Muted, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                }
+            }
+            item {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = category == null,
+                        onClick = { category = null },
+                        label = { Text("Todas") },
+                        modifier = Modifier.testTag("cat-Todas"),
+                    )
+                    categories.forEach { name ->
+                        FilterChip(
+                            selected = category == name,
+                            onClick = { category = if (category == name) null else name },
+                            label = { Text(categoryEmoji(name) + " " + name) },
+                            modifier = Modifier.testTag("cat-" + name),
                         )
                     }
-                    Text(
-                        money(lineTotalCents(product.priceCents, line.qtyMilli)),
-                        fontWeight = FontWeight.Bold,
-                    )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = { vm.quantity(product.id, decrementStep(line.qtyMilli, quantityStep(product.unit))) },
-                        enabled = !s.busy,
-                    ) { Icon(Icons.Outlined.RemoveCircleOutline, "Quitar una unidad de ${product.name}") }
-                    Text(
-                        qtyText(line.qtyMilli, product.unit),
-                        modifier = Modifier.weight(1f).clickable { quantityProductId = product.id },
-                        textAlign = TextAlign.Center,
-                    )
-                    IconButton(
-                        onClick = { vm.quantity(product.id, quantityStep(product.unit)) },
-                        enabled = !s.busy,
-                    ) { Icon(Icons.Outlined.AddCircleOutline, "Agregar una unidad de ${product.name}") }
+            }
+            if (visible.isEmpty()) {
+                item { Text("No encontramos productos con ese nombre.") }
+            } else {
+                if (quickVisible.isNotEmpty()) {
+                    stickyHeader(key = "seccion-Rápidos") { CatalogSectionHeader("Rápidos", "⚡") }
+                    items(quickVisible, key = { "product-" + it.id }) { product -> catalogRow(product) }
+                }
+                if (!quickOnly) {
+                    byCategory.forEach { (name, group) ->
+                        stickyHeader(key = "seccion-" + name) { CatalogSectionHeader(name, categoryEmoji(name)) }
+                        items(group, key = { "product-" + it.id }) { product -> catalogRow(product) }
+                    }
                 }
             }
         }
+        undo?.let { pending ->
+            UndoAddBar(
+                productName = products.firstOrNull { it.id == pending.productId }?.name,
+                onUndo = {
+                    val current = s.cart.find { it.productId == pending.productId }?.qtyMilli ?: 0
+                    undo = null
+                    if (current > 0) {
+                        feedback.removed()
+                        vm.quantity(pending.productId, -minOf(current, pending.deltaMilli))
+                    }
+                },
+            )
         }
         CartActionBar(
-            count = itemCount,
+            itemCount = itemCount,
             total = total,
+            onVerCarrito = { if (s.cart.isNotEmpty()) cartSheetOpen = true },
             onCobrar = { if (s.cart.isNotEmpty()) paySheetOpen = true },
+        )
+    }
+    if (cartSheetOpen) {
+        CartSheet(
+            lines = cartLines,
+            itemCount = itemCount,
+            total = total,
+            busy = s.busy,
+            onDismiss = { cartSheetOpen = false },
+            onDelta = { product, delta ->
+                if (delta > 0) feedback.added() else feedback.removed()
+                vm.quantity(product.id, delta)
+            },
+            onRemoveLine = { product, qty ->
+                feedback.removed()
+                vm.quantity(product.id, -qty)
+            },
         )
     }
     if (paySheetOpen) {
@@ -464,28 +516,6 @@ private fun PaymentSheet(
                     fontSize = 17.sp,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CartActionBar(count: Int, total: Long, onCobrar: () -> Unit) {
-    Surface(tonalElevation = 6.dp) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(if (count == 1) "1 producto" else "$count productos", color = Muted, fontSize = 12.sp)
-                Text(money(total), fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            }
-            Button(
-                onClick = onCobrar,
-                enabled = count > 0,
-                modifier = Modifier.heightIn(min = 52.dp).testTag("abrir-pago"),
-                shape = RoundedCornerShape(16.dp),
-            ) { Text("Cobrar") }
         }
     }
 }

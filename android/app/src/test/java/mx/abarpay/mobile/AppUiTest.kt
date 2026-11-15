@@ -5,9 +5,11 @@ import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.ViewModelProvider
 import org.junit.Rule
@@ -57,6 +59,29 @@ abstract class AppUiTest {
     protected fun scrollToTag(tag: String): SemanticsNodeInteraction {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag(tag))
         return compose.onNodeWithTag(tag)
+    }
+
+    /** Abre Cobrar con el catálogo listo y la primera fila del catálogo compuesta. */
+    protected fun openCheckout() {
+        loginOwner()
+        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.waitUntil(15_000) { model().ui.value.tab == TAB_SELL && !model().ui.value.busy }
+        compose.onNode(hasScrollToIndexAction()).performScrollToKey("product-1")
+    }
+
+    /** Toca el botón grande «+» de una fila del catálogo (por defecto Coca-Cola). */
+    protected fun addProduct(name: String = "Coca-Cola 600 ml", times: Int = 1) {
+        repeat(times) { compose.onNodeWithContentDescription("Agregar $name").performClick() }
+    }
+
+    /** Captura del entorno Robolectric para revisar el diseño como evidencia. */
+    protected fun capture(name: String) {
+        val decor = compose.activity.window.decorView
+        val bitmap = android.graphics.Bitmap.createBitmap(decor.width, decor.height, android.graphics.Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { decor.draw(android.graphics.Canvas(bitmap)) }
+        val file = java.io.File("build/qa-screenshots/$name.png")
+        checkNotNull(file.parentFile).mkdirs()
+        file.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) }
     }
 
     protected fun loginOwner() {
