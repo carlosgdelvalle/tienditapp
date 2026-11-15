@@ -196,6 +196,109 @@
       box-shadow: 0 16px 34px rgba(20, 33, 29, 0.24);
     }
     .footer { margin-top: 22px; color: #8b9892; font-size: 11.5px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .store-header {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin: 0 0 18px;
+      padding: 16px 20px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--card);
+      box-shadow: 0 9px 28px rgba(20, 33, 29, 0.04);
+    }
+    .store-photo-wrap {
+      flex: 0 0 auto;
+      width: 78px;
+      height: 78px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #f3f0e8;
+    }
+    .store-photo-wrap img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .store-details { min-width: 0; }
+    .store-name { font-size: clamp(19px, 2vw, 25px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.15; }
+    .store-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 7px; color: var(--ink-soft); font-size: 12.5px; }
+    .store-meta .dot-sep { color: #b3bcb6; }
+    .inventory-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .switch { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-soft); font-size: 11.5px; font-weight: 750; cursor: pointer; user-select: none; }
+    .switch input { width: 15px; height: 15px; margin: 0; accent-color: var(--green); }
+    .inv-summary {
+      display: flex;
+      align-items: center;
+      gap: 34px;
+      flex-wrap: wrap;
+      padding: 16px 19px;
+      border-bottom: 1px solid #eeebe2;
+      background: linear-gradient(120deg, #edf8f2 0%, #fbfaf6 74%);
+    }
+    .inv-total {
+      min-width: 230px;
+      padding: 13px 18px 14px;
+      border: 1px solid #d9e9e0;
+      border-radius: 15px;
+      background: #fff;
+      box-shadow: 0 6px 18px rgba(20, 33, 29, 0.05);
+    }
+    .inv-total .label { color: var(--ink-soft); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.09em; }
+    .inv-total .value { margin-top: 4px; font-size: clamp(23px, 2.5vw, 32px); font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+    .inv-total .detail { margin-top: 3px; color: #7b8882; font-size: 12px; }
+    .inv-mini { display: flex; gap: 26px; flex-wrap: wrap; }
+    .inv-mini-item { min-width: 84px; }
+    .inv-mini-item .label { color: #7b8882; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; }
+    .inv-mini-item .value { margin-top: 4px; font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .inv-actions { display: flex; align-items: center; gap: 6px; }
+    .qty-btn {
+      padding: 5px 9px;
+      border: 1px solid #dbe8e0;
+      border-radius: 9px;
+      background: #eef4f0;
+      color: var(--green-dark);
+      font-size: 12.5px;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+    .qty-btn:hover { border-color: var(--green); background: var(--green); color: #fff; }
+    .qty-btn:disabled { border-color: var(--line); background: #f1efe8; color: #8b9892; cursor: default; }
+    .set-btn {
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--ink-soft);
+      font-size: 11.5px;
+      font-weight: 750;
+      line-height: 1.25;
+    }
+    .set-btn:hover { background: #f6f3ec; color: var(--ink); }
+    .last-update { line-height: 1.35; }
+    .last-update .person { font-weight: 650; }
+    .last-update .nick { color: #7b8882; font-size: 11px; }
+    .last-update .when { color: #8b9892; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .inv-editor { padding: 15px 19px 17px; border-bottom: 1px solid #eeebe2; background: #fcfbf7; }
+    .inv-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+    .inv-editor-title { font-size: 13px; font-weight: 800; }
+    .inv-editor form { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+    .inv-field { display: grid; gap: 5px; }
+    .inv-field label { color: var(--ink-soft); font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; }
+    .inv-field input {
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 14px;
+      letter-spacing: normal;
+      outline: none;
+    }
+    .inv-field input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(11, 122, 92, 0.12); }
+    .inv-field.qty input { width: 108px; }
+    .inv-field.note input { width: 240px; font-size: 13px; }
+    .inv-editor .error { flex-basis: 100%; margin: 0; font-size: 11.5px; }
+    .btn-inline { padding: 10px 15px; border-radius: 10px; font-size: 12.5px; }
+    .btn-inline.ghost { border: 1px solid var(--line); background: transparent; color: var(--ink-soft); }
+    .btn-inline.ghost:hover { background: #fff; color: var(--ink); }
     [hidden] { display: none !important; }
     @media (max-width: 1180px) {
       .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -249,6 +352,16 @@
         <span>se cobra $0.01 MXN por PEY; el total comercial de la venta se conserva.</span>
       </div>
 
+      <section class="store-header" id="store-header" aria-label="Datos del negocio">
+        <div class="store-photo-wrap" id="store-photo-wrap" hidden>
+          <img id="store-photo" alt="Foto del negocio" decoding="async">
+        </div>
+        <div class="store-details">
+          <div class="store-name" id="store-name">Tiendita de la Esquina</div>
+          <div class="store-meta" id="store-meta">Consola de la dueña</div>
+        </div>
+      </section>
+
       <section class="cards" id="cards" aria-label="Resumen de hoy"></section>
 
       <section class="grid">
@@ -285,14 +398,60 @@
           </div>
         </div>
 
-        <div class="panel span-2">
+        <div class="panel span-2" id="inventory-panel">
           <div class="panel-head">
-            <div class="panel-title">Inventario</div>
-            <div class="panel-sub">Stock en piezas y kilos · negativo permitido en demo</div>
+            <div>
+              <div class="panel-title">Inventario</div>
+              <div class="panel-sub" id="inventory-sub">Precio de venta × existencias · negativo permitido en demo</div>
+            </div>
+            <div class="inventory-tools">
+              <label class="switch">
+                <input type="checkbox" id="inventory-low-only">
+                Solo stock bajo
+              </label>
+            </div>
+          </div>
+          <div class="inv-summary">
+            <div class="inv-total">
+              <div class="label">Valor del inventario</div>
+              <div class="value" id="inventory-total">$0.00</div>
+              <div class="detail" id="inventory-total-detail">Sin productos</div>
+            </div>
+            <div class="inv-mini">
+              <div class="inv-mini-item">
+                <div class="label">Productos</div>
+                <div class="value" id="inventory-count">0</div>
+              </div>
+              <div class="inv-mini-item">
+                <div class="label">Stock bajo</div>
+                <div class="value low-stock" id="inventory-low-count">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="inv-editor" id="inv-editor" hidden>
+            <div class="inv-editor-head">
+              <div class="inv-editor-title">Fijar cantidad · <span id="inv-editor-product">—</span></div>
+              <div class="panel-sub">Se guarda como movimiento con tu nota.</div>
+            </div>
+            <form id="inv-editor-form" autocomplete="off">
+              <div class="inv-field qty">
+                <label for="inv-editor-qty">Cantidad (<span id="inv-editor-unit">pza</span>)</label>
+                <input id="inv-editor-qty" type="text" inputmode="decimal" placeholder="12">
+              </div>
+              <div class="inv-field note">
+                <label for="inv-editor-note">Nota</label>
+                <input id="inv-editor-note" type="text" maxlength="120" placeholder="Conteo en consola">
+              </div>
+              <button type="submit" class="btn-inline" id="inv-editor-save">Guardar</button>
+              <button type="button" class="btn-inline ghost" id="inv-editor-cancel">Cancelar</button>
+              <p class="error" id="inv-editor-error" hidden></p>
+            </form>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Producto</th><th>Unidad</th><th class="right">Precio</th><th class="right">Stock</th><th>Estado</th></tr></thead>
+              <thead>
+                <tr><th>Producto</th><th>Unidad</th><th class="right">Precio</th><th class="right">Nivel actual</th><th class="right">Valor</th><th>Última actualización</th><th>Ajustes</th></tr>
+              </thead>
               <tbody id="inventory-body"></tbody>
             </table>
           </div>
@@ -327,10 +486,17 @@
 
       var PIN_KEY = "abarpayOwnerPin";
       var REFRESH_MS = 3000;
+      var EMPLOYEE_ID = 1;
+      var PHOTO_REFRESH_MS = 30000;
       var pin = "";
       var refreshTimer = null;
       var refreshing = false;
       var toastTimer = null;
+      var photoBuster = Date.now();
+      var lowOnly = false;
+      var pendingOps = {};
+      var editingProductId = null;
+      var inventoryState = { items: [], totalValueCents: 0, lowCount: 0, source: "v2" };
 
       var loginScreen = document.getElementById("login-screen");
       var app = document.getElementById("app");
@@ -361,6 +527,68 @@
         var value = Number(milli || 0) / 1000;
         var text = Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
         return text + (unit === "kg" ? " kg" : " pza");
+      }
+
+      function stockLevelMilli(value, unit) {
+        if (value === null || value === undefined || !Number.isFinite(Number(value))) return "Sin nivel";
+        var milli = Number(value);
+        var text = Number.isInteger(milli / 1000) ? String(milli / 1000) : (milli / 1000).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+        return text + (unit === "kg" ? " kg" : " pza");
+      }
+
+      function displayUnit(unit) {
+        return unit === "kg" ? "kg" : "pza";
+      }
+
+      function parseQtyMilli(text) {
+        var value = String(text == null ? "" : text).trim().replace(",", ".");
+        if (!value) return null;
+        var number = Number(value);
+        if (!Number.isFinite(number) || Math.abs(number) > 1000000) return null;
+        return Math.round(number * 1000);
+      }
+
+      function qtyInputValue(milli) {
+        var value = Number(milli || 0) / 1000;
+        if (Number.isInteger(value)) return String(value);
+        return String(Number(value.toFixed(3)));
+      }
+
+      function personLabel(name, nickname, employeeId) {
+        if (name) return nickname ? name + " (" + nickname + ")" : name;
+        if (nickname) return nickname;
+        if (employeeId !== null && employeeId !== undefined) return "Persona #" + employeeId;
+        return "—";
+      }
+
+      function dateTimeLabel(epoch) {
+        if (!epoch) return "";
+        return dateLabel(epoch) + " · " + timeLabel(epoch);
+      }
+
+      function storePhotoUrl() {
+        return "/api/store/photo?t=" + photoBuster;
+      }
+
+      function initStorePhoto() {
+        var img = document.getElementById("store-photo");
+        var wrap = document.getElementById("store-photo-wrap");
+        if (!img || !wrap || img.getAttribute("data-ready") === "1") return;
+        img.setAttribute("data-ready", "1");
+        img.addEventListener("load", function () {
+          wrap.hidden = false;
+        });
+        img.addEventListener("error", function () {
+          wrap.hidden = true;
+        });
+        img.src = storePhotoUrl();
+      }
+
+      function maybeRefreshStorePhoto() {
+        if (Date.now() - photoBuster < PHOTO_REFRESH_MS) return;
+        photoBuster = Date.now();
+        var img = document.getElementById("store-photo");
+        if (img && img.getAttribute("src")) img.src = storePhotoUrl();
       }
 
       function timeLabel(epoch) {
@@ -420,6 +648,8 @@
         loginScreen.hidden = false;
         pin = "";
         pinInput.value = "";
+        closeStockEditor();
+        pendingOps = {};
         sessionStorage.removeItem(PIN_KEY);
         loginError.hidden = !message;
         loginError.textContent = message || "";
@@ -447,6 +677,9 @@
         var opts = options || {};
         var headers = opts.headers || {};
         headers["X-Owner-Pin"] = pin;
+        if (opts.employeeId !== undefined && opts.employeeId !== null) {
+          headers["X-Employee-Id"] = String(opts.employeeId);
+        }
         if (opts.body) headers["Content-Type"] = "application/json";
         return fetch(path, { method: opts.method || "GET", headers: headers, body: opts.body })
           .then(function (response) {
@@ -477,6 +710,7 @@
 
       function startRefresh() {
         stopRefresh();
+        initStorePhoto();
         refreshAll();
         refreshTimer = setInterval(refreshAll, REFRESH_MS);
       }
@@ -573,26 +807,275 @@
         body.innerHTML = html;
       }
 
-      function renderInventory(inventory) {
-        var items = inventory.items || [];
+      function normalizeInventory(raw, source, summary) {
+        var rawItems = (raw && raw.items) || [];
+        var lowStockIds = {};
+        var lowList = (summary && summary.lowStock) || [];
+        for (var l = 0; l < lowList.length; l += 1) {
+          if (lowList[l] && lowList[l].id !== undefined && lowList[l].id !== null) {
+            lowStockIds[String(lowList[l].id)] = true;
+          }
+        }
+        var items = [];
+        var computedTotal = 0;
+        for (var i = 0; i < rawItems.length; i += 1) {
+          var rawItem = rawItems[i] || {};
+          var productId = rawItem.productId !== undefined && rawItem.productId !== null ? rawItem.productId : rawItem.id;
+          var priceCents = Number(rawItem.priceCents || 0);
+          var stockMilli = Number(rawItem.stockMilli || 0);
+          var unlimitedStock = Boolean(rawItem.unlimitedStock);
+          var valueCents = rawItem.valueCents !== undefined && rawItem.valueCents !== null
+            ? Number(rawItem.valueCents || 0)
+            : (unlimitedStock ? 0 : Math.round(priceCents * stockMilli / 1000));
+          var lowStockMilli = rawItem.lowStockMilli !== undefined && rawItem.lowStockMilli !== null
+            ? Number(rawItem.lowStockMilli)
+            : null;
+          var low = false;
+          if (!unlimitedStock) {
+            if (lowStockMilli !== null) low = stockMilli <= lowStockMilli;
+            else low = Boolean(lowStockIds[String(productId)]);
+          }
+          computedTotal += valueCents;
+          items.push({
+            productId: productId,
+            name: rawItem.name || "Producto",
+            unit: rawItem.unit === "kg" ? "kg" : "pieza",
+            priceCents: priceCents,
+            stockMilli: stockMilli,
+            unlimitedStock: unlimitedStock,
+            valueCents: valueCents,
+            lowStockMilli: lowStockMilli,
+            low: low,
+            lastUpdatedAt: rawItem.lastUpdatedAt !== undefined && rawItem.lastUpdatedAt !== null ? Number(rawItem.lastUpdatedAt) : null,
+            lastUpdatedById: rawItem.lastUpdatedById !== undefined ? rawItem.lastUpdatedById : null,
+            lastUpdatedByName: rawItem.lastUpdatedByName || "",
+            lastUpdatedByNickname: rawItem.lastUpdatedByNickname || ""
+          });
+        }
+        var totalValueCents = raw && raw.totalValueCents !== undefined && raw.totalValueCents !== null
+          ? Number(raw.totalValueCents || 0)
+          : computedTotal;
+        var lowCount = 0;
+        for (var j = 0; j < items.length; j += 1) {
+          if (items[j].low) lowCount += 1;
+        }
+        return { items: items, totalValueCents: totalValueCents, lowCount: lowCount, source: source || "v2" };
+      }
+
+      function fetchInventory() {
+        return consoleFetch("/api/inventory", { employeeId: EMPLOYEE_ID }).then(function (data) {
+          return { source: "v2", data: data || {} };
+        }).catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+          return consoleFetch("/api/console/inventory").then(function (data) {
+            return { source: "v1", data: data || {} };
+          }).catch(function (fallbackError) {
+            if (fallbackError && fallbackError.message === "AUTH") throw fallbackError;
+            return { source: "none", data: { items: [] }, error: fallbackError };
+          });
+        });
+      }
+
+      function fetchStoreProfile() {
+        return consoleFetch("/api/store/profile").catch(function (error) {
+          if (error && error.message === "AUTH") throw error;
+          return null;
+        });
+      }
+
+      function findProduct(productId) {
+        var key = String(productId);
+        for (var i = 0; i < inventoryState.items.length; i += 1) {
+          if (String(inventoryState.items[i].productId) === key) return inventoryState.items[i];
+        }
+        return null;
+      }
+
+      function inventoryRow(product) {
+        var busy = Boolean(pendingOps[String(product.productId)]);
+        var disableAttr = busy || product.unlimitedStock
+          ? ' disabled title="' + (product.unlimitedStock ? "Inventario sin límite" : "Guardando…") + '"'
+          : "";
+        var level = product.unlimitedStock
+          ? '<span class="muted">Sin límite</span>'
+          : '<span class="mono ' + (product.low ? "low-stock" : "stock-good") + '">' + escapeHtml(quantity(product.stockMilli, product.unit)) + '</span>';
+        var value = product.unlimitedStock ? '<span class="muted">—</span>' : escapeHtml(money(product.valueCents));
+        var last = '<span class="muted">Sin movimientos</span>';
+        if (product.lastUpdatedAt) {
+          var who = personLabel(product.lastUpdatedByName, product.lastUpdatedByNickname, product.lastUpdatedById);
+          last = '<div class="last-update">' +
+            '<div class="person">' + escapeHtml(who) + '</div>' +
+            '<div class="when">' + escapeHtml(dateTimeLabel(product.lastUpdatedAt)) + '</div>' +
+            '</div>';
+        }
+        var actions = product.unlimitedStock
+          ? '<span class="muted">—</span>'
+          : '<div class="inv-actions">' +
+            '<button type="button" class="qty-btn" data-inv-action="decrease" data-product-id="' + escapeHtml(String(product.productId)) + '"' + disableAttr + ' aria-label="Quitar 1 a ' + escapeHtml(product.name) + '">−1</button>' +
+            '<button type="button" class="qty-btn" data-inv-action="increase" data-product-id="' + escapeHtml(String(product.productId)) + '"' + disableAttr + ' aria-label="Sumar 1 a ' + escapeHtml(product.name) + '">+1</button>' +
+            '<button type="button" class="set-btn" data-inv-action="set" data-product-id="' + escapeHtml(String(product.productId)) + '"' + (busy ? " disabled" : "") + '>Fijar cantidad</button>' +
+            '</div>';
+        return '<tr data-row-product-id="' + escapeHtml(String(product.productId)) + '">' +
+          '<td>' + escapeHtml(product.name) + '</td>' +
+          '<td>' + escapeHtml(displayUnit(product.unit)) + '</td>' +
+          '<td class="right mono">' + escapeHtml(money(product.priceCents)) + '</td>' +
+          '<td class="right">' + level + '</td>' +
+          '<td class="right mono">' + value + '</td>' +
+          '<td>' + last + '</td>' +
+          '<td>' + actions + '</td>' +
+          '</tr>';
+      }
+
+      function renderInventory() {
+        var state = inventoryState;
+        var items = state.items || [];
+        var visible = [];
+        for (var i = 0; i < items.length; i += 1) {
+          if (!lowOnly || items[i].low) visible.push(items[i]);
+        }
+        document.getElementById("inventory-total").textContent = money(state.totalValueCents);
+        document.getElementById("inventory-count").textContent = String(items.length);
+        document.getElementById("inventory-low-count").textContent = String(state.lowCount || 0);
+        document.getElementById("inventory-total-detail").textContent = items.length
+          ? items.length + " productos · " + (state.lowCount || 0) + " con stock bajo"
+          : "Sin productos";
+        var sub = "Precio de venta × existencias · negativo permitido en demo";
+        if (state.source === "v1") sub = "Vista v1: el servidor no manda el historial de movimientos";
+        else if (state.source === "none") sub = "No se pudo leer el inventario; se reintenta solo";
+        document.getElementById("inventory-sub").textContent = sub;
         var body = document.getElementById("inventory-body");
         if (!items.length) {
-          body.innerHTML = '<tr><td colspan="5" class="empty">Sin productos.</td></tr>';
+          body.innerHTML = '<tr><td colspan="7" class="empty">Sin productos en el inventario.</td></tr>';
+          return;
+        }
+        if (!visible.length) {
+          body.innerHTML = '<tr><td colspan="7" class="empty">Ningún producto con stock bajo. Todo en orden.</td></tr>';
           return;
         }
         var html = "";
-        for (var i = 0; i < items.length; i += 1) {
-          var product = items[i];
-          var low = !product.unlimitedStock && Number(product.stockMilli) <= Number(product.lowStockMilli);
-          html += '<tr>' +
-            '<td>' + escapeHtml(product.name) + '</td>' +
-            '<td>' + escapeHtml(product.unit === "kg" ? "kg" : "pieza") + '</td>' +
-            '<td class="right mono">' + escapeHtml(money(product.priceCents)) + '</td>' +
-            '<td class="right mono ' + (low ? "low-stock" : "stock-good") + '">' + escapeHtml(product.unlimitedStock ? "Sin límite" : quantity(product.stockMilli, product.unit)) + '</td>' +
-            '<td>' + (low ? '<span class="badge bad">Stock bajo</span>' : '<span class="badge ok">Disponible</span>') + '</td>' +
-            '</tr>';
+        for (var j = 0; j < visible.length; j += 1) {
+          html += inventoryRow(visible[j]);
         }
         body.innerHTML = html;
+      }
+
+      function renderStoreProfile(profile, summary) {
+        var fallbackName = summary && summary.store && summary.store.name ? summary.store.name : "Tiendita de la Esquina";
+        document.getElementById("store-name").textContent = profile && profile.name ? profile.name : fallbackName;
+        var parts = [];
+        if (profile && profile.businessType) {
+          parts.push('<span class="badge ok">' + escapeHtml(profile.businessType) + '</span>');
+        }
+        if (profile && profile.ownerName) {
+          parts.push('<span>Dueña: ' + escapeHtml(profile.ownerName) + '</span>');
+        }
+        if (!profile) {
+          parts.push('<span class="muted">Perfil del negocio no disponible</span>');
+        }
+        if (!parts.length) {
+          parts.push('<span class="muted">Consola de la dueña</span>');
+        }
+        document.getElementById("store-meta").innerHTML = parts.join('<span class="dot-sep">·</span>');
+      }
+
+      function adjustInventory(product, deltaMilli) {
+        if (!product || product.unlimitedStock) return;
+        var key = String(product.productId);
+        if (pendingOps[key]) return;
+        pendingOps[key] = true;
+        renderInventory();
+        consoleFetch("/api/inventory/adjust", {
+          method: "POST",
+          employeeId: EMPLOYEE_ID,
+          body: JSON.stringify({
+            employeeId: EMPLOYEE_ID,
+            productId: product.productId,
+            deltaMilli: deltaMilli,
+            reason: "Ajuste en consola"
+          })
+        }).then(function () {
+          showToast("Listo: " + product.name + " quedó en " + stockLevelMilli(product.stockMilli + deltaMilli, product.unit) + ".");
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            showToast(error.message || "No se pudo ajustar el inventario.");
+          }
+        }).then(function () {
+          delete pendingOps[key];
+          renderInventory();
+          refreshAll();
+        });
+      }
+
+      function openStockEditor(product) {
+        if (!product || product.unlimitedStock) return;
+        editingProductId = product.productId;
+        document.getElementById("inv-editor").hidden = false;
+        document.getElementById("inv-editor-product").textContent = product.name;
+        document.getElementById("inv-editor-unit").textContent = displayUnit(product.unit);
+        var qtyInput = document.getElementById("inv-editor-qty");
+        qtyInput.value = qtyInputValue(product.stockMilli);
+        qtyInput.placeholder = product.unit === "kg" ? "0.5" : "12";
+        document.getElementById("inv-editor-note").value = "";
+        var errorBox = document.getElementById("inv-editor-error");
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+        qtyInput.focus();
+        qtyInput.select();
+      }
+
+      function closeStockEditor() {
+        editingProductId = null;
+        var editor = document.getElementById("inv-editor");
+        if (editor) editor.hidden = true;
+        var errorBox = document.getElementById("inv-editor-error");
+        if (errorBox) {
+          errorBox.hidden = true;
+          errorBox.textContent = "";
+        }
+      }
+
+      function saveStockEditor() {
+        if (editingProductId === null || editingProductId === undefined) return;
+        var product = findProduct(editingProductId);
+        var qtyInput = document.getElementById("inv-editor-qty");
+        var errorBox = document.getElementById("inv-editor-error");
+        var qtyMilli = parseQtyMilli(qtyInput.value);
+        errorBox.hidden = true;
+        if (qtyMilli === null) {
+          errorBox.hidden = false;
+          errorBox.textContent = "Escribe una cantidad válida, por ejemplo 12 o 0.5.";
+          qtyInput.focus();
+          return;
+        }
+        if (!product) {
+          closeStockEditor();
+          showToast("Ese producto ya no está en el inventario.");
+          return;
+        }
+        var note = document.getElementById("inv-editor-note").value.trim() || "Conteo en consola";
+        var saveButton = document.getElementById("inv-editor-save");
+        saveButton.disabled = true;
+        saveButton.textContent = "Guardando…";
+        pendingOps[String(product.productId)] = true;
+        consoleFetch("/api/inventory/set", {
+          method: "POST",
+          employeeId: EMPLOYEE_ID,
+          body: JSON.stringify({ productId: product.productId, qtyMilli: qtyMilli, note: note })
+        }).then(function () {
+          closeStockEditor();
+          showToast("Listo: " + product.name + " quedó en " + stockLevelMilli(qtyMilli, product.unit) + ".");
+        }).catch(function (error) {
+          if (error && error.message !== "AUTH") {
+            errorBox.hidden = false;
+            errorBox.textContent = error.message || "No se pudo fijar la cantidad.";
+          }
+        }).then(function () {
+          saveButton.disabled = false;
+          saveButton.textContent = "Guardar";
+          delete pendingOps[String(product.productId)];
+          renderInventory();
+          if (editingProductId === null || editingProductId === undefined) refreshAll();
+        });
       }
 
       function renderFiado(fiado) {
@@ -615,17 +1098,20 @@
         body.innerHTML = html;
       }
 
-      function renderAll(summary, sales, inventory, fiado) {
-        var store = summary.store ? summary.store.name : "Tiendita de la Esquina";
+      function renderAll(summary, sales, inventory, fiado, profile) {
+        var store = (profile && profile.name) || (summary.store ? summary.store.name : "Tiendita de la Esquina");
         document.getElementById("store-pill").textContent = store;
         document.getElementById("demo-banner").className = (summary.today && summary.today.demoMode) ? "demo-banner show" : "demo-banner";
         document.getElementById("footer-mode").textContent = (summary.today && summary.today.demoMode) ? "Modo demo" : "Modo live";
+        inventoryState = normalizeInventory(inventory.data, inventory.source, summary);
         renderCards(summary);
         renderSales(sales);
         renderTopProducts(summary);
         renderEmployees(summary);
-        renderInventory(inventory);
+        renderInventory();
         renderFiado(fiado);
+        renderStoreProfile(profile, summary);
+        maybeRefreshStorePhoto();
         document.getElementById("updated").innerHTML = '<span class="live-dot"></span>Actualizado ' + escapeHtml(timeLabel(Date.now() / 1000)) + ' · ' + escapeHtml(dateLabel(Date.now() / 1000));
       }
 
@@ -635,10 +1121,11 @@
         Promise.all([
           consoleFetch("/api/console/summary"),
           consoleFetch("/api/console/sales?limit=25"),
-          consoleFetch("/api/console/inventory"),
-          consoleFetch("/api/console/fiado")
+          fetchInventory(),
+          consoleFetch("/api/console/fiado"),
+          fetchStoreProfile()
         ]).then(function (results) {
-          renderAll(results[0], results[1], results[2], results[3]);
+          renderAll(results[0], results[1], results[2], results[3], results[4]);
         }).catch(function (error) {
           if (error && error.message === "AUTH") return;
           showToast(error && error.message ? error.message : "No se pudo actualizar la consola");
@@ -646,6 +1133,31 @@
           refreshing = false;
         });
       }
+
+      document.getElementById("inventory-body").addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("button[data-inv-action]") : null;
+        if (!button) return;
+        var product = findProduct(button.getAttribute("data-product-id"));
+        if (!product) return;
+        var action = button.getAttribute("data-inv-action");
+        if (action === "increase") adjustInventory(product, 1000);
+        else if (action === "decrease") adjustInventory(product, -1000);
+        else if (action === "set") openStockEditor(product);
+      });
+
+      document.getElementById("inventory-low-only").addEventListener("change", function (event) {
+        lowOnly = Boolean(event.target.checked);
+        renderInventory();
+      });
+
+      document.getElementById("inv-editor-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        saveStockEditor();
+      });
+
+      document.getElementById("inv-editor-cancel").addEventListener("click", function () {
+        closeStockEditor();
+      });
 
       loginForm.addEventListener("submit", function (event) {
         event.preventDefault();
