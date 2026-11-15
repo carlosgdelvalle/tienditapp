@@ -250,6 +250,16 @@ class InventoryVoiceIn(BaseModel):
     text: str
 
 
+class SupportTicketIn(BaseModel):
+    saleId: str | None = None
+    note: str | None = None
+
+
+class SupportTicketPatchIn(BaseModel):
+    status: Literal["open", "resolved"] | None = None
+    note: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -361,6 +371,73 @@ def _require_inventory_employee(
     ):
         raise HTTPException(status_code=403, detail=INVENTORY_FORBIDDEN_DETAIL)
     return employee
+
+
+# v2 support tickets --------------------------------------------------------
+
+
+def _support_ticket_row(
+    conn: sqlite3.Connection, ticket_id: str
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM support_tickets WHERE id = ? AND store_id = ?",
+        (ticket_id, STORE_ID),
+    ).fetchone()
+
+
+def _support_ticket_sale_row(
+    conn: sqlite3.Connection, sale_id: str | None
+) -> sqlite3.Row | None:
+    """Live sale context for a ticket: status, totals and the PEY tx id.
+
+    The contract keeps the sale context out of the ticket row, so every read
+    resolves it from sales (with the employee name used as "reported by" when
+    the reporter is not known from the current request header).
+    """
+
+    if sale_id is None:
+        return None
+    return conn.execute(
+        """SELECT s.status, s.total_cents, s.charged_cents, s.pey_tx_id,
+                  e.name AS employee_name
+           FROM sales s LEFT JOIN employees e ON e.id = s.employee_id
+           WHERE s.id = ?""",
+        (sale_id,),
+    ).fetchone()
+
+
+def _support_ticket_payload(
+    conn: sqlite3.Connection,
+    row: sqlite3.Row,
+    *,
+    reported_by_name: str | None = None,
+    include_resolved_at: bool = False,
+) -> dict[str, Any]:
+    """Ticket JSON per the v2 contract.
+
+    POST responses use the contract's create shape (no resolvedAt); list and
+    PATCH responses add resolvedAt. A ticket without a sale has no sale
+    context at all.
+    """
+
+    sale = _support_ticket_sale_row(conn, row["sale_id"])
+    if reported_by_name is None and sale is not None:
+        reported_by_name = sale["employee_name"]
+    payload: dict[str, Any] = {
+        "id": row["id"],
+        "saleId": row["sale_id"],
+        "saleStatus": sale["status"] if sale is not None else None,
+        "saleTotalCents": sale["total_cents"] if sale is not None else None,
+        "chargedCents": sale["charged_cents"] if sale is not None else None,
+        "peyTxId": sale["pey_tx_id"] if sale is not None else None,
+        "note": row["note"],
+        "status": row["status"],
+        "createdAt": row["created_at"],
+        "reportedByName": reported_by_name,
+    }
+    if include_resolved_at:
+        payload["resolvedAt"] = row["resolved_at"]
+    return payload
 
 
 # v2 store profile ----------------------------------------------------------
@@ -1425,6 +1502,113 @@ def _install_routes(app: FastAPI) -> None:
                 (body.productId, body.deltaMilli, reason, body.employeeId, _now()),
             )
         return product_to_dict(_require_product(conn, body.productId))
+
+    # v2 support tickets ----------------------------------------------------
+
+    @api.post("/support/tickets")
+    def create_support_ticket(
+        body: SupportTicketIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        # Any active employee in the store can report a problem; no header keeps
+        # the open v1 behavior (scripts/tests).
+        employee = _optional_employee(conn, x_employee_id)
+        reported_by_name = employee["name"] if employee is not None else None
+        note = (body.note or "").strip() or None
+        sale_id: str | None = None
+        if body.saleId is not None:
+            sale_id = body.saleId.strip()
+            if not sale_id:
+                raise HTTPException(
+                    status_code=400, detail="El id de la venta no es válido"
+                )
+        if sale_id is None and note is None:
+            raise HTTPException(
+                status_code=400,
+                detail="La nota es obligatoria cuando el ticket no tiene venta",
+            )
+
+        with write_transaction(conn):
+            if sale_id is not None:
+                _require_sale(conn, sale_id)
+                # One open ticket per sale: reporting twice returns the same one.
+                existing = conn.execute(
+                    """SELECT * FROM support_tickets
+                       WHERE store_id = ? AND sale_id = ? AND status = 'open'
+                       ORDER BY created_at ASC, id ASC LIMIT 1""",
+                    (STORE_ID, sale_id),
+                ).fetchone()
+                if existing is not None:
+                    payload = _support_ticket_payload(
+                        conn, existing, reported_by_name=reported_by_name
+                    )
+                    payload["alreadyOpen"] = True
+                    return payload
+            ticket_id = "tkt_" + secrets.token_hex(8)
+            conn.execute(
+                """INSERT INTO support_tickets
+                       (id, store_id, sale_id, note, status, created_at, resolved_at)
+                   VALUES (?, ?, ?, ?, 'open', ?, NULL)""",
+                (ticket_id, STORE_ID, sale_id, note, _now()),
+            )
+        row = _support_ticket_row(conn, ticket_id)
+        assert row is not None
+        payload = _support_ticket_payload(
+            conn, row, reported_by_name=reported_by_name
+        )
+        payload["alreadyOpen"] = False
+        return payload
+
+    @api.get("/support/tickets")
+    def list_support_tickets(
+        status: Literal["open", "resolved", "all"] = "all",
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        query = "SELECT * FROM support_tickets WHERE store_id = ?"
+        params: list[Any] = [STORE_ID]
+        if status != "all":
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY created_at DESC, id DESC"
+        rows = conn.execute(query, params).fetchall()
+        return {
+            "items": [
+                _support_ticket_payload(conn, row, include_resolved_at=True)
+                for row in rows
+            ]
+        }
+
+    @api.patch("/support/tickets/{ticket_id}")
+    def patch_support_ticket(
+        ticket_id: str,
+        body: SupportTicketPatchIn,
+        conn: sqlite3.Connection = Depends(get_db),
+        x_employee_id: Annotated[int | None, Header(alias="X-Employee-Id")] = None,
+    ):
+        _require_owner_employee(conn, x_employee_id)
+        if _support_ticket_row(conn, ticket_id) is None:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        updates: dict[str, Any] = {}
+        if body.note is not None:
+            updates["note"] = body.note.strip() or None
+        if body.status is not None:
+            updates["status"] = body.status
+            # Resolving stamps resolved_at; reopening clears it.
+            updates["resolved_at"] = _now() if body.status == "resolved" else None
+        if updates:
+            assignments = ", ".join(f"{column} = ?" for column in updates)
+            with write_transaction(conn):
+                conn.execute(
+                    f"UPDATE support_tickets SET {assignments} "
+                    "WHERE id = ? AND store_id = ?",
+                    (*updates.values(), ticket_id, STORE_ID),
+                )
+        row = _support_ticket_row(conn, ticket_id)
+        assert row is not None
+        return _support_ticket_payload(conn, row, include_resolved_at=True)
 
     @api.post("/console/login")
     def console_login(body: LoginIn, settings: Settings = Depends(get_settings)):

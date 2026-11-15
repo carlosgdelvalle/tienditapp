@@ -294,12 +294,26 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     outcome TEXT NOT NULL
 );
 
+-- v2 support tickets: the person in the store reports a charge that was not
+-- confirmed. The sale context (status, totals, PEY tx id) is read live from
+-- sales when the ticket is serialized; a ticket without a sale only has a note.
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id TEXT PRIMARY KEY,
+    store_id TEXT NOT NULL REFERENCES stores(id),
+    sale_id TEXT REFERENCES sales(id),
+    note TEXT,
+    status TEXT NOT NULL CHECK(status IN ('open','resolved')),
+    created_at REAL NOT NULL,
+    resolved_at REAL
+);
+
 CREATE INDEX IF NOT EXISTS idx_sales_store_created ON sales(store_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sales_qr ON sales(pey_qr_id);
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_payments_sale ON payments(sale_id);
 CREATE INDEX IF NOT EXISTS idx_movements_product ON inventory_movements(product_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_fiado_entries_customer ON fiado_entries(customer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_sale ON support_tickets(sale_id);
 """
 
 
