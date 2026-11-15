@@ -7,7 +7,7 @@
 Hackatón **DevDay Exchange México 2026** · pagos **PEY (CoDi)** · comercio de demostración **Tiendita de la Esquina** (ficticio).
 Entrega: **domingo 8 de noviembre de 2026, 13:00 CDMX**.
 
-> **Estado (15-nov-2026).** La entrega principal es la **app Android** en [`android/`](android/README.md), con el **backend v1** en [`server/`](server/README.md) y la **consola del dueño** en [`/console`](server/static/console.html). La demo corre en **Render** con disco persistente: API `https://abarpay-api.onrender.com` y consola `https://abarpay-api.onrender.com/console` (PIN demo `1234`); guía en [`docs/despliegue-render.md`](docs/despliegue-render.md). El **pago real de $0.01** se confirmó el **8-nov a las 10:28:34** por conciliación con PEY (tx `01M6XZTYHZC3H4F1FZRYGKGF75`). `main` integra Android **1.0.7** con **cancelación de cobros PEY pendientes**, stock sin límite y **Tacos de pastor**; Render sigue en el despliegue de tacos hasta un redeploy manual. El webhook de PEY ya apunta al host de Render. Las decisiones abiertas están en [`docs/pendientes-manana.md`](docs/pendientes-manana.md).
+> **Estado (15-nov-2026).** La entrega principal es la **app Android** en [`android/`](android/README.md), con el backend en [`server/`](server/README.md) y la **consola del dueño** en [`/console`](server/static/console.html). La demo corre en **Render** con disco persistente: API `https://abarpay-api.onrender.com` y consola `https://abarpay-api.onrender.com/console` (PIN demo `1234`); guía en [`docs/despliegue-render.md`](docs/despliegue-render.md). El **pago real de $0.01** se confirmó el **8-nov a las 10:28:34** por conciliación con PEY (tx `01M6XZTYHZC3H4F1FZRYGKGF75`). La rama integra **v2 (15-nov)**: onboarding del dueño (metas, nombre, negocio y foto), equipo con invitaciones por enlace/QR y permisos (vender, fiado, inventario; reportes solo dueño), inventario por voz, módulo de inventario completo en la consola (niveles, valor y última persona) e Inicio informativo. Android **1.1.0 / code 11**; contrato en [`docs/v2-contract.md`](docs/v2-contract.md). Las decisiones abiertas siguen en [`docs/pendientes-manana.md`](docs/pendientes-manana.md).
 
 El backend viejo en [`app/`](app/README.md) y los prototipos en [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) quedan como referencia. La app Android ya no los usa.
 
@@ -39,21 +39,23 @@ flowchart LR
 
 | Entregable | Estado | Dónde |
 | --- | --- | --- |
-| **Backend v1** | Implementado: efectivo, PEY, fiado, inventario (con stock sin límite), reportes, webhook, cancelación segura de cobros PEY pendientes y consola. **67 pruebas**. Desplegado en Render con disco persistente. | [`server/`](server/README.md), [`docs/despliegue-render.md`](docs/despliegue-render.md) |
-| **APK Android v1** | Release firmado **1.0.7 / code 10** en [`dist/`](dist/); instalado y probado en SM-A165M (1.0.6). Servidor Render fijo y de solo lectura, conexión automática. Cash, PEY QR, fiado, abono, inventario, reportes y cancelación de cobros PEY pendientes. | [`android/`](android/README.md) |
-| **Consola del dueño** | `https://abarpay-api.onrender.com/console` con PIN demo 1234 y refresco cada 3 s; ventas, efectivo/PEY/fiado, inventario y equipo. | [`server/static/console.html`](server/static/console.html) |
+| **Backend** | Efectivo, PEY, fiado, inventario (stock sin límite), reportes, webhook, cancelación segura de cobros PEY pendientes, perfil de tienda/foto, empleados con permisos, invitaciones por token y consola. **110 pruebas**. Desplegado en Render con disco persistente. | [`server/`](server/README.md), [`docs/despliegue-render.md`](docs/despliegue-render.md) |
+| **APK Android** | Release firmado **1.1.0 / code 11** en [`dist/`](dist/). Servidor Render fijo y de solo lectura, conexión automática. Onboarding del dueño, equipo con invitaciones por enlace/QR, permisos por empleado, inventario por voz, Inicio informativo y cobros PEY/fiado/inventario. | [`android/`](android/README.md) |
+| **Consola del dueño** | `https://abarpay-api.onrender.com/console` con PIN demo 1234 y refresco cada 3 s; foto y perfil del negocio, módulo de inventario completo (niveles, valor, última persona en actualizar) y ventas/fiado/equipo. | [`server/static/console.html`](server/static/console.html) |
 | **Pago real PEY** | Confirmado por conciliación: `sale_fed4e2ffe9684050b4d6`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, $0.01 `PAID` a las 10:28:34. El webhook real llegó con 400 `invalid_payload` (payload plano); corregido y verificado con el payload exacto. El portal de PEY ya apunta a `https://abarpay-api.onrender.com/webhooks/pey`; la entrega real del webhook queda por ejercitar con otro pago. | Ver [`docs/pendientes-manana.md`](docs/pendientes-manana.md) |
 | **Referencia** | App vieja y prototipos; no son la entrega v1. | [`app/`](app/README.md), [`prototypes/`](prototypes/tiendita-inteligente-pey-v0.4/README.md) |
-| **Documentación** | Contrato v1, decisiones, bitácora, pendientes y presentación. | [`docs/`](docs/README.md), [`presentacion/`](presentacion/README.md) |
+| **Documentación** | Contratos v1 y v2, decisiones, bitácora, pendientes y presentación. | [`docs/`](docs/README.md), [`presentacion/`](presentacion/README.md) |
 
 ## Flujos de la app
 
-- **Acceso mockup**: dueño o empleado de ejemplo desde `GET /api/bootstrap`. No hay contraseñas, OAuth ni sesiones; el acceso no autentica.
+- **Acceso mockup**: dueño o empleado de ejemplo desde `GET /api/bootstrap`; la identidad simulada viaja en el header `X-Employee-Id`. No hay contraseñas, OAuth ni sesiones; el acceso no autentica.
+- **Onboarding (dueño, primer arranque)**: metas del negocio, nombre del dueño, nombre y tipo del negocio y foto; nombre/tipo/foto se guardan en el servidor, las metas quedan locales.
+- **Equipo**: el dueño invita empleados con nombre y permisos (vender, fiado, inventario) y comparte un enlace o un QR; el empleado abre el enlace en su app, elige su apodo y queda ligado a ese teléfono. Reportes solo dueño.
 - **Cobrar**: escáner continuo con CameraX + ML Kit, dictado primero y texto/código manual en una acción secundaria. Barra fija con artículos y total; hoja de pago dedicada con métodos, billetes rápidos y cantidades por presets. El carrito usa `qtyMilli`; el servidor confirma precios y total.
 - **Efectivo**: se captura el efectivo recibido, el servidor calcula el cambio y registra `paid_cash`; no se llama a PEY.
 - **PEY/CoDi**: el servidor crea el QR; la app lo muestra y consulta cada 3 s. Solo pasa a éxito con `paid_pey`. En modo demo se cobra **$0.01** y la pantalla lo dice. Los cobros pendientes se pueden **cancelar desde la app**: el servidor concilia con PEY y rechaza la cancelación (409) si el pago ya llegó; no revoca el QR bancario ni reembolsa.
 - **Fiado**: cliente existente o alta con nombre/teléfono; la venta queda `credit`, con saldo y abonos.
-- **Inventario**: consulta y ajuste simple de ±1000 miliunidades; cada cambio deja un movimiento y el stock negativo está permitido en la demo. Los productos con stock sin límite (Tacos de pastor) no descuentan existencias ni aceptan ajustes manuales.
+- **Inventario**: consulta y ajuste de ±1000 miliunidades o **fijado absoluto por conteo** (voz: «coca colas de 600… 4, 5, 6… 12 piezas» → 12 pza); cada cambio deja un movimiento con quién lo hizo. El stock negativo está permitido en la demo. Los productos con stock sin límite (Tacos de pastor) no descuentan existencias ni aceptan ajustes.
 - **Reportes**: total registrado, cobrado, efectivo, PEY, fiado, pendientes, fiado por cobrar, por empleado y productos más vendidos.
 
 ## Cómo correr
@@ -123,8 +125,8 @@ python -m pytest server/tests -q
 cd android && ./scripts/test-core.sh
 ```
 
-- Backend: **67 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
-- Android: **53 pruebas Gradle** (dominio, repositorio y flujos Compose en simulación) más las pruebas de núcleo JVM de [`android/scripts/test-core.sh`](android/scripts/test-core.sh).
+- Backend: **110 pruebas** con `FakePey` etiquetado SIMULADO; no llaman a PEY real.
+- Android: **87 pruebas Gradle** (dominio, repositorio y flujos Compose en simulación) más las pruebas de núcleo JVM de [`android/scripts/test-core.sh`](android/scripts/test-core.sh).
 - No hay pago real en las pruebas. El pago real de $0.01 lo hace una persona.
 
 ## Integración con PEY
@@ -160,17 +162,18 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 
 | Evidencia | Resultado |
 | --- | --- |
-| Backend | **67 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado; `./scripts/verificar.sh` OK (gitleaks + 16 pruebas legacy) |
+| Backend | **110 passed**; smoke de salud, bootstrap, efectivo, consola y webhook firmado; `./scripts/verificar.sh` OK (gitleaks + 16 pruebas legacy) |
 | Android | Release firmado, instalado y ejecutado en **SM-A165M** (Android 16/API 36); venta en efectivo, fiado, abono, inventario, media kilo de tortillas ($13), código de barras manual 7500000000001 y consola |
 | PEY | Pago real de $0.01 confirmado por conciliación: `PAID`, tx `01M6XZTYHZC3H4F1FZRYGKGF75`, 10:28:34 |
 | Webhook | El evento real llegó con 400 `invalid_payload` porque PEY envía los campos en la raíz; ya se acepta ese formato y el replay exacto devolvió 200 `duplicate_transaction`. El portal de PEY apunta al host de Render; la entrega real del webhook queda por ejercitar con otro pago |
 | Render | Servicio `abarpay-api` (Python, Oregon), disco persistente de 1 GB en `/var/data`; `/api/health`, `/api/bootstrap` y `/console` HTTP 200; 18 productos; persistencia verificada tras reinicio |
-| Release APK | [`dist/Abarpay-Android-1.0.7.apk`](dist/Abarpay-Android-1.0.7.apk); 34 MB; SHA-256 `f93823f32277f671148d59e090af66bd9c9987ee6d180b1dd5434121482d6b16`; firma v2 verificada |
+| Release APK | [`dist/Abarpay-Android-1.1.0.apk`](dist/Abarpay-Android-1.1.0.apk); 34 MB; SHA-256 `f300baace8810a603a77e92d61ba8f728491c9ea78a7fac541555deeeae7f7c2`; firma v2 verificada |
 | Referencia | Prototipo v0.4: 15 pruebas; v0.6: reporte independiente, no fusionado |
 
 ## Limitaciones y decisiones abiertas
 
-- Acceso **mockup** sin autenticación; consola con PIN demo compartido, no sesiones firmadas.
+- Acceso **mockup** sin autenticación; consola con PIN demo compartido, no sesiones firmadas. Invitaciones y permisos usan tokens y el header `X-Employee-Id`: protección de demostración, no seguridad real.
+- Las metas del onboarding quedan solo en el teléfono; la foto y el perfil de la tienda viven en el servidor.
 - Una sola tienda; no hay multi-tienda ni aislamiento por comercio.
 - El despliegue de Render es una demo pública sin autenticación, con una sola instancia; los despliegues tienen una breve interrupción y `autoDeploy` está desactivado (ver [`docs/despliegue-render.md`](docs/despliegue-render.md)).
 - Falta probar dictado por voz en un teléfono físico con hardware real (el escáner de cámara, el flujo manual, el parser y la media kilo sí se probaron).
@@ -185,6 +188,7 @@ Base `https://api.pey.mx`, autenticación `Authorization: Bearer <API_KEY>`.
 | --- | --- |
 | [`server/`](server/README.md) | Backend v1 FastAPI + SQLite y consola. |
 | [`docs/despliegue-render.md`](docs/despliegue-render.md) | Despliegue público en Render: servicio, disco persistente, webhook y respaldos. |
+| [`docs/v2-contract.md`](docs/v2-contract.md) | Contrato v2: onboarding, equipo e invitaciones, permisos e inventario. |
 | [`android/`](android/README.md) | App Android v1 (Kotlin/Compose). |
 | [`docs/v1-contract.md`](docs/v1-contract.md) | Contrato de API, datos y supuestos. |
 | [`docs/pendientes-manana.md`](docs/pendientes-manana.md) | Pago pendiente y decisiones para la mañana. |

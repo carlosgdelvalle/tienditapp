@@ -17,6 +17,8 @@ Abarpay: cobros CoDi verificados, ventas e inventario para la tiendita de barrio
 | Esquema y catálogo demo | `server/db.py` | Catálogo ficticio; la base **activa** vive en el disco de Render, la local es de desarrollo |
 | Pantallas del teléfono | `android/app/src/main/java/mx/abarpay/mobile/` | Español, verbos simples, sin tecnicismos |
 | Consola del dueño | `server/static/console.html` → `/console` | Vanilla HTML/CSS/JS; PIN demo en header `X-Owner-Pin` |
+| Onboarding, equipo e invitaciones | `docs/v2-contract.md` | Dueño: metas/nombre/negocio/foto; empleados por enlace o QR con permisos; identidad simulada `X-Employee-Id` |
+| Inventario v2 | `docs/v2-contract.md` → `GET /api/inventory`, `POST /set`, `POST /voice` | Valor = precio × existencias; último en actualizar sale de movimientos; conteo por voz fija stock absoluto |
 | Despliegue público | `docs/despliegue-render.md` | Render `abarpay-api`, disco persistente `/var/data`, `autoDeploy` apagado |
 | Qué se decidió | `docs/decisiones/` | Solo se agrega. Cambiar una decisión = PR con OK de la mesa |
 | Estado del equipo | `HANDOFF.md` | Lo actualiza el integrador en cada hito; es un reclamo, verifícalo contra git |
