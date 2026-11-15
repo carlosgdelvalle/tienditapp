@@ -102,3 +102,44 @@ Decisión: los pendientes/por conciliar ya no son una alarma en el teléfono; so
 - `PATCH /api/support/tickets/{id}` (owner) body `{status?, note?}`: actualiza; al resolver pone `resolved_at`.
 - Android: la tarjeta «Pendientes» del Inicio del dueño se reemplaza por «Cobrado hoy» (collectedCents). En la pantalla de venta PEY `por_conciliar` (no asentada) aparece el botón «Reportar problema» → diálogo con nota opcional → `POST /api/support/tickets` → mensaje «Ticket #… creado» o «Ya existe el ticket #…». Expired/canceled quedan como estados normales sin acción.
 - Consola: sección «Tickets de soporte» (tabla con ticket, venta, estado, reportado por, nota, fecha; botones Resolver/Reabrir vía PATCH) y tabla «Eventos PEY» con las ventas PEY recientes de cualquier estado (folio, estado, monto, hora) como rastro de eventos, resaltando pendientes/por_conciliar.
+
+## v3 · Generalización a negocios pequeños · 15-nov
+
+Decisiones del dueño (todas confirmadas): CRUD de catálogo en consola Y app; plantillas solo para negocios nuevos (tiendita usa un catálogo curado de resources/catalogo-mx/tiendita; revisar UX para catálogos grandes); tareas fijas por tipo y SOLO se muestran si están asignadas a un empleado; marca «Abarpay» y demo renombrada a nombre genérico; «Fiado» se conserva tal cual; segmentación Productos/Servicios/Comida preparada = sí; Gastos con registro simple + dictado = sí; comprobante compartible imagen/PDF = sí (cliente, en Android).
+
+### Modelo (server/db.py, migraciones aditivas/idempotentes)
+
+- products: ampliar unit CHECK a ('pieza','kg','g','litro','servicio','sesion','turno','minuto','hora','paquete','combo') (requiere recrear la tabla con copia de datos; probar idempotencia). Añadir kind TEXT NOT NULL DEFAULT 'producto' CHECK(kind IN ('producto','servicio','platillo')), category TEXT (NULL), duration_minutes INTEGER (NULL). unlimited_stock=1 significa «no lleva inventario» para servicios/platillos.
+- day_tasks: (id INTEGER PK, store_id TEXT NOT NULL REFERENCES stores(id), key TEXT NOT NULL, title TEXT NOT NULL, assigned_employee_id INTEGER NULL REFERENCES employees(id), active INTEGER NOT NULL DEFAULT 1, UNIQUE(store_id,key)). Las plantillas por tipo se crean al aplicar plantilla con assigned NULL; un empleado SOLO ve las tareas que le están asignadas (GET /api/tasks con X-Employee-Id).
+- expenses: (id INTEGER PK, store_id, employee_id INTEGER NULL REFERENCES employees(id), amount_cents INTEGER NOT NULL, note TEXT, created_at REAL NOT NULL).
+- STORE_NAME por defecto pasa a «Mi negocio» (solo bases nuevas; Render conserva su nombre hasta que el dueño lo cambie).
+
+### Endpoints nuevos
+
+- GET /api/catalog?q=&category=&kind=&limit=&offset= → {items:[...con kind/category/durationMinutes/aliases/stock...], total} (público como bootstrap).
+- POST /api/catalog (owner) {name, unit, priceCents, aliases?, stockMilli?, unlimitedStock?, kind?, category?, durationMinutes?, quick?}; PATCH /api/catalog/{id} (owner); DELETE /api/catalog/{id} (owner; 409 si tiene ventas o movimientos). Validar unit y kind.
+- POST /api/catalog/templates/apply {businessType} (owner): SOLO si la tienda no tiene items todavía (409 si ya tiene); inserta los items de la plantilla del tipo + las day_tasks de la plantilla (assigned NULL). businessType ∈ {tiendita, tortilleria, taqueria, comida-corrida, peluqueria, estetica, fondita, otro}. Tiendita: catálogo curado (~24-32 items con categoría y precio demo) leído de resources/catalogo-mx/tiendita/ (README.md, resumen.json, catalogo-incluir.csv); no incrustar el CSV completo.
+- GET /api/tasks (owner: todas; empleado: solo las suyas asignadas y activas). PATCH /api/tasks/{id} (owner) {assignedEmployeeId?: int|null, active?: bool, title?}.
+- POST /api/expenses {amountCents, note?} (cualquier empleado activo vía X-Employee-Id; sin header abierto v1); GET /api/expenses?limit=50 (owner). POST /api/expenses/voice {text} → parse {amountCents, note} sin guardar (parser: «veinte pesos de gas» → 2000, nota «gas»; dígitos y palabras; la app confirma).
+- /api/reports/today agrega totalExpensesCents (gastos de hoy).
+
+### Android (1.2.0 / code 12)
+
+- Onboarding: tipos ampliados (Tiendita/Abarrotes, Miscelánea, Tortillería, Taquería, Comida corrida, Peluquería/Barbería, Estética de uñas, Fondita, Otro); paso «¿Qué vendes?» multi-select (Productos / Servicios / Comida preparada y bebidas); metas con «Omitir»; al terminar: PUT profile, POST /api/store/photo (si hay foto), POST /api/catalog/templates/apply {tipo} (ignorar 409 si ya había catálogo), enlazar dueño.
+- Catálogo del dueño (nueva pantalla accesible desde Inicio, no una pestaña nueva): lista con búsqueda, chips de categoría, favoritos/rápidos, LazyColumn para catálogos grandes; alta/edición con formulario (nombre, precio, unidad, kind, categoría, stock o sin límite, duración, aliases); borrar con 409 controlado. Los servicios/platillos no muestran controles de stock.
+- Presets de cantidad por unidad: servicio/sesión/turno/combo → 1,2,3; kg → 250g/500g/1kg/2kg; minuto → 30/60/90; pieza/g/paquete → +1/−1.
+- Tareas: Inicio del empleado muestra SOLO las tareas asignadas a él (GET /api/tasks); tareas sin asignar no aparecen. El dueño ve «Tareas del día» (todas) con asignación por empleado (pantalla desde Inicio).
+- Gastos: botón «Registrar gasto» en Inicio (dueño y empleado) → diálogo monto + nota + micrófono (RecognizerIntent → /api/expenses/voice → confirmación) → POST /api/expenses. Los gastos de hoy salen en Reportes (totalExpensesCents).
+- Comprobante: en venta asentada (cash/fiado/PEY pagada), botón «Compartir comprobante» → vista previa → «Compartir imagen» (Compose bitmap) y «Compartir PDF» (android.graphics.pdf.PdfDocument) vía ACTION_SEND + FileProvider.
+- Copy: «Tu negocio» (no «Tu tiendita»), «Inventario bajo», «disponibles»/«unidades» en badges; «Fiado» se conserva. Demo genérica: referencias a «Tiendita de la Esquina» solo en textos de seed/legacy.
+
+### Consola
+
+- Sección «Catálogo»: tabla con búsqueda y paginación server-side (q/category/kind/limit/offset), alta/edición/borrado, campos kind/unit/category/duration; diseñada para catálogos grandes (no pintar todo de golpe).
+- Sección «Gastos»: lista + total de hoy + alta (monto y nota).
+- Sección «Tareas»: lista de day_tasks con asignación a empleado (dropdown) y activar/desactivar.
+- Copy «negocio»; «Fiado» intacto. La consola ya muestra el tipo de negocio y la foto.
+
+### Reglas que no cambian
+
+- Solo apply_payment marca PEY pagado; el verde es la única señal de entrega; tickets de soporte y eventos PEY siguen igual; equipo/invitaciones/permisos siguen igual.
