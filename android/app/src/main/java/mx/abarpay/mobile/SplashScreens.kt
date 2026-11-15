@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,7 +37,7 @@ import kotlinx.coroutines.delay
 internal fun SplashGate(onDone: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("splash", 0) }
-    var introSeen = remember { prefs.getBoolean("splash_intro_seen", false) }
+    var introSeen by remember { mutableStateOf(prefs.getBoolean("splash_intro_seen", false)) }
     if (!introSeen) {
         SplashVideoScreen(
             onDone = {
@@ -113,12 +116,6 @@ private fun SplashVideoScreen(onDone: () -> Unit) {
         AndroidView(
             factory = { playerView },
             modifier = Modifier.fillMaxSize(),
-        )
-        // Marca discreta encima del video.
-        Image(
-            painter = painterResource(R.drawable.ic_abarpay),
-            contentDescription = null,
-            modifier = Modifier.align(Alignment.Center),
         )
     }
 }
