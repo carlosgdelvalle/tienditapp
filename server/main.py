@@ -69,6 +69,7 @@ from .routes_onboarding import register as register_onboarding_routes
 from .routes_till import register as register_till_routes
 from .routes_platform import register as register_platform_routes
 from .routes_purchasing import register as register_purchasing_routes
+from .routes_landing import register as register_landing_routes, landing_page_response
 
 logger = logging.getLogger("abarpay")
 
@@ -151,6 +152,7 @@ def create_app(
     register_till_routes(app)
     register_platform_routes(app)
     register_purchasing_routes(app)
+    register_landing_routes(app)
     return app
 
 
@@ -2644,8 +2646,8 @@ def _install_routes(app: FastAPI) -> None:
         )
 
     @app.get("/", include_in_schema=False)
-    def root():
-        return RedirectResponse(url="/console")
+    def root(request: Request):
+        return landing_page_response(request)
 
 
 app = create_app()

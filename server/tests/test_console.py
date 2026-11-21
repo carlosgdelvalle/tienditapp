@@ -25,9 +25,10 @@ def test_console_page_is_static_and_auto_refreshes(client):
     assert "REFRESH_MS = 3000" in response.text
     assert "Modo demo" in response.text
 
-    redirect = client.get("/", follow_redirects=False)
-    assert redirect.status_code in (307, 308)
-    assert redirect.headers["location"] == "/console"
+    landing = client.get("/", follow_redirects=False)
+    assert landing.status_code == 200
+    assert "text/html" in landing.headers["content-type"]
+    assert "Abarpay" in landing.text
 
 
 def test_console_login_pin(client):

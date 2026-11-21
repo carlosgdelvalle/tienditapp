@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Abarpay reúne la venta, el efectivo, el fiado, el inventario y CoDi en el teléfono de tu tienda. Plan Gratis, Control y piloto de Formalización.">
+  <title>Abarpay · Cobra, controla lo que te deben y sabe qué reponer</title>
+  <style>
+    :root {
+      --ink: #16202b;
+      --ink-soft: #3a4753;
+      --bg: #ffffff;
+      --bg-soft: #f4f6f8;
+      --line: #d7dde3;
+      --brand: #0b6e4f;      /* verde oscuro, contraste AA sobre blanco */
+      --brand-dark: #085239;
+      --brand-ink: #ffffff;
+      --accent: #0b6e4f;
+      --warn-bg: #fff6e5;
+      --warn-line: #e0b25c;
+      --warn-ink: #6b4a00;
+      --muted: #57616c;
+      --focus: #1f6fd0;
+      --radius: 10px;
+      --maxw: 1120px;
+      --shadow: 0 1px 3px rgba(22,32,43,.12), 0 8px 24px rgba(22,32,43,.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+      }
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--ink);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--brand-dark); }
+    a:hover { color: #06432c; }
+
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 0;
+      top: -3rem;
+      background: var(--ink);
+      color: #fff;
+      padding: .65rem 1rem;
+      z-index: 100;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .skip-link:focus { top: 0; }
+
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    /* ---------- Header / nav ---------- */
+    .site-header {
+      position: sticky;
+      top: 0;
+      background: rgba(255,255,255,.96);
+      border-bottom: 1px solid var(--line);
+      z-index: 20;
+      backdrop-filter: blur(6px);
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      min-height: 3.5rem;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      font-weight: 800;
+      font-size: 1.15rem;
+      color: var(--ink);
+      text-decoration: none;
+      margin-right: auto;
+    }
+    .brand .mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 6px;
+      background: var(--brand);
+      color: #fff;
+      font-size: .95rem;
+      font-weight: 800;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .nav-links a {
+      text-decoration: none;
+      color: var(--ink-soft);
+      font-weight: 600;
+      padding: .5rem .25rem;
+    }
+    .nav-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.6rem;
+      padding: .5rem 1rem;
+      border: 1.5px solid var(--brand);
+      color: var(--brand-dark);
+      border-radius: var(--radius);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .nav-cta:hover { background: var(--bg-soft); }
+
+    @media (max-width: 720px) {
+      .nav-links a:not(.nav-cta) { display: none; }
+      .nav { gap: .5rem; }
+    }
+
+    /* ---------- Buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      min-height: 3rem;
+      padding: .75rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      text-align: center;
+    }
+    .btn-primary { background: var(--brand); color: var(--brand-ink); }
+    .btn-primary:hover { background: var(--brand-dark); color: #fff; }
+    .btn-secondary { background: #fff; color: var(--brand-dark); border-color: var(--brand); }
+    .btn-secondary:hover { background: var(--bg-soft); }
+    .btn-ghost { background: transparent; color: var(--ink-soft); border-color: var(--line); }
+    .btn-ghost:hover { background: var(--bg-soft); }
+    .btn:disabled, .btn[aria-disabled="true"] {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    /* ---------- Hero ---------- */
+    .hero {
+      padding: 3rem 0 2.5rem;
+      background: linear-gradient(180deg, #f6fbf8 0%, #ffffff 100%);
+      border-bottom: 1px solid var(--line);
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    .hero h1 {
+      font-size: clamp(1.9rem, 4.5vw, 3rem);
+      line-height: 1.12;
+      letter-spacing: -.01em;
+      margin: 0 0 1rem;
+      color: var(--ink);
+    }
+    .hero p.lede {
+      font-size: 1.12rem;
+      color: var(--ink-soft);
+      margin: 0 0 1.5rem;
+      max-width: 36rem;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin: 0 0 .9rem;
+    }
+    .microcopy {
+      font-size: .875rem;
+      color: var(--muted);
+      max-width: 40rem;
+    }
+
+    .proof-frame {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 1rem;
+    }
+    .proof-frame .phone {
+      display: grid;
+      gap: .6rem;
+    }
+    .proof-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: .55rem .7rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--bg-soft);
+    }
+    .proof-line .k { color: var(--muted); font-size: .875rem; }
+    .proof-line .v { font-weight: 700; text-align: right; }
+    .proof-state {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      font-weight: 700;
+      color: var(--brand-dark);
+    }
+    .tag-simulado {
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: #6b4a00;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-line);
+      border-radius: 5px;
+      padding: .1rem .45rem;
+    }
+    .proof-caption { font-size: .8rem; color: var(--muted); margin-top: .6rem; }
+
+    @media (max-width: 860px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .proof-frame { max-width: 30rem; }
+    }
+
+    /* ---------- Sections ---------- */
+    section { padding: 2.75rem 0; }
+    section + section { border-top: 1px solid var(--line); }
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2.1rem);
+      line-height: 1.2;
+      margin: 0 0 .75rem;
+      color: var(--ink);
+    }
+    .section-lede { max-width: 44rem; color: var(--ink-soft); font-size: 1.06rem; margin: 0 0 1.25rem; }
+    .alt-bg { background: var(--bg-soft); }
+    .note {
+      border-left: 3px solid var(--brand);
+      background: #eef6f1;
+      padding: .75rem 1rem;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--ink-soft);
+      font-size: .95rem;
+      margin: 1rem 0 0;
+    }
+    .note-warn {
+      border-left-color: var(--warn-line);
+      background: var(--warn-bg);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.1rem;
+      background: #fff;
+    }
+    .card h3 { margin: 0 0 .5rem; font-size: 1.05rem; }
+    .card p { margin: 0; color: var(--ink-soft); font-size: .95rem; }
+    @media (max-width: 720px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+
+    .steps { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: .6rem; }
+    .steps li {
+      display: flex;
+      gap: .75rem;
+      align-items: flex-start;
+      padding: .65rem .8rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .steps .num {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 800;
+      font-size: .85rem;
+    }
+
+    .status-draft {
+      display: inline-block;
+      margin-top: .25rem;
+      font-weight: 700;
+      color: var(--muted);
+      background: var(--bg-soft);
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      padding: .2rem .6rem;
+      font-size: .9rem;
+    }
+
+    /* ---------- Plans ---------- */
+    .plan-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      align-items: start;
+      margin-top: 1rem;
+    }
+    .plan {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 1.35rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: .6rem;
+    }
+    .plan.featured { border-color: var(--brand); box-shadow: var(--shadow); }
+    .plan .price { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+    .plan .price small { font-size: .9rem; font-weight: 600; color: var(--muted); }
+    .plan .label {
+      align-self: flex-start;
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--brand-dark);
+      background: #e7f3ed;
+      border-radius: 5px;
+      padding: .15rem .5rem;
+    }
+    .plan .label.light {
+      color: #6b4a00;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-line);
+    }
+    .plan ul { margin: .25rem 0 0; padding-left: 1.15rem; color: var(--ink-soft); font-size: .95rem; }
+    .plan .btn { margin-top: .4rem; }
+    @media (max-width: 860px) {
+      .plan-grid { grid-template-columns: 1fr; }
+    }
+
+    .dossier {
+      border: 1px dashed var(--line);
+      background: var(--bg-soft);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.2rem;
+      margin-top: 1rem;
+    }
+    .dossier .label { font-weight: 700; color: var(--muted); font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; }
+
+    /* ---------- Tables ---------- */
+    .table-scroll { overflow-x: auto; margin-top: 1rem; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+    table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .94rem; }
+    caption { text-align: left; padding: .75rem 1rem; font-weight: 700; color: var(--ink); }
+    th, td { padding: .6rem .75rem; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { background: var(--bg-soft); font-weight: 700; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td.yes { color: var(--brand-dark); font-weight: 700; }
+    td.no { color: var(--muted); }
+
+    .table-version { min-width: 720px; }
+
+    /* ---------- APK ---------- */
+    .apk-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 1.35rem 1.2rem;
+      margin-top: 1rem;
+    }
+    .apk-box .unavailable {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-line);
+      border-radius: 8px;
+      padding: .8rem 1rem;
+      color: var(--warn-ink);
+      font-weight: 600;
+      margin: 0 0 1rem;
+    }
+    .apk-field-list { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: .4rem; }
+    .apk-field-list li { display: flex; gap: .75rem; font-size: .95rem; }
+    .apk-field-list .f { flex: 0 0 9.5rem; font-weight: 700; color: var(--muted); }
+    .apk-field-list .v { color: var(--muted); }
+
+    /* ---------- Community ---------- */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin: 1rem 0 .25rem;
+      flex-wrap: wrap;
+    }
+    .toggle {
+      position: relative;
+      width: 3rem;
+      height: 1.7rem;
+      border-radius: 1rem;
+      background: var(--line);
+      border: 1px solid var(--ink-soft);
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .toggle[aria-pressed="true"] { background: var(--brand); border-color: var(--brand-dark); }
+    .toggle .knob {
+      position: absolute;
+      top: 2px; left: 2px;
+      width: calc(1.7rem - 6px);
+      height: calc(1.7rem - 6px);
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.3);
+      transition: transform .15s ease;
+    }
+    .toggle[aria-pressed="true"] .knob { transform: translateX(1.3rem); }
+    @media (prefers-reduced-motion: reduce) { .toggle .knob { transition: none; } }
+    .consent-state { font-size: .85rem; color: var(--muted); }
+    .consent-version { font-size: .85rem; color: var(--muted); }
+
+    /* ---------- FAQ ---------- */
+    .faq { display: grid; gap: .6rem; margin-top: 1rem; }
+    details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: .7rem 1rem;
+    }
+    details summary {
+      cursor: pointer;
+      font-weight: 700;
+      padding: .2rem 0;
+    }
+    details p { margin: .5rem 0 0; color: var(--ink-soft); }
+
+    /* ---------- Footer ---------- */
+    .site-footer {
+      border-top: 1px solid var(--line);
+      padding: 2rem 0;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+    .site-footer .cols {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      justify-content: space-between;
+    }
+    .site-footer a { color: var(--brand-dark); }
+    .fine-print { margin-top: 1.25rem; font-size: .82rem; line-height: 1.55; }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0;
+      margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body data-variant="full" data-route="/">
+
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="site-header">
+    <div class="wrap nav">
+      <a class="brand" href="/">
+        <span class="mark" aria-hidden="true">A</span>
+        <span>Abarpay</span>
+      </a>
+      <nav class="nav-links" aria-label="Navegación principal">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#planes">Planes</a>
+        <a href="#preguntas">Preguntas</a>
+        <a class="nav-cta" href="/entrar" data-cta="entrar-nav">Entrar a mi tienda</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido">
+
+    <!-- Hero -->
+    <section class="hero" aria-labelledby="h1-hero">
+      <div class="wrap hero-grid">
+        <div>
+          <h1 id="h1-hero">Cobra, controla lo que te deben y sabe qué reponer.</h1>
+          <p class="lede">Abarpay reúne la venta, el efectivo, el fiado, el inventario y CoDi en el teléfono de tu tienda. El efectivo y sus comprobantes quedan en el teléfono cuando falla la conexión. Al volver la señal, todo se sincroniza para que tu equipo trabaje con el mismo estado.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="/empezar" data-cta="empezar-gratis">Empezar gratis</a>
+            <a class="btn btn-secondary" href="/entrar" data-cta="entrar-mi-tienda">Entrar a mi tienda</a>
+            <a class="btn btn-ghost" href="/apk-piloto" data-cta="apk-piloto">Instalar APK piloto firmado</a>
+          </div>
+          <p class="microcopy">Gratis incluye historial y exportación. Control cuesta MXN 149 por tienda al mes y se cobra manualmente. La web no procesa cargos automáticos.</p>
+        </div>
+        <figure class="proof-frame" role="group" aria-labelledby="proof-caption">
+          <div class="phone">
+            <div class="proof-line"><span class="k">Cobro en efectivo</span><span class="v">MXN 124.50</span></div>
+            <div class="proof-line"><span class="k">Cambio</span><span class="v">MXN 75.50</span></div>
+            <div class="proof-line"><span class="k">Estado</span><span class="proof-state">&#10003; Guardado en el teléfono</span></div>
+            <div class="proof-line"><span class="k">Comprobante</span><span class="v">Venta: 2401</span></div>
+          </div>
+          <figcaption id="proof-caption" class="proof-caption">
+            <span class="tag-simulado">Simulado</span> Ejemplo de una venta en efectivo con cambio, estado y comprobante.
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 1. Today's operation -->
+    <section id="como-funciona" aria-labelledby="s1">
+      <div class="wrap">
+        <h2 id="s1" class="section-title">Tu tienda, en orden desde el primer cobro.</h2>
+        <p class="section-lede">Abre el catálogo, cobra, registra un gasto y revisa lo que pasó hoy. El dueño ve la tienda completa. Cada empleado ve solo lo que necesita para su turno.</p>
+        <div class="cards">
+          <div class="card">
+            <h3>Cobrar</h3>
+            <p>Productos, total y cambio en una sola pantalla. <span class="tag-simulado">Simulado</span></p>
+          </div>
+          <div class="card">
+            <h3>Inicio</h3>
+            <p>Ventas, lo cobrado, lo que te deben y los productos por agotarse. <span class="tag-simulado">Simulado</span></p>
+          </div>
+          <div class="card">
+            <h3>Inventario</h3>
+            <p>Existencia, último movimiento y una alerta de reposición. <span class="tag-simulado">Simulado</span></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Offline cash -->
+    <section class="alt-bg" aria-labelledby="s2">
+      <div class="wrap">
+        <h2 id="s2" class="section-title">La caja sigue cuando la señal no.</h2>
+        <p class="section-lede">Cobra en efectivo, calcula el cambio y entrega un comprobante con una referencia estable aunque no haya internet. El teléfono conserva la venta y el movimiento de existencia. Al reconectar, envía la operación una sola vez y muestra si quedó pendiente, sincronizada o necesita atención.</p>
+        <p class="note">CoDi, fiado, invitaciones y cambios de cuenta necesitan conexión. Abarpay muestra qué se puede terminar en el teléfono y qué falta del servidor.</p>
+      </div>
+    </section>
+
+    <!-- 3. CoDi -->
+    <section aria-labelledby="s3">
+      <div class="wrap">
+        <h2 id="s3" class="section-title">El QR es el inicio. La confirmación es la que cuenta.</h2>
+        <p class="section-lede">Abarpay crea el cobro CoDi para la cuenta activa de tu tienda. El pago se marca como confirmado cuando el servidor verifica la transacción. Una captura de pantalla no cambia el estado.</p>
+        <ol class="steps">
+          <li><span class="num" aria-hidden="true">1</span><span>Registra la cuenta receptora y espera su activación.</span></li>
+          <li><span class="num" aria-hidden="true">2</span><span>Genera el QR desde la venta.</span></li>
+          <li><span class="num" aria-hidden="true">3</span><span>Consulta el estado hasta recibir la confirmación verificada.</span></li>
+        </ol>
+        <p class="note note-warn">La activación bancaria puede tardar hasta cinco días hábiles. La página no promete disponibilidad inmediata ni un banco específico hasta que la cuenta esté activa.</p>
+      </div>
+    </section>
+
+    <!-- 4. Credit sales -->
+    <section class="alt-bg" aria-labelledby="s4">
+      <div class="wrap">
+        <h2 id="s4" class="section-title">Lo que te deben, con nombre y con historial.</h2>
+        <p class="section-lede">Registra una venta fiada con el cliente correcto. Consulta el saldo, registra un abono parcial o liquida la deuda. Cada movimiento conserva fecha, responsable y nota. El fiado se confirma con conexión para no duplicar una deuda desde dos teléfonos.</p>
+        <p class="note">La demostración usa nombres ficticios con una etiqueta visible <span class="tag-simulado">Simulado</span>. Esta página no muestra deudas de personas reales.</p>
+      </div>
+    </section>
+
+    <!-- 5. Restocking -->
+    <section aria-labelledby="s5">
+      <div class="wrap">
+        <h2 id="s5" class="section-title">Sabe qué falta y qué sigue.</h2>
+        <p class="section-lede">Las existencias bajas se convierten en una lista de trabajo: revisar el producto, armar el pedido, recibir la mercancía y publicar la entrada cuando esté aprobada.</p>
+        <p><span class="status-draft">Estamos preparando esta función</span></p>
+        <p><a class="btn btn-secondary" href="/empezar?interes=reposicion" data-cta="interes-piloto-reposicion">Me interesa el piloto</a></p>
+      </div>
+    </section>
+
+    <!-- 6. Built for a store that does not stop -->
+    <section class="alt-bg" aria-labelledby="s6">
+      <div class="wrap">
+        <h2 id="s6" class="section-title">Hecho para una tienda que no se detiene.</h2>
+        <div class="cards">
+          <div class="card">
+            <h3>En el teléfono</h3>
+            <p>Cobra, consulta y conserva comprobantes en el dispositivo.</p>
+          </div>
+          <div class="card">
+            <h3>Con tu equipo</h3>
+            <p>Invita por liga o QR y asigna permisos por persona.</p>
+          </div>
+          <div class="card">
+            <h3>Para decidir</h3>
+            <p>Revisa ventas, deudas y reposición con periodos y fuentes claras.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. History and export -->
+    <section aria-labelledby="s7">
+      <div class="wrap">
+        <h2 id="s7" class="section-title">Lo que registraste sigue siendo tuyo.</h2>
+        <p class="section-lede">El plan Gratis incluye historial y exportación. Si usas Control o participas en un piloto de datos, puedes consultar y recuperar tus registros. Cambiar de opinión sobre la comunidad no borra tu historial.</p>
+      </div>
+    </section>
+
+    <!-- Plans -->
+    <section id="planes" class="alt-bg" aria-labelledby="planes-title">
+      <div class="wrap">
+        <h2 id="planes-title" class="section-title">Planes</h2>
+        <p class="section-lede">Precios de referencia en pesos mexicanos. El servidor aplica la matriz por tienda y nunca bloquea la consulta ni la exportación de los registros ya creados.</p>
+
+        <div class="plan-grid">
+          <article class="plan">
+            <h3>Gratis</h3>
+            <div class="price">MXN 0</div>
+            <p class="section-lede">Incluye caja, catálogo, inventario básico, registro de ventas, CoDi sin recargo de Abarpay, historial y exportación. La web no procesa cargos automáticos.</p>
+            <a class="btn btn-primary" href="/empezar" data-cta="empezar-gratis-plan">Empezar gratis</a>
+          </article>
+
+          <article class="plan featured">
+            <h3>Control</h3>
+            <span class="label">Piloto con cobro manual</span>
+            <div class="price">MXN 149 <small>por tienda al mes</small></div>
+            <p class="section-lede">Incluye permisos por empleado, alertas de reposición, herramientas de conciliación y reportes de margen y fiado. Se activa para una tienda después de confirmar el pago del periodo.</p>
+            <ul>
+              <li>La facturación es manual y no existe cargo automático desde la landing.</li>
+              <li>La continuación se confirma antes de emitir el siguiente cobro manual.</li>
+              <li>Si no se paga el siguiente periodo, las automatizaciones se suspenden y conservas historial y exportación.</li>
+            </ul>
+            <a class="btn btn-secondary" href="/empezar?interes=control" data-cta="interes-control">Me interesa Control</a>
+            <p class="consent-state">Precio por tienda y por mes · cobro manual fuera de esta página · fecha de inicio y periodo cubierto en la confirmación · impuestos y factura en la cotización aplicable.</p>
+          </article>
+
+          <article class="plan">
+            <h3>Formalización</h3>
+            <span class="label light">Próximo piloto · registro de interés, sin renovación automática</span>
+            <div class="price">MXN 399 <small>al mes durante 3 meses</small></div>
+            <p class="section-lede">Estamos preparando tres meses de Control con acompañamiento para alta o actualización en el RFC, preparación para facturar y un primer cierre para tu contador. Al terminar vuelves a Gratis o eliges Control.</p>
+            <ul>
+              <li>El contador se cotiza aparte.</li>
+              <li>Hoy puedes registrar interés; no hay cargo ni renovación automática.</li>
+            </ul>
+            <a class="btn btn-secondary" href="/empezar?interes=formalizacion" data-cta="interes-formalizacion">Me interesa el piloto</a>
+          </article>
+        </div>
+
+        <div class="dossier">
+          <p class="label">Investigación futura · Dossier financiero</p>
+          <p class="section-lede">Estamos evaluando un expediente que tú, incluso en Gratis, podrías revisar y compartir con una financiera específica. Distinguiría ventas de caja y cobros confirmados. Probaríamos una tarifa fija que pagaría la financiera por expediente entregado. La financiera decide el crédito. Hoy sólo registramos interés.</p>
+          <a class="btn btn-ghost" href="/empezar?interes=dossier" data-cta="interes-dossier">Me interesa el expediente</a>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <caption>Matriz de comparación de planes</caption>
+            <thead>
+              <tr><th scope="col">Capacidad</th><th scope="col">Gratis</th><th scope="col">Control</th><th scope="col">Formalización</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Operación de tienda</td><td class="yes">Sí</td><td class="yes">Sí</td><td class="yes">Sí</td></tr>
+              <tr><td>Historial y exportación</td><td class="yes">Sí</td><td class="yes">Sí</td><td class="yes">Sí</td></tr>
+              <tr><td>Efectivo y comprobantes offline</td><td>Según build aceptado</td><td>Según build aceptado</td><td>Según build aceptado</td></tr>
+              <tr><td>Fiado en línea</td><td>Según build aceptado</td><td>Según build aceptado</td><td>Según build aceptado</td></tr>
+              <tr><td>Permisos por empleado, alertas de reposición, conciliación y reportes de margen/fiado</td><td class="no">No</td><td class="yes">Incluidos</td><td>Incluidos en la hipótesis de piloto</td></tr>
+              <tr><td>Acompañamiento operativo</td><td class="no">No</td><td class="no">No</td><td class="yes">Sí, durante tres meses</td></tr>
+              <tr><td>Contador</td><td class="no">No</td><td class="no">No</td><td>Servicio externo, pagado aparte</td></tr>
+              <tr><td>Renovación automática</td><td>No aplica</td><td>No, cobro manual</td><td class="no">No</td></tr>
+              <tr><td>Precio</td><td>MXN 0</td><td>MXN 149 al mes por tienda</td><td>MXN 399 al mes por 3 meses</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-scroll">
+          <table class="table-version">
+            <caption>Tabla de producto y precio versionada</caption>
+            <thead>
+              <tr><th scope="col">Versión</th><th scope="col">Vigencia</th><th scope="col">Producto</th><th scope="col">Precio</th><th scope="col">Facturación</th><th scope="col">Renovación</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>v1.0 (borrador de referencia, 21-nov-2026)</td><td>desde el 21-nov-2026 hasta cambio autorizado</td><td>Gratis</td><td>MXN 0</td><td>—</td><td>No aplica</td></tr>
+              <tr><td>v1.0 (borrador de referencia, 21-nov-2026)</td><td>ídem</td><td>Control</td><td>MXN 149 / tienda / mes</td><td>Manual, fuera de la landing</td><td>No automática; confirmación antes del siguiente cobro</td></tr>
+              <tr><td>v1.0 (borrador de referencia, 21-nov-2026)</td><td>ídem</td><td>Formalización</td><td>MXN 399 / mes por 3 meses</td><td>Manual (hipótesis de piloto)</td><td>Sin renovación automática</td></tr>
+              <tr><td>v1.0 (borrador de referencia, 21-nov-2026)</td><td>ídem</td><td>Dossier financiero</td><td>Sin precio confirmado</td><td>No aplica (solo interés)</td><td>No aplica</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="consent-state">Un cambio de precio, una nueva promesa comercial o una prueba con dinero requiere autorización del dueño de producto. Un experimento no cambia el precio cobrado.</p>
+      </div>
+    </section>
+
+    <!-- APK pilot -->
+    <section id="apk" aria-labelledby="apk-title">
+      <div class="wrap">
+        <h2 id="apk-title" class="section-title">Prueba Abarpay en el teléfono de tu tienda.</h2>
+        <p class="section-lede">El piloto se instala con un APK firmado. Antes de descargar, revisa la versión, el SHA-256 y las notas. La actualización conserva los datos locales autorizados.</p>
+        <div class="apk-box">
+          <p class="unavailable">El APK piloto aún no está publicado. Déjanos tu interés y te avisaremos cuando exista una versión firmada y verificada.</p>
+          <ul class="apk-field-list">
+            <li><span class="f">Versión</span><span class="v">No publicado</span></li>
+            <li><span class="f">Fecha</span><span class="v">No publicado</span></li>
+            <li><span class="f">Revisión fuente</span><span class="v">No publicado</span></li>
+            <li><span class="f">SHA-256</span><span class="v">No publicado</span></li>
+            <li><span class="f">Firma</span><span class="v">No publicado</span></li>
+            <li><span class="f">Compatibilidad</span><span class="v">No publicado</span></li>
+            <li><span class="f">Notas</span><span class="v">No publicado</span></li>
+            <li><span class="f">Instrucciones</span><span class="v">No publicado</span></li>
+          </ul>
+          <a class="btn btn-primary" href="/apk-piloto" data-cta="apk-piloto-request" aria-disabled="false">Solicitar el APK piloto</a>
+        </div>
+        <p class="note note-warn">Nunca distribuimos un archivo sin firma ni hash. Un enlace temporal, un archivo de depuración o un binario cuya firma no coincide con el dominio del producto no son una descarga válida.</p>
+      </div>
+    </section>
+
+    <!-- Community and data -->
+    <section class="alt-bg" aria-labelledby="com-title">
+      <div class="wrap">
+        <h2 id="com-title" class="section-title">Tú decides si compartes. Gratis sigue teniendo historial y exportación.</h2>
+        <p class="section-lede">Podemos pedir tu permiso para usar información agregada de tienda en un piloto con un socio de abasto. La participación empieza apagada. Antes de activarla verás qué campos se usan, para qué decisión, qué recibe el socio, cuánto se conserva y cómo salir. La salida detiene contribuciones futuras y conserva las reglas de los reportes ya entregados. Tus datos de clientes y tu cuenta bancaria no forman parte del reporte agregado.</p>
+        <div class="toggle-row">
+          <button type="button" class="toggle" id="data-toggle" aria-pressed="false" aria-label="Participar en el piloto de datos" data-consent="participacion">
+            <span class="knob" aria-hidden="true"></span>
+          </button>
+          <label for="data-toggle" style="font-weight:700;">Participar en el piloto de datos</label>
+        </div>
+        <p class="consent-state" id="consent-state" aria-live="polite">Estado: apagado (por defecto).</p>
+        <p class="consent-version">Versión de consentimiento: v1.0 · 21-nov-2026.</p>
+        <p>
+          <a href="#aviso-privacidad" data-cta="ver-aviso">Aviso de privacidad y propósito actual</a>
+          <span aria-hidden="true"> · </span>
+          <a href="#" data-cta="descargar-historial" onclick="return false;">Descargar mi historial</a>
+        </p>
+        <button type="button" class="btn btn-secondary" id="leave-pilot" data-cta="dejar-de-participar" hidden>Dejar de participar</button>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="preguntas" aria-labelledby="faq-title">
+      <div class="wrap">
+        <h2 id="faq-title" class="section-title">Preguntas</h2>
+        <div class="faq">
+          <details>
+            <summary>¿Qué pasa si se cae el internet?</summary>
+            <p>El efectivo, su comprobante y los movimientos locales se conservan en el teléfono. CoDi, fiado e invitaciones requieren conexión y la app lo indica.</p>
+          </details>
+          <details>
+            <summary>¿A dónde llega el dinero de CoDi?</summary>
+            <p>A la cuenta receptora activa de la tienda. La página explica el registro y la activación por el proveedor. No afirma que Abarpay retiene el saldo.</p>
+          </details>
+          <details>
+            <summary>¿Puedo perder mi historial?</summary>
+            <p>Gratis incluye historial y exportación. La recuperación de teléfono y la restauración se documentan.</p>
+          </details>
+          <details>
+            <summary>¿Control se cobra solo?</summary>
+            <p>No. El precio es MXN 149 por tienda al mes y el cobro es manual. La confirmación indica el periodo cubierto.</p>
+          </details>
+          <details>
+            <summary>¿Cómo cancelo Control?</summary>
+            <p>La página muestra el canal de contacto y explica que las automatizaciones se suspenden al terminar el periodo pagado. El historial y la exportación permanecen accesibles.</p>
+          </details>
+          <details>
+            <summary>¿Formalización incluye contador?</summary>
+            <p>No. El contador externo trabaja y cobra por separado. El piloto dura tres meses y no se renueva automáticamente.</p>
+          </details>
+          <details>
+            <summary>¿El dossier financiero está disponible?</summary>
+            <p>Es una investigación futura. No está incluido en los planes ni tiene precio o disponibilidad confirmados.</p>
+          </details>
+          <details>
+            <summary>¿Comparten mis datos?</summary>
+            <p>Solo con consentimiento para el piloto descrito. Participación apagada por defecto. Los datos de clientes y la cuenta bancaria quedan fuera del reporte agregado.</p>
+          </details>
+          <details>
+            <summary>¿Por qué piden el APK en vez de Google Play?</summary>
+            <p>El piloto distribuye una build firmada desde el dominio del producto. La ficha de Google Play es una etapa separada.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section id="aviso-privacidad" aria-labelledby="aviso-title">
+      <div class="wrap">
+        <h2 id="aviso-title" class="section-title">Aviso de privacidad y propósito actual</h2>
+        <p class="section-lede">La medición de esta página sirve para mejorar la página y la operación comercial; no es una promesa de retorno publicitario. Los eventos de medición sólo incluyen campos permitidos (ruta, variante, UTM permitidos, CTA, campaña, actor responsable y fecha). No se envían CLABE, tokens, nombres de clientes, teléfonos, deudas, direcciones, contenido de venta ni identificadores de pago a analítica ni a publicidad.</p>
+        <p class="consent-state">Cifras de negocio como CAC o ROI se muestran como <strong>Sin datos suficientes</strong> cuando falta costo o atribución completa.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="cols">
+        <div>
+          <p><strong>Abarpay</strong> · Cobros CoDi, ventas e inventario para la tiendita.</p>
+        </div>
+        <div>
+          <p><a href="/empezar" data-cta="footer-empezar">Empezar gratis</a> · <a href="/entrar" data-cta="footer-entrar">Entrar a mi tienda</a> · <a href="/apk-piloto" data-cta="footer-apk">APK piloto</a></p>
+          <p><a href="mailto:hola@aibuilders.lat">Contacto: hola@aibuilders.lat</a></p>
+        </div>
+      </div>
+      <p class="fine-print">Precios y producto en versión <strong>v1.0 (borrador de referencia, 21-nov-2026)</strong>. Las cifras sin fuente, fecha, muestra y método se muestran como «Sin datos suficientes» o se omiten. Las capturas de esta página son ejemplos con datos ficticios marcados como <span class="tag-simulado">Simulado</span>. La comunidad usa «datos agregados con controles de divulgación».</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // Funnel instrumentation hooks (consent-respecting).
+      // Only PERMITTED fields are ever collected. No CLABE, tokens, customer
+      // names, phone numbers, debt, address, sale content, or payment ids.
+      var endpoint = (window.__ABARPAY_ANALYTICS_URL__ || null);
+      var route = document.body.getAttribute("data-route") || "/";
+      var variant = document.body.getAttribute("data-variant") || "full";
+
+      function utm() {
+        var p = new URLSearchParams(window.location.search);
+        var out = {};
+        ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].forEach(function (k) {
+          var v = p.get(k);
+          if (v) { out[k] = v; }
+        });
+        return out;
+      }
+
+      function device() {
+        return (window.matchMedia && window.matchMedia("(max-width: 720px)").matches)
+          ? "mobile" : "desktop";
+      }
+
+      function eventId() {
+        return "evt-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9);
+      }
+
+      // Dedupe by stable id; only UI events (view/click/consent) are emitted here.
+      function track(name, fields) {
+        var payload = {
+          event: name,
+          id: eventId(),
+          ts: new Date().toISOString(),
+          route: route,
+          variant: variant,
+          campaign: (utm().utm_campaign || null),
+          actor: null
+        };
+        for (var k in fields) { if (Object.prototype.hasOwnProperty.call(fields, k)) { payload[k] = fields[k]; } }
+        if (!endpoint) {
+          // No analytics backend configured: no-op. Never logs sensitive data.
+          if (window.console && window.console.debug) { window.console.debug("[Abarpay analytics]", name, payload); }
+          return;
+        }
+        try {
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(endpoint, new Blob([JSON.stringify(payload)], { type: "application/json" }));
+          } else {
+            fetch(endpoint, { method: "POST", body: JSON.stringify(payload), keepalive: true, headers: { "Content-Type": "application/json" } });
+          }
+        } catch (e) { /* best effort */ }
+      }
+
+      // landing_view
+      track("landing_view", { utms: utm(), device: device(), date: new Date().toISOString().slice(0, 10) });
+
+      // cta_click on any element carrying data-cta
+      document.addEventListener("click", function (e) {
+        var el = e.target && e.target.closest ? e.target.closest("[data-cta]") : null;
+        if (!el) { return; }
+        track("cta_click", { cta: el.getAttribute("data-cta"), destination: el.getAttribute("href") || null });
+      }, true);
+
+      // Community consent toggle (off by default)
+      var toggle = document.getElementById("data-toggle");
+      var stateEl = document.getElementById("consent-state");
+      var leaveBtn = document.getElementById("leave-pilot");
+      var consentVersion = "v1.0";
+
+      function setConsent(on) {
+        toggle.setAttribute("aria-pressed", on ? "true" : "false");
+        stateEl.textContent = "Estado: " + (on ? "participando" : "apagado (por defecto)") + ".";
+        leaveBtn.hidden = !on;
+        track("consent_changed", { version: consentVersion, state: on ? "participando" : "apagado", date: new Date().toISOString().slice(0, 10) });
+      }
+
+      toggle.addEventListener("click", function () {
+        setConsent(toggle.getAttribute("aria-pressed") !== "true");
+      });
+      leaveBtn.addEventListener("click", function () {
+        setConsent(false);
+      });
+    })();
+  </script>
+</body>
+</html>
