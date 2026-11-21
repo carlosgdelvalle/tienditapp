@@ -56,6 +56,15 @@ from .serializers import (
     store_to_dict,
 )
 
+# I-phase: OIDC identity + offline sync, wired non-breaking with SIMULADO
+# defaults so the server boots without real OIDC credentials. Production swaps
+# the in-memory store for server/identity_pg.PostgresIdentityStore and a real
+# AuthConfig (see server/identity_pg.py).
+from .auth import AuthConfig
+from .auth_routes import register as register_auth_routes
+from .identity import MemoryIdentityStore
+from .sync_routes import register as register_sync_routes
+
 logger = logging.getLogger("abarpay")
 
 _PEY_RECONCILABLE = {"pending", "por_conciliar", "expired"}
@@ -132,7 +141,23 @@ def create_app(
         app.state.pey = None
 
     _install_routes(app)
+    _install_identity_and_sync(app)
     return app
+
+
+def _install_identity_and_sync(app: FastAPI) -> None:
+    """Wire the I-phase routers with SIMULADO/test defaults (non-breaking).
+
+    Identity boots on an in-memory store with an empty AuthConfig so the app
+    starts without OIDC credentials; sync reuses the existing SQLite path.
+    """
+
+    register_auth_routes(
+        app,
+        store=MemoryIdentityStore(),
+        auth_config=AuthConfig(secure_cookies=False, cookie_samesite="lax"),
+    )
+    register_sync_routes(app)
 
 
 # ---------------------------------------------------------------------------

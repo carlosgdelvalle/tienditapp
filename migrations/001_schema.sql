@@ -305,6 +305,20 @@ CREATE TABLE IF NOT EXISTS till_shifts (
     FOREIGN KEY (tenant_id, closed_by) REFERENCES memberships (tenant_id, user_id)
 );
 
+-- A device is bound to exactly one tenant and one store, forever; the
+-- composite UNIQUE (tenant_id, device_id) is the offline-journal lease binding
+-- and the composite FK keeps device -> store inside the same tenant.
+CREATE TABLE IF NOT EXISTS outbox_devices (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id text NOT NULL UNIQUE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id),
+    store_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, id),
+    UNIQUE (tenant_id, device_id),
+    FOREIGN KEY (tenant_id, store_id) REFERENCES stores (tenant_id, id)
+);
+
 CREATE TABLE IF NOT EXISTS outbox_applied (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid NOT NULL REFERENCES tenants(id),
@@ -469,6 +483,13 @@ ALTER TABLE till_shifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE till_shifts FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS till_shifts_tenant_isolation ON till_shifts;
 CREATE POLICY till_shifts_tenant_isolation ON till_shifts FOR ALL
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+
+ALTER TABLE outbox_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE outbox_devices FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS outbox_devices_tenant_isolation ON outbox_devices;
+CREATE POLICY outbox_devices_tenant_isolation ON outbox_devices FOR ALL
     USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
     WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
 
