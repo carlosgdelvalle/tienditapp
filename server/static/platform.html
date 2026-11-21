@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Abarpay · Plataforma SaaS</title>
+  <style>
+    :root {
+      --purple: #2a0065;
+      --violet: #8400ff;
+      --violet-deep: #6a00cc;
+      --lavender: #f5f0fb;
+      --soft-violet: #eadfff;
+      --soft-amber: #fff0d9;
+      --soft-green: #e4f4da;
+      --green-app: #297a00;
+      --amber-app: #9a5600;
+      --muted-app: #666680;
+      --line-soft: #f0eaf9;
+      --red: #b3261e;
+      --red-soft: #fbe4e2;
+      --ink: var(--purple);
+      --paper: var(--lavender);
+      --card: #ffffff;
+      --line: #e7ddf6;
+      --radius-card: 18px;
+      --radius-control: 12px;
+      --shadow-card: 0 1px 2px rgba(42, 0, 101, 0.05), 0 10px 26px rgba(42, 0, 101, 0.06);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(132, 0, 255, 0.10), transparent 34rem),
+        radial-gradient(circle at 100% 10%, rgba(42, 0, 101, 0.08), transparent 30rem),
+        var(--lavender);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, select, input { font: inherit; }
+
+    .shell { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+
+    .topbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+      margin-bottom: 22px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--soft-amber); color: var(--amber-app);
+      border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--amber-app); }
+    .spacer { flex: 1; }
+    .role-box { display: flex; align-items: center; gap: 8px; }
+    .role-box label { font-size: 13px; color: var(--muted-app); }
+    .role-box select {
+      border: 1px solid var(--line); background: var(--card); color: var(--ink);
+      border-radius: var(--radius-control); padding: 8px 12px; min-width: 150px;
+    }
+    .role-box select:focus { outline: 2px solid var(--violet); outline-offset: 1px; }
+
+    .tabs {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--line); margin-bottom: 22px;
+    }
+    .tab {
+      border: none; background: transparent; color: var(--muted-app);
+      padding: 12px 16px; border-radius: 12px 12px 0 0; cursor: pointer;
+      font-weight: 600; font-size: 15px;
+      border-bottom: 3px solid transparent; margin-bottom: -1px;
+    }
+    .tab:hover { color: var(--ink); }
+    .tab.active { color: var(--violet); border-bottom-color: var(--violet); }
+
+    .controls { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .controls label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-app); cursor: pointer; }
+
+    .panel { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 26px; min-height: 320px; }
+
+    .panel-head { margin-bottom: 18px; }
+    .panel-head h2 { margin: 0 0 2px; font-size: 20px; }
+    .panel-head .sub { color: var(--muted-app); font-size: 14px; margin: 0; }
+    .meta-line { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted-app); margin-top: 10px; }
+
+    .state { display: grid; place-items: center; text-align: center; padding: 48px 16px; color: var(--muted-app); }
+    .state .glyph { font-size: 34px; margin-bottom: 10px; }
+    .state .msg { font-size: 15px; max-width: 460px; }
+    .state .hint { font-size: 13px; color: var(--muted-app); margin-top: 6px; opacity: 0.8; }
+    .spinner {
+      width: 28px; height: 28px; border: 3px solid var(--soft-violet);
+      border-top-color: var(--violet); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .metric { background: var(--lavender); border-radius: 14px; padding: 16px; }
+    .metric .label { font-size: 13px; color: var(--muted-app); margin-bottom: 8px; }
+    .metric .value { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+    .metric .note { font-size: 12px; color: var(--muted-app); margin-top: 8px; }
+
+    .table-wrap { overflow-x: auto; margin-bottom: 18px; border: 1px solid var(--line-soft); border-radius: 12px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
+    th { background: var(--soft-violet); color: var(--ink); font-weight: 700; white-space: nowrap; }
+    tr:last-child td { border-bottom: none; }
+    td { color: var(--ink); }
+
+    .note { border-radius: 12px; padding: 12px 14px; font-size: 13.5px; margin-bottom: 14px; }
+    .note.info { background: var(--soft-violet); color: var(--purple); }
+    .note.warn { background: var(--soft-amber); color: var(--amber-app); }
+
+    .empty-box { border: 1px dashed var(--line); border-radius: 12px; padding: 22px; text-align: center; color: var(--muted-app); margin-bottom: 14px; }
+
+    .funnel-campaign { margin-bottom: 16px; }
+    .funnel-campaign .name { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+    .funnel-stage { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .funnel-stage .stage-label { width: 84px; flex: none; font-size: 12.5px; color: var(--muted-app); text-align: right; }
+    .funnel-stage .bar-track { flex: 1; background: var(--line-soft); border-radius: 6px; height: 18px; overflow: hidden; }
+    .funnel-stage .bar { background: var(--violet); height: 100%; border-radius: 6px; min-width: 2px; }
+    .funnel-stage .stage-value { width: 48px; flex: none; font-size: 12.5px; font-weight: 700; }
+
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .spacer { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">
+        <h1>Abarpay · Plataforma</h1>
+        <span class="badge">SIMULADO</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="role-box">
+        <label for="role">Rol (identidad simulada)</label>
+        <select id="role">
+          <option value="staff" selected>staff · todas las secciones</option>
+          <option value="operations">operations · Salud</option>
+          <option value="marketing">marketing · Crecimiento</option>
+          <option value="finance">finance · Ingresos</option>
+          <option value="analyst">analyst · Datos</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="controls">
+      <label>
+        <input type="checkbox" id="emptyToggle">
+        Mostrar estado vacío (SIMULADO)
+      </label>
+    </div>
+
+    <div class="panel" id="panel"></div>
+  </div>
+
+  <script>
+    var SECTIONS = [
+      { id: "salud", title: "Salud", subtitle: "Operaciones y soporte", role: "operations" },
+      { id: "crecimiento", title: "Crecimiento", subtitle: "Marketing y embudo", role: "marketing" },
+      { id: "ingresos", title: "Ingresos", subtitle: "Ingreso SaaS y finanzas", role: "finance" },
+      { id: "datos", title: "Datos", subtitle: "Comunidad, socios y analista", role: "analyst" }
+    ];
+
+    var activeId = "salud";
+    var tabsEl = document.getElementById("tabs");
+    var panelEl = document.getElementById("panel");
+    var roleEl = document.getElementById("role");
+    var emptyToggle = document.getElementById("emptyToggle");
+
+    var mxnFmt = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+    var intFmt = new Intl.NumberFormat("es-MX");
+
+    function esc(s) {
+      return String(s).replace(/[&<>"]/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+      });
+    }
+
+    function buildTabs() {
+      tabsEl.innerHTML = "";
+      SECTIONS.forEach(function (s) {
+        var b = document.createElement("button");
+        b.className = "tab" + (s.id === activeId ? " active" : "");
+        b.textContent = s.title;
+        b.setAttribute("aria-label", s.subtitle);
+        b.addEventListener("click", function () {
+          activeId = s.id;
+          buildTabs();
+          render();
+        });
+        tabsEl.appendChild(b);
+      });
+    }
+
+    function showLoading() {
+      panelEl.innerHTML =
+        '<div class="state"><div class="spinner"></div>' +
+        '<div class="msg">Cargando…</div></div>';
+    }
+
+    function showInsufficientAccess(message) {
+      panelEl.innerHTML =
+        '<div class="state"><div class="glyph">🔒</div>' +
+        '<div class="msg">' + esc(message) + '</div>' +
+        '<div class="hint">Cambia el rol para ver esta sección.</div></div>';
+    }
+
+    function showEmpty(message) {
+      panelEl.innerHTML =
+        '<div class="state"><div class="glyph">📭</div>' +
+        '<div class="msg">' + esc(message) + '</div></div>';
+    }
+
+    function fmtValue(block) {
+      var v = block.value;
+      if (v === null || v === undefined) return "Sin datos suficientes";
+      if (block.kind === "moneyCents") return mxnFmt.format(v / 100);
+      if (block.kind === "count") return intFmt.format(v);
+      if (block.kind === "percent") return v + "%";
+      return String(v);
+    }
+
+    function renderMetric(block) {
+      return '<div class="metric"><div class="label">' + esc(block.label) + '</div>' +
+        '<div class="value">' + esc(fmtValue(block)) + '</div>' +
+        (block.note ? '<div class="note-text note">' + esc(block.note) + '</div>' : '') +
+        '</div>';
+    }
+
+    function renderTable(block) {
+      var html = '<div class="table-wrap"><table><thead><tr>';
+      block.columns.forEach(function (c) { html += '<th>' + esc(c) + '</th>'; });
+      html += '</tr></thead><tbody>';
+      block.rows.forEach(function (row) {
+        html += '<tr>';
+        row.forEach(function (cell) { html += '<td>' + esc(cell) + '</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    function renderNote(block) {
+      var level = block.level === "warn" ? "warn" : "info";
+      return '<div class="note ' + level + '">' + esc(block.text) + '</div>';
+    }
+
+    function renderEmpty(block) {
+      return '<div class="empty-box">' + esc(block.message) + '</div>';
+    }
+
+    function renderFunnel(block) {
+      var html = "";
+      block.campaigns.forEach(function (campaign) {
+        html += '<div class="funnel-campaign"><div class="name">Campaña ' + esc(campaign.name) + '</div>';
+        var max = 1;
+        campaign.stages.forEach(function (st) { if (st.value > max) max = st.value; });
+        campaign.stages.forEach(function (st) {
+          var pct = Math.max(2, Math.round((st.value / max) * 100));
+          html += '<div class="funnel-stage"><div class="stage-label">' + esc(st.label) + '</div>' +
+            '<div class="bar-track"><div class="bar" style="width:' + pct + '%"></div></div>' +
+            '<div class="stage-value">' + intFmt.format(st.value) + '</div></div>';
+        });
+        html += '</div>';
+      });
+      return html;
+    }
+
+    function renderBlock(block) {
+      if (block.type === "metric") return renderMetric(block);
+      if (block.type === "table") return renderTable(block);
+      if (block.type === "note") return renderNote(block);
+      if (block.type === "empty") return renderEmpty(block);
+      if (block.type === "funnel") return renderFunnel(block);
+      return "";
+    }
+
+    function renderData(data) {
+      var html = '<div class="panel-head"><h2>' + esc(data.title) + '</h2>' +
+        '<p class="sub">' + esc(data.subtitle) + '</p>' +
+        '<div class="meta-line"><span>Rol mínimo: ' + esc(data.role) + '</span>' +
+        '<span>Último cálculo: ' + (data.lastCalcAt ? esc(data.lastCalcAt) : "Sin cálculo (SIMULADO)") + '</span>' +
+        (data.delayed ? '<span>Datos con retraso</span>' : '') + '</div></div>';
+
+      if (data.empty) {
+        html += '<div class="state"><div class="glyph">📭</div><div class="msg">' +
+          esc(data.emptyMessage) + '</div></div>';
+      } else {
+        var metricHtml = "";
+        var restHtml = "";
+        data.blocks.forEach(function (block) {
+          if (block.type === "metric") { metricHtml += renderMetric(block); }
+          else { restHtml += renderBlock(block); }
+        });
+        if (metricHtml) html += '<div class="grid">' + metricHtml + '</div>';
+        html += restHtml;
+      }
+      panelEl.innerHTML = html;
+    }
+
+    function render() {
+      showLoading();
+      var section = SECTIONS.find(function (s) { return s.id === activeId; });
+      if (!section) return;
+      var url = "/api/platform/" + section.id;
+      if (emptyToggle.checked) url += "?fixture=empty";
+      fetch(url, { headers: { "X-Platform-Role": roleEl.value } })
+        .then(function (resp) {
+          return resp.json().catch(function () { return {}; }).then(function (body) {
+            return { ok: resp.ok, status: resp.status, body: body };
+          });
+        })
+        .then(function (r) {
+          if (r.status === 401) {
+            showInsufficientAccess(r.body && r.body.detail ? r.body.detail : "Falta rol de plataforma.");
+          } else if (r.status === 403) {
+            var msg = "Acceso insuficiente para esta sección.";
+            if (r.body && r.body.detail && r.body.detail.message) msg = r.body.detail.message;
+            showInsufficientAccess(msg);
+          } else if (!r.ok) {
+            showEmpty("No se pudo cargar la sección (error " + r.status + ").");
+          } else if (r.body.empty) {
+            showEmpty(r.body.emptyMessage || "Sin datos.");
+          } else {
+            renderData(r.body);
+          }
+        })
+        .catch(function () {
+          showEmpty("No se pudo conectar con la plataforma.");
+        });
+    }
+
+    roleEl.addEventListener("change", render);
+    emptyToggle.addEventListener("change", render);
+    buildTabs();
+    render();
+  </script>
+</body>
+</html>

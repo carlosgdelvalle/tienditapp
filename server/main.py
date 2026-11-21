@@ -67,6 +67,7 @@ from .identity import MemoryIdentityStore
 from .sync_routes import register as register_sync_routes
 from .routes_onboarding import register as register_onboarding_routes
 from .routes_till import register as register_till_routes
+from .routes_platform import register as register_platform_routes
 
 logger = logging.getLogger("abarpay")
 
@@ -147,6 +148,7 @@ def create_app(
     _install_identity_and_sync(app)
     _install_onboarding(app)
     register_till_routes(app)
+    register_platform_routes(app)
     return app
 
 
