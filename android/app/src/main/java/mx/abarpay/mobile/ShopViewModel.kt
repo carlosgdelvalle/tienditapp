@@ -30,6 +30,7 @@ data class ShopState(
     val uncertain: Boolean = false,
     val busy: Boolean = false,
     val message: String? = null,
+    val online: Boolean = true,
     val tab: String = TAB_HOME,
     val qrHidden: Boolean = false,
     val linkCode: String? = null,
@@ -113,15 +114,15 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 action()
+                state.update { it.copy(online = true) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                val msg = when (e) {
-                    is ApiFailure -> e.message
-                    is IllegalStateException -> e.message
-                    else -> null
+                when (e) {
+                    is IllegalStateException -> state.update { it.copy(message = e.message) }
+                    is ApiFailure -> state.update { it.copy(message = e.message, online = true) }
+                    else -> state.update { it.copy(message = null, online = false) }
                 }
-                state.update { it.copy(message = msg ?: "No pudimos conectar. Intenta de nuevo.") }
             } finally {
                 state.update { it.copy(busy = false) }
             }

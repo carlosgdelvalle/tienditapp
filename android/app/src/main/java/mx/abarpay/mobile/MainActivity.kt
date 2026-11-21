@@ -174,6 +174,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
                     },
                     warning = !s.simulated,
                 )
+                if (!s.online) Notice("Sin conexión. Los cobros en línea están desactivados hasta que se restablezca la conexión.", true)
                 s.message?.let { Notice(it, true) }
                 when {
                     s.inviteToken != null -> InviteAcceptScreen(s, vm)

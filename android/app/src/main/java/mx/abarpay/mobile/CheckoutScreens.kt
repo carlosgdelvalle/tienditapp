@@ -411,7 +411,7 @@ private fun PaymentSheet(
                 FilterChip(
                     selected = s.paymentMethod == PAYMENT_PEY,
                     onClick = { vm.setPaymentMethod(PAYMENT_PEY) },
-                    enabled = !s.busy,
+                    enabled = !s.busy && s.online,
                     modifier = Modifier.testTag("pago-pey"),
                     label = { Text("PEY / CoDi") },
                     leadingIcon = { Icon(Icons.Outlined.QrCode2, null, Modifier.size(16.dp)) },
