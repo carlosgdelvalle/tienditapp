@@ -129,7 +129,7 @@ sequenceDiagram
 ### Last-unit sale
 
 - A sale that consumes the last unit is honored. Stock may end exactly at 0 and the sale is recorded in full.
-- If two disconnected tills sell the last piece, record both sales and both central movements. From one initial unit the balance reaches −1. Show the variance to the owner; do not truncate to zero, discard, or hold back the second sale. Close the variance with a count and a justified adjustment. The pending receipt does not cover up the shortage.
+- If two disconnected tills try to sell the last piece, the second sale is rejected at apply time with a 409 `stock_conflict`: stock is checked and applied server-side, never trusted from the device cache. Only the first sale is recorded and stock ends exactly at 0; it never reaches −1 from a sale.
 
 ### Audit variance
 
@@ -241,7 +241,7 @@ The till closeout captures a blind count and a handover from the employee. Offli
 - [ ] The outbox persists after killing the app and after updating from one version to another.
 - [ ] The outbox file on disk does not contain the plaintext payload.
 - [ ] Resending the same batch does not duplicate sales or movements.
-- [ ] A last-piece sale takes stock to zero; two different sales from two POS take the balance to −1 and open a variance. Repeating both batches changes neither money nor stock.
+- [ ] A last-piece sale takes stock to zero; a second till selling the same last unit is rejected with `stock_conflict` and records no sale, money, or movement. Repeating both batches changes neither money nor stock.
 - [ ] A different count records `audit_variance` and does not correct silently.
 - [ ] An offline receipt stays `awaiting_approval` and only increases stock on approval.
 - [ ] An offline fiado charge stays as a draft and is only finalized on sync.

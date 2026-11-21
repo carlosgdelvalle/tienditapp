@@ -12,14 +12,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from server.db import STORE_ID
-from server.routes_till import register as register_till_routes
 
 pytestmark = pytest.mark.usefixtures("staff")
 
 
 @pytest.fixture
 def till_client(app):
-    register_till_routes(app)
+    # create_app already wires register_till_routes; the fixture only wraps it.
     with TestClient(app) as test_client:
         yield test_client
 
@@ -116,6 +115,55 @@ def test_last_unit_conflict_between_two_tills(client, db):
     ).fetchone()[0] == 1
 
 
+# ---------------------------------------------------------------------------
+# Online last-unit conflict (POST /api/sales, cash path)
+# ---------------------------------------------------------------------------
+
+
+def test_online_last_unit_oversell_returns_409(client, db):
+    # One unit of product 1 remains; the first online sale honors it, the
+    # second (a second till selling the last piece via POST /api/sales) is
+    # rejected with 409 stock_conflict instead of a 500.
+    db.execute("UPDATE products SET stock_milli = 1000 WHERE id = 1")
+    db.commit()
+
+    first = client.post(
+        "/api/sales",
+        json={
+            "employeeId": 2,
+            "items": [{"productId": 1, "qtyMilli": 1000}],
+            "paymentMethod": "cash",
+            "cashReceivedCents": 2000,
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    second = client.post(
+        "/api/sales",
+        json={
+            "employeeId": 2,
+            "items": [{"productId": 1, "qtyMilli": 1000}],
+            "paymentMethod": "cash",
+            "cashReceivedCents": 2000,
+        },
+    )
+    assert second.status_code == 409, second.text
+    body = second.json()
+    assert body["code"] == "stock_conflict"
+    assert body.get("message")
+
+    # Exactly one sale and one payment survive; stock never goes negative.
+    assert db.execute(
+        "SELECT stock_milli FROM products WHERE id = 1"
+    ).fetchone()[0] == 0
+    assert db.execute(
+        "SELECT COUNT(*) FROM sales WHERE store_id = ?", (STORE_ID,)
+    ).fetchone()[0] == 1
+    assert db.execute(
+        "SELECT COUNT(*) FROM payments WHERE source = 'pos'"
+    ).fetchone()[0] == 1
+
+
 def test_offline_cash_resend_adds_no_money_nor_stock(client, db):
     db.execute("UPDATE products SET stock_milli = 5000 WHERE id = 1")
     db.commit()
@@ -147,6 +195,15 @@ def test_offline_cash_resend_adds_no_money_nor_stock(client, db):
 # ---------------------------------------------------------------------------
 # Till close: handover, acceptance, audited variance, idempotent retry
 # ---------------------------------------------------------------------------
+
+
+def test_till_routes_registered_by_create_app(client):
+    # create_app wires register_till_routes(app); /api/till/current resolves to
+    # the till router (404 "No hay caja abierta") instead of FastAPI's default
+    # 404 "Not Found".
+    response = client.get("/api/till/current")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No hay caja abierta"
 
 
 def _cash_sale(client: TestClient) -> None:

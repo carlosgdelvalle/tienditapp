@@ -40,6 +40,7 @@ from .db import (
 )
 from .parser import line_total_cents, normalize, parse_count, parse_expense, parse_text
 from .payments import apply_payment, restore_inventory, decrement_inventory
+from .outbox import SyncError
 from .pey import PeyClient, PeyError, PeyTimeout, payload_cents, verify_webhook
 from .reports import build_today_report, fiado_outstanding_cents, today_expenses_cents
 from .serializers import (
@@ -65,6 +66,7 @@ from .auth_routes import register as register_auth_routes
 from .identity import MemoryIdentityStore
 from .sync_routes import register as register_sync_routes
 from .routes_onboarding import register as register_onboarding_routes
+from .routes_till import register as register_till_routes
 
 logger = logging.getLogger("abarpay")
 
@@ -144,6 +146,7 @@ def create_app(
     _install_routes(app)
     _install_identity_and_sync(app)
     _install_onboarding(app)
+    register_till_routes(app)
     return app
 
 
@@ -1837,130 +1840,138 @@ def _install_routes(app: FastAPI) -> None:
         cash_received: int | None = None
         change_cents: int | None = None
 
-        with write_transaction(conn):
-            employee = _require_employee(conn, body.employeeId)
-            products: list[sqlite3.Row] = []
-            for product_id in merged:
-                products.append(_require_product(conn, product_id))
+        try:
+            with write_transaction(conn):
+                employee = _require_employee(conn, body.employeeId)
+                products: list[sqlite3.Row] = []
+                for product_id in merged:
+                    products.append(_require_product(conn, product_id))
 
-            total_cents = 0
-            lines: list[dict[str, Any]] = []
-            for product in products:
-                qty_milli = merged[int(product["id"])]
-                line_total = line_total_cents(int(product["price_cents"]), qty_milli)
-                total_cents += line_total
-                lines.append(
-                    {
-                        "product": product,
-                        "qty_milli": qty_milli,
-                        "line_total": line_total,
-                    }
-                )
-
-            customer = None
-            if body.paymentMethod == "fiado":
-                if body.customerId is None:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="customerId es obligatorio para fiado",
+                total_cents = 0
+                lines: list[dict[str, Any]] = []
+                for product in products:
+                    qty_milli = merged[int(product["id"])]
+                    line_total = line_total_cents(int(product["price_cents"]), qty_milli)
+                    total_cents += line_total
+                    lines.append(
+                        {
+                            "product": product,
+                            "qty_milli": qty_milli,
+                            "line_total": line_total,
+                        }
                     )
-                customer = _require_customer(conn, body.customerId)
 
-            if body.paymentMethod == "cash":
-                cash_received = (
-                    total_cents if body.cashReceivedCents is None else body.cashReceivedCents
-                )
-                if cash_received < total_cents:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="El efectivo recibido no cubre el total",
+                customer = None
+                if body.paymentMethod == "fiado":
+                    if body.customerId is None:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="customerId es obligatorio para fiado",
+                        )
+                    customer = _require_customer(conn, body.customerId)
+
+                if body.paymentMethod == "cash":
+                    cash_received = (
+                        total_cents if body.cashReceivedCents is None else body.cashReceivedCents
                     )
-                change_cents = cash_received - total_cents
-                status = "paid_cash"
-                charged_cents = total_cents
-                paid_at = now
-                expires_at = None
-            elif body.paymentMethod == "fiado":
-                cash_received = None
-                change_cents = None
-                status = "credit"
-                charged_cents = total_cents
-                paid_at = None
-                expires_at = None
-            else:
-                cash_received = None
-                change_cents = None
-                status = "pending"
-                charged_cents = settings.demo_charge_cents if settings.modo_demo else total_cents
-                paid_at = None
-                expires_at = now + settings.pey_expiration_seconds
+                    if cash_received < total_cents:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="El efectivo recibido no cubre el total",
+                        )
+                    change_cents = cash_received - total_cents
+                    status = "paid_cash"
+                    charged_cents = total_cents
+                    paid_at = now
+                    expires_at = None
+                elif body.paymentMethod == "fiado":
+                    cash_received = None
+                    change_cents = None
+                    status = "credit"
+                    charged_cents = total_cents
+                    paid_at = None
+                    expires_at = None
+                else:
+                    cash_received = None
+                    change_cents = None
+                    status = "pending"
+                    charged_cents = settings.demo_charge_cents if settings.modo_demo else total_cents
+                    paid_at = None
+                    expires_at = now + settings.pey_expiration_seconds
 
-            conn.execute(
-                """INSERT INTO sales
-                   (id, store_id, employee_id, created_at, status, payment_method,
-                    total_cents, charged_cents, cash_received_cents, change_cents,
-                    customer_id, pey_qr_id, pey_tx_id, paid_at, expires_at, note)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)""",
-                (
-                    sale_id,
-                    STORE_ID,
-                    employee["id"],
-                    now,
-                    status,
-                    body.paymentMethod,
-                    total_cents,
-                    charged_cents,
-                    cash_received,
-                    change_cents,
-                    body.customerId,
-                    paid_at,
-                    expires_at,
-                    body.note,
-                ),
-            )
-            for line in lines:
-                product = line["product"]
                 conn.execute(
-                    """INSERT INTO sale_items
-                       (sale_id, product_id, name, unit, qty_milli,
-                        unit_price_cents, line_total_cents)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    """INSERT INTO sales
+                       (id, store_id, employee_id, created_at, status, payment_method,
+                        total_cents, charged_cents, cash_received_cents, change_cents,
+                        customer_id, pey_qr_id, pey_tx_id, paid_at, expires_at, note)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)""",
                     (
                         sale_id,
-                        product["id"],
-                        product["name"],
-                        product["unit"],
-                        line["qty_milli"],
-                        product["price_cents"],
-                        line["line_total"],
-                    ),
-                )
-
-            if body.paymentMethod == "cash":
-                decrement_inventory(conn, sale_id, employee["id"], now=now)
-                conn.execute(
-                    """INSERT INTO payments
-                       (tx_id, sale_id, amount_cents, method, source, applied, received_at)
-                       VALUES (?, ?, ?, 'cash', 'pos', 1, ?)""",
-                    (f"cash_{sale_id}", sale_id, total_cents, now),
-                )
-            elif body.paymentMethod == "fiado":
-                decrement_inventory(conn, sale_id, employee["id"], now=now)
-                conn.execute(
-                    """INSERT INTO fiado_entries
-                       (customer_id, sale_id, kind, amount_cents, note,
-                        employee_id, created_at)
-                       VALUES (?, ?, 'charge', ?, ?, ?, ?)""",
-                    (
-                        customer["id"],
-                        sale_id,
-                        total_cents,
-                        body.note,
+                        STORE_ID,
                         employee["id"],
                         now,
+                        status,
+                        body.paymentMethod,
+                        total_cents,
+                        charged_cents,
+                        cash_received,
+                        change_cents,
+                        body.customerId,
+                        paid_at,
+                        expires_at,
+                        body.note,
                     ),
                 )
+                for line in lines:
+                    product = line["product"]
+                    conn.execute(
+                        """INSERT INTO sale_items
+                           (sale_id, product_id, name, unit, qty_milli,
+                            unit_price_cents, line_total_cents)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            sale_id,
+                            product["id"],
+                            product["name"],
+                            product["unit"],
+                            line["qty_milli"],
+                            product["price_cents"],
+                            line["line_total"],
+                        ),
+                    )
 
+                if body.paymentMethod == "cash":
+                    decrement_inventory(conn, sale_id, employee["id"], now=now)
+                    conn.execute(
+                        """INSERT INTO payments
+                           (tx_id, sale_id, amount_cents, method, source, applied, received_at)
+                           VALUES (?, ?, ?, 'cash', 'pos', 1, ?)""",
+                        (f"cash_{sale_id}", sale_id, total_cents, now),
+                    )
+                elif body.paymentMethod == "fiado":
+                    decrement_inventory(conn, sale_id, employee["id"], now=now)
+                    conn.execute(
+                        """INSERT INTO fiado_entries
+                           (customer_id, sale_id, kind, amount_cents, note,
+                            employee_id, created_at)
+                           VALUES (?, ?, 'charge', ?, ?, ?, ?)""",
+                        (
+                            customer["id"],
+                            sale_id,
+                            total_cents,
+                            body.note,
+                            employee["id"],
+                            now,
+                        ),
+                    )
+
+        except SyncError as exc:
+            if exc.code == "stock_conflict":
+                return JSONResponse(
+                    status_code=409,
+                    content={"code": exc.code, "message": exc.detail},
+                )
+            raise
         if body.paymentMethod != "pey":
             return _serialize_sale(conn, sale_id)
 
