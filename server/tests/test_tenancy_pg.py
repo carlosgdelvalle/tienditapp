@@ -67,17 +67,19 @@ TENANT_TABLES = [
     "stores", "products", "sales", "sale_items", "payments",
     "inventory_movements", "fiado_customers", "fiado_entries",
     "fiado_drafts", "expenses", "day_tasks", "bank_accounts",
-    "purchase_orders", "receipts", "till_shifts", "outbox_applied",
-    "webhook_events", "barcodes", "store_settings", "support_tickets",
+    "purchase_orders", "receipts", "till_shifts", "outbox_devices",
+    "outbox_applied", "webhook_events", "barcodes", "store_settings",
+    "support_tickets",
 ]
 
 # Deletion order for per-tenant cleanup (children before parents).
 _CHILD_ORDER = (
     "sale_items", "payments", "inventory_movements", "fiado_entries",
     "fiado_drafts", "expenses", "day_tasks", "receipts", "till_shifts",
-    "bank_accounts", "purchase_orders", "outbox_applied", "support_tickets",
-    "webhook_events", "sales", "fiado_customers", "barcodes", "products",
-    "store_settings", "memberships", "stores", "invites",
+    "bank_accounts", "purchase_orders", "outbox_applied", "outbox_devices",
+    "support_tickets", "webhook_events", "sales", "fiado_customers",
+    "barcodes", "products", "store_settings", "memberships", "stores",
+    "invites",
 )
 
 

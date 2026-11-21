@@ -5,7 +5,9 @@ frozen PostgreSQL schema in migrations/001_schema.sql, using the tenancy-aware
 pool and set_tenant_context from server/db_pg.py. Membership and invite
 *writes* are routed through the SECURITY DEFINER functions
 (manage_membership, create_invite, accept_invite), which are the only escape
-from pure RLS for those tables.
+from pure RLS for those tables. Devices, challenges and sessions are likewise
+reached only through their SECURITY DEFINER functions because their domain keys
+are user- or token-scoped rather than tenant-scoped.
 
 The SQLite demo (server/db.py) stays the default runtime; this adapter is
 opted in explicitly:
@@ -17,37 +19,13 @@ opted in explicitly:
     pool = create_pool()  # or set ABARPAY_PG_DSN
     app = create_app(identity_store=PostgresIdentityStore(pool))
 
-Scope and current gaps
-----------------------
-001_schema.sql only carries the identity core (tenants, stores, users,
-memberships, invites) plus three SECURITY DEFINER functions, and RLS is
-deny-by-default: the service role may only SELECT its own users row and its own
-memberships, and memberships/invites are writable only through the three
-functions. This adapter therefore implements exactly what the schema supports
-and raises NotImplementedError (with a precise reason) for the rest:
-
-Supported (PostgreSQL):
-  * get_tenant, get_store
-  * get_user, list_memberships, get_membership   (self-read under RLS)
-  * upsert_membership, update_membership          (manage_membership)
-  * save_invite                                   (create_invite)
-
-Requires schema additions (not yet in 001_schema.sql):
-  * find_user / create_user: users is self-read only; needs a SECURITY DEFINER
-    resolve/create function (or a write policy) for OIDC sign-in.
-  * list_tenant_members / count_active_owners: memberships is self-read only;
-    needs an owner-wide read policy or a SECURITY DEFINER function.
-  * get_invite: invites is FORCE RLS with no read policy; needs a read function.
-  * claim_invite: the accept_invite function requires the invite's tenant_id,
-    which the IdentityStore.claim_invite signature does not carry.
-  * devices / challenges / sessions: no tables exist in the frozen schema.
-
 Actor context
 -------------
-manage_membership and create_invite validate that current_setting('app.user_id')
-is an active owner of the tenant. The IdentityStore protocol methods do not
-receive an actor, so the acting owner is threaded through a context variable;
-the future request wiring must wrap owner mutations in actor_context():
+manage_membership, create_invite and list_tenant_members validate that
+current_setting('app.user_id') is an active owner of the tenant. The
+IdentityStore protocol methods do not receive an actor, so the acting owner is
+threaded through a context variable; the request wiring must wrap owner
+mutations in actor_context():
 
     from server.identity_pg import actor_context
     with actor_context(owner_user_id):
@@ -70,13 +48,17 @@ from psycopg_pool import ConnectionPool
 
 from . import db_pg
 from .identity import (
+    Challenge,
+    Device,
     IdentityStore,
     Invite,
     MemberRow,
     Membership,
+    SessionRecord,
     StoreRecord,
     TenantRecord,
     User,
+    sha256_hex,
 )
 
 # Acting owner for SECURITY DEFINER writes (see module docstring).
@@ -120,6 +102,87 @@ def _membership_from_row(row: dict) -> Membership:
     )
 
 
+def _user_from_row(row: dict) -> User:
+    return User(
+        id=str(row["id"]),
+        email=row["email"] or "",
+        name=row["name"] or "",
+        idp=row["idp"],
+        external_sub=row["external_sub"],
+    )
+
+
+def _device_from_row(row: dict) -> Device:
+    return Device(
+        device_id=row["device_id"],
+        user_id=str(row["user_id"]),
+        public_key=row["public_key"],
+        label=row["label"],
+        created_at=_to_epoch(row["created_at"]),
+        last_seen_at=_to_epoch(row["last_seen_at"]),
+    )
+
+
+def _challenge_from_row(row: dict) -> Challenge:
+    return Challenge(
+        id=row["challenge_id"],
+        code=row["code"],
+        intent=row["intent"],
+        nonce=row["nonce"],
+        created_at=_to_epoch(row["created_at"]),
+        expires_at=_to_epoch(row["expires_at"]),
+        status=row["status"],
+        browser_token_hash=row["browser_token_hash"],
+        approver_user_id=str(row["approver_user_id"]) if row["approver_user_id"] else None,
+        approver_device_id=row["approver_device_id"],
+        selected_tenant_id=str(row["tenant_id"]) if row["tenant_id"] else None,
+        approved_at=_to_epoch(row["approved_at"]),
+        redeemed_at=_to_epoch(row["redeemed_at"]),
+    )
+
+
+def _session_from_row(row: dict, token: str) -> SessionRecord:
+    return SessionRecord(
+        token=token,
+        user_id=str(row["user_id"]),
+        tenant_id=str(row["tenant_id"]) if row["tenant_id"] else None,
+        csrf_token=row["csrf_token"],
+        created_at=_to_epoch(row["created_at"]),
+        expires_at=_to_epoch(row["expires_at"]),
+        revoked_at=_to_epoch(row["revoked_at"]),
+    )
+
+
+def _invite_from_row(row: dict) -> Invite:
+    return Invite(
+        token_hash=row["token_hash"],
+        tenant_id=str(row["tenant_id"]),
+        email=row["email"],
+        role=row["role"],
+        can_sell=bool(row["can_sell"]),
+        can_fiado=bool(row["can_fiado"]),
+        can_inventory=bool(row["can_inventory"]),
+        created_at=_to_epoch(row["created_at"]),
+        expires_at=_to_epoch(row["expires_at"]),
+        accepted_at=_to_epoch(row["accepted_at"]),
+        revoked_at=_to_epoch(row["revoked_at"]),
+        accepted_by=None,  # in-memory bookkeeping; not part of the frozen schema
+    )
+
+
+def _member_row_from_row(row: dict) -> MemberRow:
+    return MemberRow(
+        user_id=str(row["user_id"]),
+        email=row["email"] or "",
+        name=row["name"] or "",
+        role=row["role"],
+        can_sell=bool(row["can_sell"]),
+        can_fiado=bool(row["can_fiado"]),
+        can_inventory=bool(row["can_inventory"]),
+        active=bool(row["active"]),
+    )
+
+
 class PostgresIdentityStore(IdentityStore):
     """IdentityStore over PostgreSQL, writes through SECURITY DEFINER fns."""
 
@@ -133,17 +196,29 @@ class PostgresIdentityStore(IdentityStore):
 
     # ------------------------------------------------------------------ users
     def find_user(self, idp: str, external_sub: str) -> User | None:
-        raise self._unsupported(
-            "find_user",
-            "users is self-read only (user_self_read) with no resolve/create "
-            "SECURITY DEFINER function; OIDC sign-in cannot claim a user yet.",
-        )
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT id, email, name, idp, external_sub "
+                    "FROM public.resolve_user(%s, %s)",
+                    (idp, external_sub),
+                )
+                row = cur.fetchone()
+        return _user_from_row(row) if row else None
 
     def create_user(self, idp: str, external_sub: str, email: str | None, name: str | None) -> User:
-        raise self._unsupported(
-            "create_user",
-            "users has no INSERT policy and no SECURITY DEFINER create function.",
-        )
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT id, email, name, idp, external_sub "
+                    "FROM public.create_user(%s, %s, %s, %s)",
+                    (idp, external_sub, email or "", name or ""),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if row is None:
+            raise RuntimeError("create_user returned no row")
+        return _user_from_row(row)
 
     def get_user(self, user_id: str) -> User | None:
         with self._conn() as conn:
@@ -155,15 +230,7 @@ class PostgresIdentityStore(IdentityStore):
                     (user_id,),
                 )
                 row = cur.fetchone()
-        if row is None:
-            return None
-        return User(
-            id=str(row["id"]),
-            email=row["email"] or "",
-            name=row["name"] or "",
-            idp=row["idp"],
-            external_sub=row["external_sub"],
-        )
+        return _user_from_row(row) if row else None
 
     # ------------------------------------------------------ tenants / stores
     def get_tenant(self, tenant_id: str) -> TenantRecord | None:
@@ -225,23 +292,24 @@ class PostgresIdentityStore(IdentityStore):
                     (user_id, tenant_id),
                 )
                 row = cur.fetchone()
-        if row is None:
-            return None
-        return _membership_from_row(row)
+        return _membership_from_row(row) if row else None
 
     def list_tenant_members(self, tenant_id: str) -> list[MemberRow]:
-        raise self._unsupported(
-            "list_tenant_members",
-            "memberships is self-read only; an owner cannot list other members "
-            "without an owner-wide read policy or SECURITY DEFINER function.",
-        )
+        actor = self._require_actor()
+        with self._conn() as conn:
+            db_pg.set_tenant_context(conn, tenant_id=tenant_id, user_id=actor)
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT user_id, email, name, role, can_sell, can_fiado, "
+                    "can_inventory, active FROM public.list_tenant_members(%s::uuid)",
+                    (tenant_id,),
+                )
+                rows = cur.fetchall()
+        return [_member_row_from_row(r) for r in rows]
 
     def count_active_owners(self, tenant_id: str) -> int:
-        raise self._unsupported(
-            "count_active_owners",
-            "memberships is self-read only; last-owner protection needs an "
-            "owner-wide read policy or SECURITY DEFINER function.",
-        )
+        members = self.list_tenant_members(tenant_id)
+        return sum(1 for m in members if m.role == "owner" and m.active)
 
     def upsert_membership(
         self,
@@ -335,44 +403,157 @@ class PostgresIdentityStore(IdentityStore):
         )
 
     # ---------------------------------------------------------------- devices
-    def save_device(self, device) -> None:
-        raise self._unsupported("save_device", "no devices table in the frozen schema.")
+    def save_device(self, device: Device) -> None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT public.save_device("
+                    "%s::uuid, %s, %s, %s, %s::timestamptz, %s::timestamptz)",
+                    (
+                        device.user_id,
+                        device.device_id,
+                        device.public_key,
+                        device.label,
+                        _from_epoch(device.created_at),
+                        _from_epoch(device.last_seen_at) if device.last_seen_at is not None else None,
+                    ),
+                )
+            conn.commit()
 
-    def get_device(self, user_id: str, device_id: str):
-        raise self._unsupported("get_device", "no devices table in the frozen schema.")
+    def get_device(self, user_id: str, device_id: str) -> Device | None:
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT device_id, user_id, public_key, label, created_at, last_seen_at "
+                    "FROM public.get_device(%s::uuid, %s)",
+                    (user_id, device_id),
+                )
+                row = cur.fetchone()
+        return _device_from_row(row) if row else None
 
-    def list_devices(self, user_id: str):
-        raise self._unsupported("list_devices", "no devices table in the frozen schema.")
+    def list_devices(self, user_id: str) -> list[Device]:
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT device_id, user_id, public_key, label, created_at, last_seen_at "
+                    "FROM public.list_devices(%s::uuid)",
+                    (user_id,),
+                )
+                rows = cur.fetchall()
+        return [_device_from_row(r) for r in rows]
 
     def delete_device(self, user_id: str, device_id: str) -> bool:
-        raise self._unsupported("delete_device", "no devices table in the frozen schema.")
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT public.delete_device(%s::uuid, %s)", (user_id, device_id))
+                deleted = cur.fetchone()[0]
+            conn.commit()
+        return bool(deleted)
 
     # ------------------------------------------------------------- challenges
-    def save_challenge(self, challenge) -> None:
-        raise self._unsupported("save_challenge", "no challenges table in the frozen schema.")
+    def save_challenge(self, challenge: Challenge) -> None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT public.save_challenge("
+                    "%s, %s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz)",
+                    (
+                        challenge.id,
+                        challenge.code,
+                        challenge.intent,
+                        challenge.nonce,
+                        challenge.status,
+                        challenge.browser_token_hash,
+                        _from_epoch(challenge.created_at),
+                        _from_epoch(challenge.expires_at),
+                    ),
+                )
+            conn.commit()
 
-    def get_challenge(self, challenge_id: str):
-        raise self._unsupported("get_challenge", "no challenges table in the frozen schema.")
+    def get_challenge(self, challenge_id: str) -> Challenge | None:
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT challenge_id, tenant_id, code, intent, nonce, status, "
+                    "browser_token_hash, approver_user_id, approver_device_id, "
+                    "created_at, expires_at, approved_at, redeemed_at "
+                    "FROM public.get_challenge(%s)",
+                    (challenge_id,),
+                )
+                row = cur.fetchone()
+        return _challenge_from_row(row) if row else None
 
-    def transition_challenge(self, challenge_id: str, from_status: str, to_status: str, **fields):
-        raise self._unsupported(
-            "transition_challenge", "no challenges table in the frozen schema."
-        )
+    def transition_challenge(
+        self, challenge_id: str, from_status: str, to_status: str, **fields: object
+    ) -> Challenge | None:
+        approver_user_id = fields.get("approver_user_id")
+        approver_device_id = fields.get("approver_device_id")
+        selected_tenant_id = fields.get("selected_tenant_id")
+        approved_at = fields.get("approved_at")
+        redeemed_at = fields.get("redeemed_at")
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT challenge_id, tenant_id, code, intent, nonce, status, "
+                    "browser_token_hash, approver_user_id, approver_device_id, "
+                    "created_at, expires_at, approved_at, redeemed_at "
+                    "FROM public.transition_challenge("
+                    "%s, %s, %s, %s::uuid, %s, %s::uuid, %s::timestamptz, %s::timestamptz)",
+                    (
+                        challenge_id,
+                        from_status,
+                        to_status,
+                        approver_user_id,
+                        approver_device_id,
+                        selected_tenant_id,
+                        _from_epoch(approved_at) if approved_at is not None else None,
+                        _from_epoch(redeemed_at) if redeemed_at is not None else None,
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return _challenge_from_row(row) if row else None
 
     # ---------------------------------------------------------------- sessions
-    def save_session(self, session) -> None:
-        raise self._unsupported("save_session", "no sessions table in the frozen schema.")
+    def save_session(self, session: SessionRecord) -> None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT public.save_session("
+                    "%s, %s::uuid, %s::uuid, %s, %s::timestamptz, %s::timestamptz)",
+                    (
+                        sha256_hex(session.token),
+                        session.user_id,
+                        session.tenant_id,
+                        session.csrf_token,
+                        _from_epoch(session.created_at),
+                        _from_epoch(session.expires_at),
+                    ),
+                )
+            conn.commit()
 
-    def get_session(self, token: str):
-        raise self._unsupported("get_session", "no sessions table in the frozen schema.")
+    def get_session(self, token: str) -> SessionRecord | None:
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT tenant_id, user_id, csrf_token, created_at, expires_at, revoked_at "
+                    "FROM public.get_session(%s)",
+                    (sha256_hex(token),),
+                )
+                row = cur.fetchone()
+        return _session_from_row(row, token) if row else None
 
     def revoke_session(self, token: str) -> None:
-        raise self._unsupported("revoke_session", "no sessions table in the frozen schema.")
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT public.revoke_session(%s)", (sha256_hex(token),))
+            conn.commit()
 
     def revoke_sessions_for_user(self, user_id: str) -> None:
-        raise self._unsupported(
-            "revoke_sessions_for_user", "no sessions table in the frozen schema."
-        )
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT public.revoke_sessions_for_user(%s::uuid)", (user_id,))
+            conn.commit()
 
     # ----------------------------------------------------------------- invites
     def save_invite(self, invite: Invite) -> None:
@@ -398,19 +579,44 @@ class PostgresIdentityStore(IdentityStore):
             conn.commit()
 
     def get_invite(self, token_hash: str) -> Invite | None:
-        raise self._unsupported(
-            "get_invite",
-            "invites is FORCE RLS with no read policy; needs a SECURITY DEFINER "
-            "read function (e.g. lookup_invite).",
-        )
+        return self._invite_by_hash(token_hash)
+
+    def lookup_invite(self, token_hash: str) -> Invite | None:
+        return self._invite_by_hash(token_hash)
 
     def claim_invite(self, token_hash: str, user_id: str, accepted_at: float) -> str | None:
-        raise self._unsupported(
-            "claim_invite",
-            "accept_invite needs the invite's tenant_id, which claim_invite's "
-            "signature does not carry; add tenant_id to claim_invite or a "
-            "lookup_invite SECURITY DEFINER read function.",
-        )
+        invite = self.lookup_invite(token_hash)
+        if invite is None:
+            return None
+        if invite.revoked_at is not None or invite.accepted_at is not None:
+            # Already accepted/revoked: any value that is not user_id signals a
+            # conflict to the caller.
+            return ""
+        try:
+            with self._conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT public.accept_invite(%s, %s::uuid, %s::uuid)",
+                        (token_hash, invite.tenant_id, user_id),
+                    )
+                conn.commit()
+            return user_id
+        except psycopg.errors.InvalidParameterValue:
+            # 'invite not found / no longer valid / expired': lost the race or
+            # the invite is gone; report a conflict rather than crashing.
+            return ""
+
+    def _invite_by_hash(self, token_hash: str) -> Invite | None:
+        with self._conn() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "SELECT token_hash, tenant_id, email, role, can_sell, can_fiado, "
+                    "can_inventory, created_at, expires_at, accepted_at, revoked_at "
+                    "FROM public.get_invite_by_hash(%s)",
+                    (token_hash,),
+                )
+                row = cur.fetchone()
+        return _invite_from_row(row) if row else None
 
     # --------------------------------------------------------------- helpers
     @contextmanager
@@ -426,10 +632,3 @@ class PostgresIdentityStore(IdentityStore):
                 "identity_pg.actor_context(owner_user_id)."
             )
         return actor
-
-    @staticmethod
-    def _unsupported(method: str, reason: str) -> NotImplementedError:
-        return NotImplementedError(
-            f"PostgresIdentityStore.{method} is not supported by the current "
-            f"migrations/001_schema.sql: {reason}"
-        )

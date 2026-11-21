@@ -381,6 +381,9 @@ class IdentityStore(ABC):
     def get_invite(self, token_hash: str) -> Invite | None: ...
 
     @abstractmethod
+    def lookup_invite(self, token_hash: str) -> Invite | None: ...
+
+    @abstractmethod
     def claim_invite(self, token_hash: str, user_id: str, accepted_at: float) -> str | None: ...
 
 
@@ -633,6 +636,10 @@ class MemoryIdentityStore(IdentityStore):
             self.invites[invite.token_hash] = invite
 
     def get_invite(self, token_hash: str) -> Invite | None:
+        with self._lock:
+            return self.invites.get(token_hash)
+
+    def lookup_invite(self, token_hash: str) -> Invite | None:
         with self._lock:
             return self.invites.get(token_hash)
 

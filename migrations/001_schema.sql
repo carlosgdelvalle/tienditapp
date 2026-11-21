@@ -84,6 +84,51 @@ CREATE TABLE IF NOT EXISTS invites (
     revoked_at timestamptz
 );
 
+-- Identity infrastructure (devices, challenges, sessions). These carry
+-- tenant_id for RLS isolation (tenant_isolation policy below) but are accessed
+-- exclusively through SECURITY DEFINER functions: the service role cannot read
+-- or write them directly because their domain keys are user/token-scoped, not
+-- tenant-scoped. tenant_id stays NULL where no tenant is bound yet (a device is
+-- user-scoped; a challenge is bound to its selected tenant only at approval).
+CREATE TABLE IF NOT EXISTS devices (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id uuid REFERENCES tenants(id),
+    user_id uuid NOT NULL REFERENCES users(id),
+    device_id text NOT NULL,
+    public_key text NOT NULL,
+    label text NOT NULL DEFAULT '',
+    revoked boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    last_seen_at timestamptz,
+    UNIQUE (user_id, device_id)
+);
+
+CREATE TABLE IF NOT EXISTS challenges (
+    challenge_id text PRIMARY KEY,
+    tenant_id uuid REFERENCES tenants(id),
+    code text NOT NULL,
+    intent text NOT NULL,
+    nonce text NOT NULL,
+    status text NOT NULL DEFAULT 'pending',
+    browser_token_hash text NOT NULL,
+    approver_user_id uuid,
+    approver_device_id text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    approved_at timestamptz,
+    redeemed_at timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    session_token_hash text PRIMARY KEY,
+    tenant_id uuid REFERENCES tenants(id),
+    user_id uuid NOT NULL REFERENCES users(id),
+    csrf_token text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz
+);
+
 -- ---------------------------------------------------------------------------
 -- Business tables. Every one carries tenant_id, a composite
 -- UNIQUE (tenant_id, id), and composite foreign keys so a row can only
@@ -544,6 +589,31 @@ CREATE POLICY membership_self_read ON memberships FOR SELECT
 ALTER TABLE invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invites FORCE ROW LEVEL SECURITY;
 
+-- Identity infrastructure tables are tenant-scoped and deny-by-default like
+-- the business tables; the service role reaches them only through the
+-- SECURITY DEFINER functions declared below (their domain keys are user/ or
+-- token-scoped, not tenant-scoped).
+ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE devices FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS devices_tenant_isolation ON devices;
+CREATE POLICY devices_tenant_isolation ON devices FOR ALL
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+
+ALTER TABLE challenges ENABLE ROW LEVEL SECURITY;
+ALTER TABLE challenges FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS challenges_tenant_isolation ON challenges;
+CREATE POLICY challenges_tenant_isolation ON challenges FOR ALL
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sessions_tenant_isolation ON sessions;
+CREATE POLICY sessions_tenant_isolation ON sessions FOR ALL
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER functions: the only escape from pure RLS for membership
 -- and invite writes. Fixed search_path, qualified names, EXECUTE revoked from
@@ -727,14 +797,409 @@ BEGIN
 END;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- Identity bootstrap and reads (SECURITY DEFINER; see the note above).
+-- resolve_user / create_user are the OIDC sign-in escape hatch: the service
+-- role cannot read or write users except for its own row, so claiming an
+-- identity runs through these functions.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION resolve_user(
+    p_idp text,
+    p_external_sub text
+)
+RETURNS SETOF public.users
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+    SELECT u.*
+    FROM public.users u
+    WHERE u.idp = p_idp AND u.external_sub = p_external_sub;
+$$;
+
+CREATE OR REPLACE FUNCTION create_user(
+    p_idp text,
+    p_external_sub text,
+    p_email text,
+    p_name text
+)
+RETURNS SETOF public.users
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_id uuid;
+BEGIN
+    INSERT INTO public.users (email, name, idp, external_sub)
+    VALUES (coalesce(p_email, ''), coalesce(p_name, ''), p_idp, p_external_sub)
+    ON CONFLICT (idp, external_sub) DO NOTHING;
+
+    SELECT u.id INTO v_id
+    FROM public.users u
+    WHERE u.idp = p_idp AND u.external_sub = p_external_sub;
+
+    IF v_id IS NULL THEN
+        RAISE EXCEPTION 'user not found after create' USING ERRCODE = '23505';
+    END IF;
+
+    RETURN QUERY
+    SELECT u.*
+    FROM public.users u
+    WHERE u.id = v_id;
+END;
+$$;
+
+-- Owner-scoped read of a tenant's members (joins users for email/name).
+CREATE OR REPLACE FUNCTION list_tenant_members(
+    p_tenant_id uuid
+)
+RETURNS TABLE (
+    user_id uuid, email text, name text, role text,
+    can_sell boolean, can_fiado boolean, can_inventory boolean, active boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_caller uuid;
+    v_ok boolean;
+BEGIN
+    v_caller := NULLIF(current_setting('app.user_id', true), '')::uuid;
+    IF v_caller IS NULL THEN
+        RAISE EXCEPTION 'missing app.user_id context' USING ERRCODE = '42501';
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1 FROM public.memberships m
+        WHERE m.tenant_id = p_tenant_id
+          AND m.user_id = v_caller
+          AND m.role = 'owner'
+          AND m.active
+    ) INTO v_ok;
+    IF NOT v_ok THEN
+        RAISE EXCEPTION 'forbidden: caller is not an owner of this tenant'
+            USING ERRCODE = '42501';
+    END IF;
+
+    RETURN QUERY
+    SELECT m.user_id, u.email, u.name, m.role,
+           m.can_sell, m.can_fiado, m.can_inventory, m.active
+    FROM public.memberships m
+    JOIN public.users u ON u.id = m.user_id
+    WHERE m.tenant_id = p_tenant_id;
+END;
+$$;
+
+-- Self-service invite read: the token hash is the secret, so no owner check.
+CREATE OR REPLACE FUNCTION get_invite_by_hash(
+    p_token_hash text
+)
+RETURNS TABLE (
+    token_hash text, tenant_id uuid, email text, role text,
+    can_sell boolean, can_fiado boolean, can_inventory boolean,
+    created_at timestamptz, expires_at timestamptz,
+    accepted_at timestamptz, revoked_at timestamptz
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+    SELECT i.token_hash, i.tenant_id, i.email, i.role,
+           i.can_sell, i.can_fiado, i.can_inventory,
+           i.created_at, i.expires_at, i.accepted_at, i.revoked_at
+    FROM public.invites i
+    WHERE i.token_hash = p_token_hash;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Devices, challenges and sessions: user/token-scoped domain operations that
+-- cannot carry a tenant_id at call time, so every read and write runs through
+-- a SECURITY DEFINER function (deny-by-default RLS is never bypassed by the
+-- service role directly).
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION save_device(
+    p_user_id uuid,
+    p_device_id text,
+    p_public_key text,
+    p_label text,
+    p_created_at timestamptz,
+    p_last_seen_at timestamptz
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    INSERT INTO public.devices
+        (user_id, device_id, public_key, label, created_at, last_seen_at)
+    VALUES
+        (p_user_id, p_device_id, p_public_key, coalesce(p_label, ''), p_created_at, p_last_seen_at)
+    ON CONFLICT (user_id, device_id) DO UPDATE
+        SET public_key = EXCLUDED.public_key,
+            label = EXCLUDED.label,
+            revoked = false,
+            last_seen_at = EXCLUDED.last_seen_at;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_device(
+    p_user_id uuid,
+    p_device_id text
+)
+RETURNS TABLE (
+    id uuid, tenant_id uuid, user_id uuid, device_id text, public_key text,
+    label text, revoked boolean, created_at timestamptz, last_seen_at timestamptz
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+    SELECT d.id, d.tenant_id, d.user_id, d.device_id, d.public_key,
+           d.label, d.revoked, d.created_at, d.last_seen_at
+    FROM public.devices d
+    WHERE d.user_id = p_user_id AND d.device_id = p_device_id AND NOT d.revoked;
+$$;
+
+CREATE OR REPLACE FUNCTION list_devices(
+    p_user_id uuid
+)
+RETURNS TABLE (
+    id uuid, tenant_id uuid, user_id uuid, device_id text, public_key text,
+    label text, revoked boolean, created_at timestamptz, last_seen_at timestamptz
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+    SELECT d.id, d.tenant_id, d.user_id, d.device_id, d.public_key,
+           d.label, d.revoked, d.created_at, d.last_seen_at
+    FROM public.devices d
+    WHERE d.user_id = p_user_id AND NOT d.revoked;
+$$;
+
+CREATE OR REPLACE FUNCTION delete_device(
+    p_user_id uuid,
+    p_device_id text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_updated integer;
+BEGIN
+    UPDATE public.devices
+    SET revoked = true
+    WHERE user_id = p_user_id AND device_id = p_device_id AND NOT revoked;
+    GET DIAGNOSTICS v_updated = ROW_COUNT;
+    RETURN v_updated > 0;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION save_challenge(
+    p_challenge_id text,
+    p_code text,
+    p_intent text,
+    p_nonce text,
+    p_status text,
+    p_browser_token_hash text,
+    p_created_at timestamptz,
+    p_expires_at timestamptz
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    INSERT INTO public.challenges
+        (challenge_id, code, intent, nonce, status, browser_token_hash,
+         created_at, expires_at)
+    VALUES
+        (p_challenge_id, p_code, p_intent, p_nonce, p_status, p_browser_token_hash,
+         p_created_at, p_expires_at);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_challenge(
+    p_challenge_id text
+)
+RETURNS TABLE (
+    challenge_id text, tenant_id uuid, code text, intent text, nonce text,
+    status text, browser_token_hash text, approver_user_id uuid,
+    approver_device_id text, created_at timestamptz, expires_at timestamptz,
+    approved_at timestamptz, redeemed_at timestamptz
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+    SELECT c.challenge_id, c.tenant_id, c.code, c.intent, c.nonce,
+           c.status, c.browser_token_hash, c.approver_user_id,
+           c.approver_device_id, c.created_at, c.expires_at,
+           c.approved_at, c.redeemed_at
+    FROM public.challenges c
+    WHERE c.challenge_id = p_challenge_id;
+$$;
+
+CREATE OR REPLACE FUNCTION transition_challenge(
+    p_challenge_id text,
+    p_from_status text,
+    p_to_status text,
+    p_approver_user_id uuid,
+    p_approver_device_id text,
+    p_tenant_id uuid,
+    p_approved_at timestamptz,
+    p_redeemed_at timestamptz
+)
+RETURNS SETOF public.challenges
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_updated integer;
+BEGIN
+    UPDATE public.challenges
+    SET status = p_to_status,
+        approver_user_id = coalesce(p_approver_user_id, approver_user_id),
+        approver_device_id = coalesce(p_approver_device_id, approver_device_id),
+        tenant_id = coalesce(p_tenant_id, tenant_id),
+        approved_at = coalesce(p_approved_at, approved_at),
+        redeemed_at = coalesce(p_redeemed_at, redeemed_at)
+    WHERE challenge_id = p_challenge_id AND status = p_from_status;
+    GET DIAGNOSTICS v_updated = ROW_COUNT;
+
+    IF v_updated = 0 THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT c.*
+    FROM public.challenges c
+    WHERE c.challenge_id = p_challenge_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION save_session(
+    p_token_hash text,
+    p_user_id uuid,
+    p_tenant_id uuid,
+    p_csrf_token text,
+    p_created_at timestamptz,
+    p_expires_at timestamptz
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    INSERT INTO public.sessions
+        (session_token_hash, user_id, tenant_id, csrf_token, created_at, expires_at)
+    VALUES
+        (p_token_hash, p_user_id, p_tenant_id, p_csrf_token, p_created_at, p_expires_at);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_session(
+    p_token_hash text
+)
+RETURNS TABLE (
+    session_token_hash text, tenant_id uuid, user_id uuid, csrf_token text,
+    created_at timestamptz, expires_at timestamptz, revoked_at timestamptz
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+    SELECT s.session_token_hash, s.tenant_id, s.user_id, s.csrf_token,
+           s.created_at, s.expires_at, s.revoked_at
+    FROM public.sessions s
+    WHERE s.session_token_hash = p_token_hash;
+$$;
+
+CREATE OR REPLACE FUNCTION revoke_session(
+    p_token_hash text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    UPDATE public.sessions
+    SET revoked_at = now()
+    WHERE session_token_hash = p_token_hash AND revoked_at IS NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION revoke_sessions_for_user(
+    p_user_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    UPDATE public.sessions
+    SET revoked_at = now()
+    WHERE user_id = p_user_id AND revoked_at IS NULL;
+END;
+$$;
+
 -- EXECUTE is revoked from PUBLIC; only the service role may call them.
 REVOKE ALL ON FUNCTION manage_membership(uuid, uuid, text, boolean, boolean, boolean, boolean) FROM PUBLIC;
 REVOKE ALL ON FUNCTION create_invite(uuid, text, text, boolean, boolean, boolean, text, timestamptz) FROM PUBLIC;
 REVOKE ALL ON FUNCTION accept_invite(text, uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION resolve_user(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION create_user(text, text, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION list_tenant_members(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION get_invite_by_hash(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION save_device(uuid, text, text, text, timestamptz, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION get_device(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION list_devices(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION delete_device(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION save_challenge(text, text, text, text, text, text, timestamptz, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION get_challenge(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION transition_challenge(text, text, text, uuid, text, uuid, timestamptz, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION save_session(text, uuid, uuid, text, timestamptz, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION get_session(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION revoke_session(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION revoke_sessions_for_user(uuid) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION manage_membership(uuid, uuid, text, boolean, boolean, boolean, boolean) TO abarpay_app;
 GRANT EXECUTE ON FUNCTION create_invite(uuid, text, text, boolean, boolean, boolean, text, timestamptz) TO abarpay_app;
 GRANT EXECUTE ON FUNCTION accept_invite(text, uuid, uuid) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION resolve_user(text, text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION create_user(text, text, text, text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION list_tenant_members(uuid) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION get_invite_by_hash(text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION save_device(uuid, text, text, text, timestamptz, timestamptz) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION get_device(uuid, text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION list_devices(uuid) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION delete_device(uuid, text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION save_challenge(text, text, text, text, text, text, timestamptz, timestamptz) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION get_challenge(text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION transition_challenge(text, text, text, uuid, text, uuid, timestamptz, timestamptz) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION save_session(text, uuid, uuid, text, timestamptz, timestamptz) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION get_session(text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION revoke_session(text) TO abarpay_app;
+GRANT EXECUTE ON FUNCTION revoke_sessions_for_user(uuid) TO abarpay_app;
 
 -- ---------------------------------------------------------------------------
 -- abarpay_app grants. RLS governs what the role can read/write.
