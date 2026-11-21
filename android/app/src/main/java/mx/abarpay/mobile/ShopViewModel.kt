@@ -121,7 +121,8 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 when (e) {
                     is IllegalStateException -> state.update { it.copy(message = e.message) }
                     is ApiFailure -> state.update { it.copy(message = e.message, online = true) }
-                    else -> state.update { it.copy(message = null, online = false) }
+                    is java.io.IOException -> state.update { it.copy(message = null, online = false) }
+                    else -> state.update { it.copy(message = "Algo salió mal. Intenta de nuevo.") }
                 }
             } finally {
                 state.update { it.copy(busy = false) }
