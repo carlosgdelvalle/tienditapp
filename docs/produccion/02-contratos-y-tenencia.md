@@ -277,3 +277,12 @@ sequenceDiagram
 - A store equals a tenant (1 to 1). An owner user can be a member of several tenants.
 - Production roles: `owner` and `employee` with the described permissions.
 - Invite tokens are stored hashed and shown once.
+
+## Frozen contracts
+
+Four domain contracts are frozen at version 1.0 for the production build, using two test tenants ("Tienda Aurora" and "Tienda Beta"), one store each. They are owned by the D2 Contracts domain owner and define the invariants each consumer package builds against:
+
+- [Tenancy isolation](contracts/tenancy.md) — isolation boundaries, resource ownership, RBAC/RLS, and what a tenant cannot read or write. Verified by **B1**.
+- [Banking and CoDi payments](contracts/banking.md) — the exact recipient when a QR is created, reconciliation against `GET /transaction/codi/qr/{id}`, duplicate webhook handling, provider failure, and that `apply_payment` is the only place a sale becomes paid. Verified by **B3**.
+- [Offline journal](contracts/offline-journal.md) — atomic outbox, receipts, resumption, exactly-one-durable-operation. Verified by **B4** and **B8**.
+- [Metrics and gross margin](contracts/metrics.md) — durable event sources, weighted-average-cost snapshot at sale time, gross margin = net sales minus attributable cost, never impute zero cost. Verified by **B5** and **B7**.
