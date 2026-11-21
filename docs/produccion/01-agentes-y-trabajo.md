@@ -1,56 +1,56 @@
-# Organización de agentes y recuperación del trabajo
+# Agent roles, dispatch, and recovery
 
-## Geometría según la dependencia
+## Match the team to the dependencies
 
-Un coordinador Pro es propietario de contratos e integración. Para investigar problemas independientes, reparte preguntas ciegas y combina resultados después. Para dinero, identidad y sincronización, una persona lógica decide el contrato y otra lo comprueba. Los estudios disponibles comparan topologías en tareas específicas; el número óptimo de agentes de Abarpay se obtiene midiendo esta máquina. [Estudio de topologías](https://arxiv.org/abs/2512.08296) · [Experiencia de ingeniería multiagente](https://www.anthropic.com/engineering/multi-agent-research-system)
+One Pro coordinator owns contracts and integration. To investigate independent questions, brief reviewers separately and compare their findings afterward. For money, identity, and synchronization, give one agent ownership of the contract and another responsibility for checking it. Published research compares topologies on specific tasks. Measure the optimal concurrency for Abarpay on this machine. [Agent topology study](https://arxiv.org/abs/2512.08296) · [Multi-agent engineering experience](https://www.anthropic.com/engineering/multi-agent-research-system)
 
-| Agente | Entrada y salida | Verificación |
+| Agent | Input and deliverable | Verification |
 |---|---|---|
-| Coordinador Pro | DAG, contratos congelados, asignaciones, resolución de conflictos e integración | Ejecuta las puertas sobre el SHA integrado y publica el índice de evidencia |
-| Ingeniería industrial Pro | Observa el entorno de la tienda, diseña la secuencia sin código, entrega tarjeta y retorno tras distracción | El implementador recorre la tarjeta, propone reducciones y devuelve objeciones al diseñador |
-| Implementador Pro | Cambios con consecuencias en dinero, identidad, aislamiento, revelación o recuperación | Segundo Pro con contexto limpio y ejemplos derivados del contrato |
-| Implementador Flash | Pantallas, fixtures, métricas, migraciones ya diseñadas, documentación y pruebas acotadas | Otro agente reproduce el resultado; puede ser Flash si el impacto está acotado |
-| Evaluadores comerciales | Dos Pro y dos Flash evalúan por separado un conjunto SIMULADO común | El coordinador comprueba cálculos, corrige errores de unidad y conserva el desacuerdo |
-| Verificador | Recibe primero el requisito; fija resultados esperados; después inspecciona el commit candidato | Dictamen PASS, FAIL o BLOCKED con reproducción y límites |
+| Pro coordinator | Dependency graph, frozen contracts, assignments, conflict resolution, integration | Run gates on the integrated SHA and publish the evidence index |
+| Pro industrial engineer | Observe the shop environment, design the sequence before coding, document the workflow and how to resume after distraction | Implementer walks through the card, proposes steps to remove, and raises objections with the designer |
+| Pro implementer | Changes affecting money, identity, isolation, disclosure, or recovery | A second Pro starts with fresh context and examples derived from the contract |
+| Flash implementer | Screens, fixtures, metrics, predesigned migrations, documentation, and bounded checks | Another agent reproduces the result. Flash is suitable for bounded impact |
+| Commercial reviewers | Two Pro and two Flash independently assess the same dataset labeled SIMULADO | Coordinator verifies calculations, corrects unit errors, and records remaining disagreement |
+| Verifier | Receive the requirement first, write down expected results, then inspect the candidate commit | Report PASS, FAIL, or BLOCKED with reproduction steps and limitations |
 
-Un trabajador solicita revisión de otro agente enviando al coordinador el ID, SHA y pregunta. El coordinador despacha o programa esa sesión dentro del cupo. El verificador puede preguntar directamente al autor por el contrato; ambos registran el caso concreto. Un tercer parecer sólo se abre cuando hay desacuerdo material y una pregunta resoluble. Evita árboles recursivos sin dueño del resultado.
+To request a peer check, send the coordinator the package ID, SHA, and question. The coordinator dispatches or schedules a session within the concurrency budget. The verifier can ask the author directly about a contract. Both record the specific case. Use a third opinion for a material disagreement with an answerable question. Every review has an owner responsible for the outcome.
 
-## Arrancar DSH en Arquimedes
+## Start DSH on Arquimedes
 
-Se verificó en el perfil distribuido `headless` de DSH Desktop 0.2.2-rc.5 la presencia de `subagent`, `subagent_fork`, perfiles por parche, entrada estándar y reanudación por ID. El perfil predeterminado seleccionaba Flash. Declara el modelo por archivo para cada proceso. Desde la raíz del repo, con sesión iniciada o credencial del proveedor provisionada por el operador para el modo elegido:
+The shipped `headless` profile in DSH Desktop 0.2.2-rc.5 included `subagent`, `subagent_fork`, profile patches, stdin input, and resumption by ID. The default profile selected Flash. Specify the model explicitly for each process. From the repo root, with a signed-in session or provider credential provisioned by the operator for the selected mode:
 
 ```sh
 DSH_BIN="/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh"
 PLAN_ROOT="$(pwd)/docs/produccion"
 "$DSH_BIN" headless --help
 "$DSH_BIN" headless --patch "$PLAN_ROOT/perfiles/pro.yml" --permission-mode workspace-write \
-  'Lee docs/produccion/00-EMPIEZA-AQUI.md. Inicia por E0 y recupera el estado del coordinador.'
+  'Read docs/produccion/00-EMPIEZA-AQUI.md. Start with E0 and recover the coordinator state.'
 ```
 
-Para un trabajador en un worktree, selecciona el parche [Flash](perfiles/flash.yml) o [Pro](perfiles/pro.yml) explícitamente. El ejemplo usa una asignación local redactada por el coordinador. La CLI admite la lectura desde stdin:
+For a worktree worker, select the [Flash](perfiles/flash.yml) or [Pro](perfiles/pro.yml) patch explicitly. Set `ASSIGNMENT_FILE` to the coordinator’s local assignment file. The CLI reads the assignment from stdin:
 
 ```sh
-"$DSH_BIN" headless --patch "$PLAN_ROOT/perfiles/flash.yml" --permission-mode workspace-write - < "$ASIGNACION_LOCAL"
+"$DSH_BIN" headless --patch "$PLAN_ROOT/perfiles/flash.yml" --permission-mode workspace-write - < "$ASSIGNMENT_FILE"
 ```
 
-Para reanudar usa el mismo directorio/perfil y `--session-id "$SESION_DSH"`. El coordinador realiza los commits si el sandbox del trabajador no tiene acceso al directorio Git común. E0 verifica en una tarea inocua la identidad **observada** del modelo en los eventos o la interfaz, el directorio efectivo y la ausencia de secretos de producción. No guardes trazas completas con prompts o variables en Git. La presencia de un plugin no demuestra que una subllamada herede el modelo correcto. Cuando el dispatcher nativo no permita fijarlo o comprobarlo, usa procesos headless independientes con los parches. Si las credenciales de Desktop no están disponibles en headless, usa sesiones Desktop con selección explícita mientras Carlos habilita el acceso del perfil; evita volcar la configuración compuesta o copiar credenciales desde el llavero.
+Resume from the same directory/profile with `--session-id "$DSH_SESSION_ID"`. The coordinator makes the commits if the worker sandbox cannot access the common Git directory. During E0, run a harmless task and verify the **observed** model in the events or interface, the effective directory, and absence of production secrets. Keep raw prompt or environment traces out of Git. Check what model subcalls actually use. When native dispatch cannot select or confirm it, start separate headless processes with the patches. If headless cannot access Desktop credentials, use Desktop sessions with explicit model selection while Carlos provisions profile access. Keep composed configuration and Keychain credentials private.
 
-## Reparto y exclusión mutua
+## Dispatch and exclusive resources
 
-Empieza con coordinador y dos trabajadores. Tras dos paquetes registra tiempo total y de espera, reprocesos, presión de memoria y límites del proveedor. Sube a cuatro trabajadores ligeros cuando aumente el trabajo aceptado por hora. Si predominan reintentos o espera de compilación, reduce el cupo. En el Mac de 16 GB usa **una** compilación Gradle, un propietario de ADB, un escritor de la secuencia de migraciones y un despliegue productivo. Los demás pueden construir y verificar en otros subsistemas.
+Start with the coordinator and two workers. After two packages, record elapsed and waiting time, rework, memory pressure, and provider limits. Increase to four lightweight workers if accepted work per hour improves. Reduce concurrency when retries or build waits dominate. On the 16 GB Mac, allow one Gradle build, one ADB owner, one migration-sequence writer, and one production deployment at a time. Other workers can build and verify independent subsystems.
 
-Un worktree por paquete con rama `cdv/<paquete>` basada en el SHA contractual. Mantén el checkout coordinador para el worklog y revisión integrada. Divide ediciones de `server/main.py`, `db.py` y la consola por responsabilidad o secuéncialas; dos agentes con la misma ruta de escritura esperan al contrato o al integrador. No hagas resets o limpiezas para resolver divergencia. Cada PR conserva su bitácora, mensaje de commit español y trazabilidad a paquete.
+Use one worktree per package with a `cdv/<package>` branch based on the contract SHA. Keep the coordinator checkout for the worklog and integration review. Divide `server/main.py`, `db.py`, and console edits by responsibility or schedule them sequentially. Workers sharing a write path wait for the contract or integrator. Preserve diverging work instead of resetting or cleaning it. Each PR includes its Spanish bitácora entry, a Spanish commit message, and a reference to its package.
 
-**Plantilla del implementador**
+**Implementer assignment**
 
-> Paquete / revisión base / dependencia aceptada / rutas con permiso de escritura / evento inicial / datos de entrada / ejemplo de éxito / caso interrumpido / resultado durable / límite de costo y tiempo / comandos de prueba / verificador previsto. Entrega SHA, decisiones tomadas y cualquier resultado sin verificar.
+> Package / base SHA / accepted dependency / writable paths / initiating event / input / success example / interrupted case / durable result / time and cost budget / test commands / designated verifier. Return the SHA, decisions made, and any outcome still unverified.
 
-**Plantilla del verificador**
+**Verifier assignment**
 
-> A partir del contrato reproduce dos casos normales, un fallo relevante y la reanudación si aplica. En un checkout limpio comprueba los datos observables antes y después, registra comandos y entorno. Clasifica las diferencias por impacto y decide PASS, FAIL o BLOCKED. Indica qué evidencia adicional cambiaría tu decisión.
+> From the contract, reproduce two ordinary cases, one relevant failure, and resumption where applicable. In a clean checkout inspect the observable before-and-after state. Record commands and environment. Classify differences by impact and return PASS, FAIL, or BLOCKED. Identify evidence that would change the verdict.
 
-**Registro mínimo en el worklog:** paquete, estado (`ready/leased/implemented/verifying/accepted/blocked`), sesión y rama, persona lógica, base y candidato, hora del último avance, evidencia, siguiente paso. Antes de recuperar un lease comprueba si hay proceso vivo, cambios sin commit, verificador activo o efecto externo ambiguo. Recupera el trabajo existente. Una caída después de un cobro, correo o push requiere consultar el resultado antes de reintentar.
+**Minimum worklog entry:** package, state (`ready/leased/implemented/verifying/accepted/blocked`), session and branch, assigned agent, base and candidate SHA, last progress time, evidence, and next action. Before reclaiming a lease, check for a running process, uncommitted edits, active verifier, or uncertain external side effect. Recover existing work. After a crash during a charge, email, or push, check its outcome before retrying.
 
-## Escalación
+## Escalation
 
-Una pregunta para Carlos abre una entrada en [AskAstra](AskAstra.md). El coordinador usa el [notificador](telegram.md). Carlos responde él mismo o decide consultar a Astra. Una decisión cambia las entradas afectadas del worklog y se comunica de forma directa a responsables y verificadores; los paquetes independientes siguen. Registra uso de tokens por modelo, latencia y porcentaje de paquetes reabiertos para decidir si otro agente aporta valor.
+For a decision from Carlos, open an [AskAstra entry](AskAstra.md). The coordinator runs the [notifier](telegram.md). Carlos answers directly or chooses to consult Astra. Update the affected worklog entries and communicate the decision directly to owners and verifiers. Independent packages continue. Track tokens by model, latency, and the proportion of packages reopened to decide whether another review adds value.

@@ -1,10 +1,10 @@
-# Notificador local a Telegram
+# Local Telegram notifier
 
-Aviso directo a un chat privado aprobado cuando una pregunta de la cola requiere la decisión de Carlos. El notificador es solo saliente y usa una plantilla fija. No envía texto arbitrario, no imprime secretos ni cuerpos de error y nunca configura ni borra el webhook del bot.
+Notify Carlos in the approved private chat when a queued question needs his decision. The outbound notifier uses a fixed template. It excludes arbitrary question text, secrets, and error bodies and leaves the bot’s webhook configuration intact.
 
-## Qué envía
+## Notification contents
 
-Cada aviso contiene el identificador de pregunta, la revisión y el indicador «Trabajo independiente», leídos de [AskAstra.md](AskAstra.md). Si se añade «Tema del aviso» con uno de los valores presupuesto, acceso, proveedor, piloto, dispositivo o criterio, el bot incluye la decisión correspondiente con texto predefinido. El detalle de la pregunta permanece en el Mac.
+Each notification contains the question ID, revision, and `Trabajo independiente` indicator from [AskAstra.md](AskAstra.md). The optional `Tema del aviso` field accepts `presupuesto`, `acceso`, `proveedor`, `piloto`, `dispositivo`, or `criterio`. The bot maps these values to predefined Spanish decision text. The full question stays on the Mac.
 
 ```text
 Abarpay DSH
@@ -12,92 +12,86 @@ Pregunta Q-001 · r1
 Trabajo independiente: sí
 ```
 
-«Trabajo independiente: sí» indica que los paquetes independientes pueden seguir sin esperar la respuesta de Carlos. «no» indica que hay que esperar.
+`Trabajo independiente: sí` means other packages can proceed while Carlos considers the question. Use `no` when work must wait.
 
-## Alcance del acceso
+## Access boundaries
 
-El notificador consulta la existencia del webhook únicamente si Carlos solicita emparejamiento. Nunca lo cambia. Durante la entrega mantiene privados el token, el chat_id, los cuerpos de error y el texto de las excepciones. No sigue redirecciones ni usa proxies, de modo que el token no pasa por un intermediario. No vuelve a enviar una revisión ya entregada.
+The notifier checks for a webhook only when Carlos requests pairing. It never changes the webhook. During delivery, the token, chat ID, error bodies, and exception text stay private. The client connects directly to Telegram, excludes proxies, and does not follow redirects. A delivered revision is deduplicated.
 
-## Requisitos previos
+## Prerequisites
 
-- El bot existente bajo control de Carlos. Puede conservar un webhook u otra integración. La entrega sólo necesita acceso HTTPS saliente a Telegram.
-- El token del bot guardado en Keychain.
-- El chat_id privado aprobado guardado en Keychain.
-- Una pregunta abierta en [AskAstra.md](AskAstra.md) en el checkout coordinador con su encabezado y su línea de trabajo independiente.
+- The existing bot under Carlos’s control. It can retain its webhook or another integration. Delivery requires outbound HTTPS access to Telegram.
+- Bot token and approved private chat ID stored in Keychain.
+- An open question in [AskAstra.md](AskAstra.md) in the coordinator checkout with its heading and independent-work field.
 
-## Configurar Keychain
+## Configure Keychain
 
-El token y el chat_id se guardan en el llavero de macOS y se leen con `/usr/bin/security`. No se escriben en el historial del shell. Para agregar cada secreto abre Keychain Access, selecciona el llavero «login» y usa Archivo → Nuevo elemento de contraseña.
+The helper reads both values using `/usr/bin/security`. For each item, open Keychain Access, select the login keychain, and choose **Archivo → Nuevo elemento de contraseña**. Avoid entering credentials in shell commands or command-line arguments that could appear in history or process listings.
 
-| Elemento | Nombre del elemento | Nombre de cuenta | Contraseña |
+| Item | Item name (service) | Account name | Password field |
 |---|---|---|---|
-| Token | `abarpay-dsh-telegram` | `bot-token` | el token que entrega BotFather |
-| Destino | `abarpay-dsh-telegram` | `chat-id` | el id numérico del chat privado |
+| Token | `abarpay-dsh-telegram` | `bot-token` | The token supplied by BotFather |
+| Destination | `abarpay-dsh-telegram` | `chat-id` | The approved numeric private chat ID |
 
-El «nombre del elemento» es el servicio que lee el notificador y el «nombre de cuenta» es la cuenta. No uses `security add-generic-password` en una terminal, porque la contraseña quedaría en el historial o en la lista de procesos.
+## Obtain the private chat ID
 
-## Obtener el chat_id privado
+From Carlos’s account, open the private bot chat and tap **Iniciar**. If the verified chat ID is already known, store it directly in Keychain. An existing webhook can continue receiving updates while DSH sends notifications.
 
-Desde la cuenta de Carlos, abrir el chat privado con su bot y pulsar **Iniciar**. Si ya conoce el ID verificado de ese chat, guardarlo directamente en el llavero. Un webhook existente puede seguir recibiendo actualizaciones mientras DSH envía avisos.
-
-Para obtener el ID sin servicios de terceros, ejecutar personalmente en una Terminal privada de Arquimedes:
+To discover the ID without a third-party service, Carlos runs these commands himself in a private interactive terminal on Arquimedes:
 
 ```sh
 scripts/notify-carlos --whoami
 scripts/notify-carlos --pair
 ```
 
-Confirmar primero el usuario del bot. Si hay un webhook, solicitar el ID al operador de esa integración y usar la configuración manual. Si otro proceso consume actualizaciones por polling, usar también el ID de esa integración. Cuando el bot esté libre para el emparejamiento, copiar la frase aleatoria en el chat privado propio, pulsar Intro en Terminal y guardar el único ID que coincidió en el llavero. El helper examina una página sin offset; nunca vacía la cola. Si no encuentra la frase o aparece más de un destino, detiene la operación. La frase y el ID de configuración se manejan en Terminal, fuera de prompts de DSH y capturas públicas.
+Confirm the bot username first. If an existing webhook or polling process handles updates, get the ID from its operator and use manual configuration. Otherwise, send the random pairing phrase in the private chat, press Enter in Terminal, and store the one matching ID in Keychain. The helper reads one page without an offset and leaves the queue intact. It stops if it finds no unique private match. Keep the pairing phrase and private ID outside DSH prompts and public screenshots.
 
-## Confirmar el emparejamiento
+## Confirm pairing
 
-Ejecuta `--whoami` para ver la identidad del bot.
+Run `--whoami` to identify the bot:
 
 ```bash
 scripts/notify-carlos --whoami
 ```
 
-La salida muestra el `@usuario` y el `id` del bot. Confirma que coincide con tu bot existente y que el `chat-id` guardado es el chat privado de Carlos. Para la primera entrega autorizada, el coordinador crea una pregunta de prueba con ID libre, revisión 1, «Trabajo independiente: sí», «Tema del aviso: acceso» y «Estado: abierta». Carlos confirma la recepción en su teléfono, se repite el mismo ID para verificar la deduplicación y se cierra la entrada. Los trabajadores ordinarios no leen el llavero. El coordinador invoca únicamente este comando; si se requiere una barrera entre procesos del mismo usuario, ejecutar el notificador con una cuenta de macOS dedicada y permisos separados sobre la cola.
+The output shows the bot username and ID. Confirm the expected bot and approved private destination. For the first authorized delivery, create a test question with an unused ID, revision 1, `Trabajo independiente: sí`, `Tema del aviso: acceso`, and `Estado: abierta`. Carlos confirms receipt on his phone. Run the same ID again to prove deduplication and close the entry. Ordinary workers do not read Keychain. The coordinator invokes the notifier command. If processes under the same user must be isolated, run the notifier under a dedicated macOS account with separate queue permissions.
 
-## Uso
+## Usage
 
 ```bash
-scripts/notify-carlos Q-001                # envía si la revisión no fue enviada
-scripts/notify-carlos Q-001 --preview      # muestra el mensaje sin red ni estado
-scripts/notify-carlos Q-001 --resolve-sent    # marca un registro dudoso como enviado
-scripts/notify-carlos Q-001 --resolve-unsent  # borra un registro dudoso para reenviar
+scripts/notify-carlos Q-001                  # send if this revision has not been delivered
+scripts/notify-carlos Q-001 --preview        # preview without network or persistent state
+scripts/notify-carlos Q-001 --resolve-sent   # mark an uncertain delivery as received
+scripts/notify-carlos Q-001 --resolve-unsent # clear an uncertain delivery after confirming it did not arrive
 ```
 
-Códigos de salida: `0` enviado u omitido, `1` fallo definitivo o no enviado, `2` requiere resolución manual o espera por límite de Telegram.
+Exit codes: `0` means delivered or already sent, `1` means definite failure or no delivery, and `2` means manual resolution or a Telegram rate-limit wait is required.
 
-## Estado y deduplicación
+## State and deduplication
 
-El notificador guarda el estado en `~/Library/Application Support/abarpay-dsh/notify-carlos-state.json` en macOS. Antes de enviar persiste una reserva «pending» y mantiene un bloqueo exclusivo durante todo el envío, de modo que dos ejecuciones simultáneas no duplican el aviso.
+On macOS the notifier stores state in `~/Library/Application Support/abarpay-dsh/notify-carlos-state.json`. Before sending it persists a `pending` reservation and holds an exclusive lock throughout dispatch to serialize concurrent runs.
 
-- `sent`: la revisión ya se entregó y se omite.
-- `pending`: el envío quedó interrumpido o está en curso, y no se reenvía solo.
-- `uncertain`: la entrega no se pudo confirmar, y no se reenvía solo.
+- `sent`: The revision was delivered. Skip it.
+- `pending`: Dispatch is in progress or was interrupted. Do not resend automatically.
+- `uncertain`: Delivery could not be confirmed. Do not resend automatically.
 
-Cuando una revisión queda en `pending` o `uncertain`, verifica a mano en el chat si llegó el aviso y resuélvelo con `--resolve-sent` o `--resolve-unsent`. Una caída después de que Telegram aceptó el mensaje deja la reserva `pending`, y la siguiente ejecución se detiene en lugar de reenviar.
+For an unresolved `pending` or `uncertain` revision, inspect the private chat and use `--resolve-sent` or `--resolve-unsent` according to what actually arrived. If the process crashes after Telegram accepted a message, the reservation survives and the next run stops for review.
 
-## Límites y reintentos
+## Rate limits and retries
 
-El notificador reintenta los fallos de conexión previos a enviar y respeta `retry_after` en las respuestas 429. Si Telegram pide esperar más que el tope de 60 segundos, el notificador no reintenta antes de tiempo. Registra una hora de reintento y termina, y la siguiente ejecución espera hasta esa hora.
+Retry connection failures that occur before dispatch. Respect Telegram’s `retry_after` on HTTP 429. When the required wait exceeds the 60-second cap, record the earliest retry time and exit. A subsequent invocation respects that deadline.
 
-## Variables de entorno
+## Environment variables
 
-- `ASK_ASTRA_FILE`: ruta alternativa a la cola de decisiones.
-- `ABARPAY_DSH_STATE_DIR`: carpeta alternativa para el archivo de estado.
-- `ABARPAY_DSH_TIMEOUT`: segundos de espera de la conexión HTTPS, 30 por defecto.
+- `ASK_ASTRA_FILE`: Alternate path to the decision queue.
+- `ABARPAY_DSH_STATE_DIR`: Alternate persistent state directory.
+- `ABARPAY_DSH_TIMEOUT`: HTTPS connection timeout in seconds, default 30.
 
-## Verificación
+## Verification
 
 ```bash
-scripts/notify-carlos Q-001 --preview   # sin red y sin estado
+scripts/notify-carlos Q-001 --preview   # no network or persistent state
 uv run --with pytest --no-project python -m pytest -q scripts/tests
 ```
 
-La prueba aislada cubre la deduplicación, la ejecución concurrente, la caída tras la reserva, el 429 diferido y la resolución manual. La confirmación del aviso real en el chat privado la hace Carlos después del emparejamiento.
-
-
-[Telegram: sendMessage](https://core.telegram.org/bots/api#sendmessage) · [Telegram: getUpdates](https://core.telegram.org/bots/api#getupdates) · [Telegram: getWebhookInfo](https://core.telegram.org/bots/api#getwebhookinfo)
+The isolated tests cover deduplication, concurrent execution, a crash after reservation, deferred 429 handling, and manual resolution. Carlos verifies real delivery to the private chat after pairing. [Telegram sendMessage](https://core.telegram.org/bots/api#sendmessage) · [Telegram getUpdates](https://core.telegram.org/bots/api#getupdates) · [Telegram getWebhookInfo](https://core.telegram.org/bots/api#getwebhookinfo)

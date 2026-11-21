@@ -1,35 +1,35 @@
-# 02 · Contratos y tenencia (multi-tenant sobre PostgreSQL con RLS)
+# 02 · Contracts and tenancy (multi-tenant on PostgreSQL with RLS)
 
-Estado: paquete de handoff para el equipo DSH. Redactado 21-nov-2026. Instrucciones de implementación para producción; no modifica el código del demo actual.
+Status: handoff package for the DSH team. Written 21-nov-2026. Implementation instructions for production. It does not modify the current demo code.
 
-## Propósito
+## Purpose
 
-Convertir el backend demo de una sola tienda (FastAPI + SQLite, una conexión por petición) en un servicio multi-tenant sobre PostgreSQL, con aislamiento a nivel de fila (RLS) y pertenencia de usuario a tenant. La identidad de los usuarios (Auth0 y Microsoft Entra ID) vive en `04-identidad-onboarding-y-pey.md` y este documento la consume.
+Convert the single-store demo backend (FastAPI + SQLite, one connection per request) into a multi-tenant service on PostgreSQL, with row-level security (RLS) and user-to-tenant membership. User identity (Auth0 and Microsoft Entra ID) lives in `04-identidad-onboarding-y-pey.md`, which this document consumes.
 
-## Contexto heredado
+## Inherited context
 
-- El demo guarda una sola tienda `tiendita-esquina` y tres empleados en SQLite (`server/db.py`, contrato `docs/v1-contract.md`).
-- El acceso es simulado con el header `X-Employee-Id` y la consola usa un PIN compartido (`docs/decisiones/0005-v1-android-backend-consola.md`).
-- La regla de que solo `apply_payment` marca una venta PEY como pagada se conserva en producción (`server/payments.py`).
+- The demo stores a single store `tiendita-esquina` and three employees in SQLite (`server/db.py`, contract `docs/v1-contract.md`).
+- Access is simulated with the `X-Employee-Id` header and the console uses a shared PIN (`docs/decisiones/0005-v1-android-backend-consola.md`).
+- The rule that only `apply_payment` marks a PEY sale as paid is kept in production (`server/payments.py`).
 
-## Decisiones de diseño
+## Design decisions
 
-- Una tienda equivale a un tenant. La relación es 1 a 1 y se impone en el esquema.
-- Un usuario dueño puede ser miembro de varios tenants independientes. Cada tenant es un negocio aislado.
-- La unidad de aislamiento es `tenant_id`. RLS filtra por tenant en cada tabla de negocio.
-- El backend usa un único rol de base de datos `abarpay_app` y fija el contexto por transacción con las variables `app.tenant_id` y `app.user_id`.
-- Ninguna consulta de la aplicación usa el rol superusuario ni el owner de las tablas.
+- A store equals a tenant. The relationship is 1 to 1 and is enforced in the schema.
+- An owner user can be a member of several independent tenants. Each tenant is an isolated business.
+- The isolation unit is `tenant_id`. RLS filters by tenant in every business table.
+- The backend uses a single database role `abarpay_app` and sets the context per transaction with the variables `app.tenant_id` and `app.user_id`.
+- No application query uses the superuser role or the owner of the tables.
 
-## Modelo de datos
+## Data model
 
-| Tabla | Propósito | Clave de aislamiento |
+| Table | Purpose | Isolation key |
 | --- | --- | --- |
-| `tenants` | Negocio (1 a 1 con su tienda) | PK `id` |
-| `stores` | Punto de venta, único por tenant | `tenant_id` UNIQUE |
-| `users` | Identidad única de una persona | PK `id` |
-| `memberships` | Relación usuario-tenant con rol y permisos | `tenant_id`, `user_id` |
-| `invites` | Invitaciones pendientes con token hasheado | `tenant_id` |
-| Tablas de negocio | `products`, `sales`, `sale_items`, `payments`, `inventory_movements`, `fiado_customers`, `fiado_entries`, `fiado_drafts`, `expenses`, `day_tasks`, `bank_accounts`, `purchase_orders`, `receipts`, `till_shifts`, `outbox_applied` | `tenant_id` |
+| `tenants` | Business (1 to 1 with its store) | PK `id` |
+| `stores` | Point of sale, unique per tenant | `tenant_id` UNIQUE |
+| `users` | Unique identity of a person | PK `id` |
+| `memberships` | User-tenant relationship with role and permissions | `tenant_id`, `user_id` |
+| `invites` | Pending invites with a hashed token | `tenant_id` |
+| Business tables | `products`, `sales`, `sale_items`, `payments`, `inventory_movements`, `fiado_customers`, `fiado_entries`, `fiado_drafts`, `expenses`, `day_tasks`, `bank_accounts`, `purchase_orders`, `receipts`, `till_shifts`, `outbox_applied` | `tenant_id` |
 
 ```sql
 CREATE TABLE tenants (
@@ -89,13 +89,13 @@ CREATE TABLE invites (
 );
 ```
 
-- `users.idp = 'legacy'` existe solo para preservar el historial de los empleados del demo durante la migración. Esas filas son históricas y nunca se vinculan automáticamente a un inicio de sesión real. Un inicio de sesión real crea su propio `users`.
-- `UNIQUE (tenant_id)` en `stores` impone la relación 1 a 1. Cada tenant tiene a lo sumo una tienda y cada tienda pertenece a un solo tenant.
-- El token de invitación se genera con 32 bytes aleatorios, se muestra una sola vez y se persiste como `SHA-256(token)` en `token_hash`. El token en claro nunca se guarda ni se registra.
+- `users.idp = 'legacy'` exists only to preserve the demo employees' history during migration. Those rows are historical and are never automatically linked to a real sign-in. A real sign-in creates its own `users` row.
+- `UNIQUE (tenant_id)` on `stores` enforces the 1-to-1 relationship. Each tenant has at most one store and each store belongs to a single tenant.
+- The invite token is generated with 32 random bytes, shown once, and persisted as `SHA-256(token)` in `token_hash`. The plaintext token is never stored or logged.
 
-## Prevención de claves foráneas entre tenants
+## Preventing cross-tenant foreign keys
 
-Cada tabla padre declara `UNIQUE (tenant_id, id)` y las claves foráneas son compuestas, de modo que una fila solo puede referenciar otra del mismo tenant.
+Each parent table declares `UNIQUE (tenant_id, id)` and the foreign keys are composite, so a row can only reference another row from the same tenant.
 
 ```sql
 ALTER TABLE stores ADD CONSTRAINT stores_tenant_id_id_key UNIQUE (tenant_id, id);
@@ -129,17 +129,17 @@ CREATE TABLE sale_items (
 );
 ```
 
-## Aislamiento con RLS
+## Isolation with RLS
 
-### Rol y variables de contexto
+### Role and context variables
 
 ```sql
 CREATE ROLE abarpay_app NOLOGIN;
--- El rol de conexión LOGIN, sin privilegios administrativos, asume abarpay_app.
--- El migrador es otro principal. El rol de servicio carece de BYPASSRLS y DDL.
+-- The LOGIN connection role, without administrative privileges, assumes abarpay_app.
+-- The migrator is a different principal. The service role lacks BYPASSRLS and DDL.
 ```
 
-Cada petición autorizada abre una transacción y fija el contexto antes de cualquier consulta:
+Each authorized request opens a transaction and sets the context before any query:
 
 ```python
 def set_tenant_context(conn, *, tenant_id: str, user_id: str) -> None:
@@ -147,9 +147,9 @@ def set_tenant_context(conn, *, tenant_id: str, user_id: str) -> None:
     conn.execute("SELECT set_config('app.user_id', %s, true)", (user_id,))
 ```
 
-El tercer argumento `true` equivale a `SET LOCAL`. El valor local se revierte al terminar o abortar la transacción. Bloquear valores de sesión globales; probar reutilización con commit y rollback. NULLIF cubre también el marcador vacío de una conexión reutilizada.
+The third argument `true` is equivalent to `SET LOCAL`. The local value is reverted when the transaction ends or aborts. Block global session values. Test reuse with commit and rollback. NULLIF also covers the empty marker of a reused connection.
 
-### Política canónica
+### Canonical policy
 
 ```sql
 ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
@@ -160,22 +160,22 @@ CREATE POLICY store_tenant_isolation ON stores FOR ALL
   WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
 ```
 
-La misma política se aplica a cada tabla de negocio, cambiando solo el nombre. Reglas:
+The same policy applies to every business table, changing only its name. Rules:
 
-- `current_setting('app.tenant_id', true)` devuelve `NULL` cuando la variable no está fijada. La comparación con `NULL` es `NULL`, y una fila con `NULL` se filtra. El resultado es denegación por defecto: sin contexto no se lee ni se escribe nada.
-- `FORCE ROW LEVEL SECURITY` evita que el owner de la tabla salte la política.
-- Las políticas `FOR ALL` cubren lectura y escritura con `USING` y `WITH CHECK`, de modo que un `INSERT` o `UPDATE` que intente escribir otra `tenant_id` falla, no se filtra en silencio.
+- `current_setting('app.tenant_id', true)` returns `NULL` when the variable is not set. Comparing with `NULL` yields `NULL`, and a row yielding `NULL` is filtered out. The result is deny-by-default: without context, nothing is read or written.
+- `FORCE ROW LEVEL SECURITY` prevents the table owner from bypassing the policy.
+- The `FOR ALL` policies cover reads and writes with `USING` and `WITH CHECK`, so an `INSERT` or `UPDATE` that tries to write another `tenant_id` fails instead of being silently filtered.
 
-### Políticas auxiliares
+### Auxiliary policies
 
 ```sql
--- Un usuario ve su propio registro.
+-- A user sees their own record.
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY user_self_read ON users FOR SELECT
   USING (id = NULLIF(current_setting('app.user_id', true), '')::uuid);
 
--- Un usuario ve sus propias pertenencias; el dueño las administra con la capa
--- de aplicación mediante una función SECURITY DEFINER limitada a ese propósito.
+-- A user sees their own memberships; the owner manages them through the
+-- application layer via a SECURITY DEFINER function limited to that purpose.
 ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memberships FORCE ROW LEVEL SECURITY;
 CREATE POLICY membership_self_read ON memberships FOR SELECT
@@ -185,95 +185,95 @@ ALTER TABLE invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invites FORCE ROW LEVEL SECURITY;
 ```
 
-El alta atómica crea tenant, tienda y dueño o revierte todo. Fijar contexto de usuario desde identidad verificada para consultar sus memberships y seleccionar tenant. La API de selección rechaza tiendas ajenas aun si el solicitante conoce el UUID. Resolver la identidad OIDC por emisor y sujeto con una operación restringida de bootstrap; el token no proporciona permisos de tabla.
+Atomic signup creates the tenant, store, and owner, or rolls everything back. Set the user context from verified identity to query their memberships and select the tenant. The selection API rejects other tenants even if the requester knows the UUID. Resolve the OIDC identity by issuer and subject with a restricted bootstrap operation. The token grants no table permissions.
 
-La administración de `memberships` e `invites` la resuelve el endpoint de dueño con una función `SECURITY DEFINER` limitada a ese propósito, con identidad de ejecución mínima, nombres de esquema calificados, search_path fijo y EXECUTE revocado a PUBLIC. Validar rol y tenant dentro de cada operación. Probar que una llamada directa no asigna un dueño o pertenencia ajena.
+The management of `memberships` and `invites` is handled by the owner endpoint through a `SECURITY DEFINER` function limited to that purpose, with minimal execution identity, qualified schema names, a fixed search_path, and EXECUTE revoked from PUBLIC. Validate role and tenant inside each operation. Verify that a direct call cannot assign an owner or a foreign membership.
 
-## Migración SQLite → PostgreSQL
+## SQLite → PostgreSQL migration
 
-La migración es una utilidad de una sola ejecución, idempotente y con `--dry-run`:
+The migration is a one-time, idempotent utility with `--dry-run`:
 
-1. Crear esquema y aplicar RLS.
-2. Inventariar las tiendas y asignar la tienda demo expresamente identificada a su tenant demo; para esa tienda, crear `tenants` y su `stores` (1 a 1) y propagar `tenant_id` a todas las filas de negocio.
-3. Crear `users` históricos con `idp='legacy'` para **todos** los empleados presentes en la copia de corte, incluidos inactivos, y sus `memberships` con los permisos equivalentes de v2. Nunca se reclaman automáticamente.
-4. Reasignar `employee_id` y referencias de claves foráneas a los nuevos UUID sin perder movimientos de inventario ni pagos.
-5. Verificar conteos por tabla contra la base SQLite y emitir un reporte de diferencias.
+1. Create the schema and apply RLS.
+2. Inventory the stores and assign the explicitly identified demo store to its demo tenant. For that store, create `tenants` and its `stores` (1 to 1) and propagate `tenant_id` to all business rows.
+3. Create historical `users` with `idp='legacy'` for **all** employees present in the cutover copy, including inactive ones, and their `memberships` with the v2-equivalent permissions. They are never claimed automatically.
+4. Reassign `employee_id` and foreign-key references to the new UUIDs without losing inventory movements or payments.
+5. Verify per-table counts against the SQLite database and emit a difference report.
 
-La base SQLite queda solo como fuente de la migración. La base activa de producción pasa a ser PostgreSQL y nunca se escribe SQLite después del corte.
+The SQLite database remains only as the migration source. The active production database becomes PostgreSQL, and SQLite is never written after the cutover.
 
-## Contratos de tenencia (API)
+## Tenancy contracts (API)
 
-Las operaciones de membresía exigen identidad verificada. Emitir invitaciones sólo a empleados con permisos seleccionados; la aceptación no permite elevar el rol. Proteger al último dueño de la tienda. Para seleccionar tienda, GET /api/me/memberships enumera sólo pertenencias activas del usuario y POST /api/session/store verifica la elegida antes de rotar la sesión. El tenant seleccionado nunca se confía a un header de identidad del cliente. El dueño se identifica por su `membership.role = 'owner'`.
+Membership operations require verified identity. Issue invites only to employees with the selected permissions; acceptance cannot elevate the role. Protect the store's last owner. To select a store, `GET /api/me/memberships` lists only the user's active memberships and `POST /api/session/store` verifies the chosen one before rotating the session. The selected tenant is never trusted to a client identity header. The owner is identified by their `membership.role = 'owner'`.
 
-- `GET /api/tenant` → `{id, slug, name, legalName, rfc, timezone, status, store:{id, name}}` del tenant del token.
+- `GET /api/tenant` → `{id, slug, name, legalName, rfc, timezone, status, store:{id, name}}` for the token's tenant.
 - `GET /api/tenant/members` (owner) → `{items:[{userId, email, name, role, canSell, canFiado, canInventory, active}]}`.
 - `POST /api/tenant/members/invite` (owner) body `{email?, role, canSell, canFiado, canInventory}` → `{token, url}`.
-- `GET /api/tenant/members/invites/{token}` → datos mínimos de la invitación (404 expirada o revocada). El token se busca por su hash.
-- `POST /api/tenant/members/invites/{token}/accept` → crea la `membership` y devuelve el perfil.
+- `GET /api/tenant/members/invites/{token}` → minimal invite data (404 if expired or revoked). The token is looked up by its hash.
+- `POST /api/tenant/members/invites/{token}/accept` → creates the `membership` and returns the profile.
 - `PATCH /api/tenant/members/{userId}` (owner) body `{role?, canSell?, canFiado?, canInventory?, active?}`.
-- `DELETE /api/tenant/members/{userId}` (owner) → desactiva la pertenencia.
+- `DELETE /api/tenant/members/{userId}` (owner) → deactivates the membership.
 
-Reglas de autorización:
+Authorization rules:
 
-- `owner`: todo el tenant, incluida la gestión de cuentas bancarias.
-- `employee`: solo lo que habilitan `can_sell`, `can_fiado` y `can_inventory`.
+- `owner`: the entire tenant, including bank account management.
+- `employee`: only what `can_sell`, `can_fiado`, and `can_inventory` enable.
 
-## Flujo de contexto por petición
+## Per-request context flow
 
 ```mermaid
 sequenceDiagram
-    participant C as Cliente (app/consola)
+    participant C as Client (app/console)
     participant A as API (FastAPI)
     participant D as PostgreSQL
-    C->>A: petición con Bearer token
-    A->>A: valida access token (aud, iss, exp) y resuelve user
-    A->>A: resuelve membership y tenant_id
+    C->>A: request with Bearer token
+    A->>A: validates access token (aud, iss, exp) and resolves user
+    A->>A: resolves membership and tenant_id
     A->>D: BEGIN; set_config('app.tenant_id',...,true)
-    A->>D: consulta de negocio (RLS filtra por tenant)
-    A->>D: COMMIT (contexto se revierte)
-    A->>C: respuesta
+    A->>D: business query (RLS filters by tenant)
+    A->>D: COMMIT (context reverts)
+    A->>C: response
 ```
 
-## Modos de fallo y recuperación
+## Failure modes and recovery
 
-| Fallo | Comportamiento | Recuperación |
+| Failure | Behavior | Recovery |
 | --- | --- | --- |
-| Contexto de tenant ausente | RLS devuelve cero filas y los writes fallan | El endpoint exige 401/403 antes de consultar |
-| Conexión de pool reutilizada | `SET LOCAL` revierte al terminar la transacción | Prueba que una segunda petición sin contexto no vea filas |
-| Intento de escribir otra `tenant_id` | `WITH CHECK` falla la sentencia | Se registra como error 403, sin escritura parcial |
-| Clave foránea entre tenants | La FK compuesta falla | Se rechaza la fila sin modificar la base |
-| Migración interrumpida | `--dry-run` primero y transacción por tabla | Reejecutar; la idempotencia no duplica filas |
-| `current_setting` con nombre no calificado | PostgreSQL rechaza variables sin namespace | Usar siempre `app.tenant_id` y `app.user_id` |
+| Missing tenant context | RLS returns zero rows and writes fail | The endpoint requires 401/403 before querying |
+| Reused pool connection | `SET LOCAL` reverts when the transaction ends | Verify that a second request without context sees no rows |
+| Attempt to write another `tenant_id` | `WITH CHECK` fails the statement | Logged as a 403 error, with no partial write |
+| Cross-tenant foreign key | The composite FK fails | The row is rejected without modifying the database |
+| Interrupted migration | `--dry-run` first and one transaction per table | Rerun; idempotency does not duplicate rows |
+| `current_setting` with an unqualified name | PostgreSQL rejects variables without a namespace | Always use `app.tenant_id` and `app.user_id` |
 
-## Criterios de aceptación
+## Acceptance criteria
 
-- [ ] Dos tenants A y B: `GET /api/tenant` de A no devuelve filas de B en ninguna tabla de negocio.
-- [ ] Una consulta directa con `app.tenant_id` sin fijar devuelve cero filas (denegación por defecto).
-- [ ] `FORCE ROW LEVEL SECURITY` está activo y `abarpay_app` no es owner ni superusuario.
-- [ ] La relación 1 a 1 se impone: un segundo `stores` para el mismo tenant falla.
-- [ ] Una clave foránea que apunte a otra `tenant_id` falla.
-- [ ] El token de invitación solo se guarda como hash y el token en claro no aparece en la base ni en logs.
-- [ ] Un inicio de sesión real nunca reclama automáticamente una fila `legacy`.
-- [ ] Un dueño puede pertenecer a varios tenants independientes.
-- [ ] La migración de una base SQLite con ventas, movimientos y fiado reproduce los conteos en PostgreSQL.
-- [ ] No hay credenciales ni secretos en el esquema, las migraciones ni los logs.
+- [ ] Two tenants A and B: A's `GET /api/tenant` returns no rows from B in any business table.
+- [ ] A direct query with `app.tenant_id` unset returns zero rows (deny-by-default).
+- [ ] `FORCE ROW LEVEL SECURITY` is active and `abarpay_app` is neither an owner nor a superuser.
+- [ ] The 1-to-1 relationship is enforced: a second `stores` row for the same tenant fails.
+- [ ] A foreign key that points to another `tenant_id` fails.
+- [ ] The invite token is only stored as a hash and the plaintext token does not appear in the database or in logs.
+- [ ] A real sign-in never automatically claims a `legacy` row.
+- [ ] An owner can belong to several independent tenants.
+- [ ] Migrating a SQLite database with sales, movements, and fiado reproduces the counts in PostgreSQL.
+- [ ] There are no credentials or secrets in the schema, migrations, or logs.
 
-## Puertas
+## Gates
 
-- [ ] Prueba de integración con una instancia PostgreSQL de prueba que ejecute las políticas de dos tenants y los casos negativos.
-- [ ] Prueba de regresión que enumera las tablas del esquema y falla si alguna tabla de negocio no tiene RLS habilitado (`pg_class.relrowsecurity = true`) y política de tenant.
-- [ ] Prueba de restricciones 1 a 1 y de claves foráneas compuestas entre tenants.
-- [ ] Migración `--dry-run` y `--apply` sobre un fixture SQLite en verde, ejecutada dos veces para probar idempotencia.
-- [ ] Ejercicio de respaldo y restauración sin pérdida de aislamiento.
+- [ ] Integration test against a test PostgreSQL instance that exercises the policies of two tenants and the negative cases.
+- [ ] Regression test that lists the schema tables and fails if any business table lacks RLS enabled (`pg_class.relrowsecurity = true`) and a tenant policy.
+- [ ] Test of the 1-to-1 constraints and composite cross-tenant foreign keys.
+- [ ] `--dry-run` and `--apply` migration over a SQLite fixture in green, run twice to prove idempotency.
+- [ ] Backup and restore exercise without losing isolation.
 
-## Proveniencia
+## Provenance
 
 - CREATE POLICY (PostgreSQL): <https://www.postgresql.org/docs/current/sql-createpolicy.html>
-- Contrato v1 heredado: `docs/v1-contract.md`
-- Contrato v2 heredado (equipo, permisos, invitaciones): `docs/v2-contract.md`
+- Inherited v1 contract: `docs/v1-contract.md`
+- Inherited v2 contract (team, permissions, invites): `docs/v2-contract.md`
 
-## Decisiones fijadas
+## Locked decisions
 
-- Una tienda equivale a un tenant (1 a 1). Un usuario dueño puede ser miembro de varios tenants.
-- Roles de producción: `owner` y `employee` con los permisos descritos.
-- Los tokens de invitación se guardan hasheados y se muestran una sola vez.
+- A store equals a tenant (1 to 1). An owner user can be a member of several tenants.
+- Production roles: `owner` and `employee` with the described permissions.
+- Invite tokens are stored hashed and shown once.

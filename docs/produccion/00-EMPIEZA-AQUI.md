@@ -1,24 +1,28 @@
-# Abarpay · instrucciones para el coordinador Pro
+# Abarpay · Start here, Pro coordinator
 
-**Resultado:** una persona abre una tienda en México desde su Android, cobra aun con una interrupción de red, concilia su propia cuenta CoDi y administra su tienda desde el navegador. Carlos y su equipo operan el SaaS desde una consola separada. La entrega incluye pilotos medibles y evidencia reproducible de recuperación.
+**Outcome:** A shopkeeper in Mexico can open a store from an Android phone, take payment during a network interruption, reconcile CoDi payments to their own bank account, and manage the store from a browser. Carlos and his team operate the SaaS through a separate console. Delivery includes measurable pilots and reproducible recovery evidence.
 
-## Primera instrucción para DSH
+## First instruction for DSH
 
-> Lee este archivo y [el tablero de paquetes](09-paquetes-y-aceptacion.md). Actúa como coordinador DeepSeek Pro en Arquimedes. Recupera el worklog y compara su revisión con Git. Empieza por E0, distribuye los paquetes listos y verifica cada implementación con otra sesión. Ejecuta y deja evidencia. Si hay una decisión externa, regístrala, avisa a Carlos y continúa los paquetes independientes. Sólo Carlos decide cuándo consultar a Astra.
+> Read this file and the [work package board](09-paquetes-y-aceptacion.md). Act as the DeepSeek Pro coordinator on Arquimedes. Recover the worklog and compare its revision with Git. Start at E0. Dispatch ready packages and have a separate session verify each implementation. Execute the work and record evidence. When a decision requires Carlos, record the question, notify him, and continue independent work. Carlos alone decides when to consult Astra.
 
-## Primer arranque y reanudación
+## Working languages
 
-1. En Arquimedes abre el checkout que contiene **este paquete**. La referencia del producto analizado es `75c1f35`, no una revisión a la que deba volver el árbol. Lee [las reglas del proyecto](../../AGENTS.md), las decisiones vigentes y la bitácora. Conserva cambios ajenos. La aplicación activa es Android + `server/`; la decisión 0005 sustituyó al MVP de `app/`.
-2. Lee [agentes y worktrees](01-agentes-y-trabajo.md). Comprueba modelos, entorno Python y permisos con datos ficticios. Prueba el [aviso directo por Telegram](telegram.md). Si faltan token, móvil o presupuesto, registra el bloqueo puntual en [PendientesCarlos](../../PendientesCarlos.md) y avanza con los paquetes sin esa dependencia.
-3. Mantén **un solo** `docs/worklog.md` local en el checkout coordinador. Si falta en el clon, créalo allí con objetivo, instrucciones, decisiones, propietario, estados, dependencias y pruebas. Nunca lo incluyas en un commit. Usa `AskAstra.md` en este directorio para las decisiones; sólo el coordinador edita la copia de trabajo de la cola. Los demás remiten hallazgos al coordinador.
-4. Selecciona una fila lista del tablero; copia su contrato de asignación, crea un worktree y designa un verificador distinto. Un paquete queda aceptado al pasar en el SHA integrado. En cada reinicio, recupera leases, sesiones, ramas y resultados antes de volver a llamar a proveedores.
-5. Cierra la entrega con los recorridos de la tabla de aceptación. Una etiqueta de Trello, una compilación o un proveedor configurado por sí solos no acreditan un resultado de negocio.
+Write agent assignments, designs, implementation instructions, and verification reports in English. Write every interface string in Mexican Spanish, including the Android app, both consoles, the landing page, receipts, email, notifications, and accessibility announcements. In acceptance criteria, describe behavior in English and quote the exact Spanish string the user should see or hear. Use the [English–Mexican Spanish glossary](glossary.md) for workflow terminology. Respect existing Spanish project records, bitácora entries, and commit conventions. Retain established API identifiers, package IDs, paths, and notifier fields.
 
-## Inventario de Arquimedes y dependencias
+## First run and resumption
 
-Comprobado por SSH el 21-nov: Apple silicon, 16 GB RAM, más de 170 GiB libres, Git, Python 3.12 en `.venv`, `uv`, Gitleaks, JDK 21, Android SDK 35/build-tools 35.0.0, ADB y DSH Desktop 0.2.2-rc.5. Los parches Pro y Flash se compusieron con la CLI instalada; esto verifica los nombres de modelo, no el acceso de facturación ni la identidad de una ejecución real. El repo remoto de esta máquina estaba en `75c1f35` antes de recibir el paquete.
+1. On Arquimedes, open the checkout containing **this packet**. The product assessment used `75c1f35` as its baseline. Keep the current checkout and preserve unrelated changes. Read the [project rules](../../AGENTS.md), current decisions, and bitácora. Android and `server/` are the active product. Decision 0005 superseded the earlier MVP in `app/`.
+2. Read [agents and worktrees](01-agentes-y-trabajo.md). Check models, the Python environment, and permissions with fictional data. Verify the [direct Telegram notification](telegram.md). If a token, phone, or budget is missing, record the specific dependency in [Carlos’s checklist](../../PendientesCarlos.md) and continue packages that can proceed.
+3. Maintain **one** local `docs/worklog.md` in the coordinator checkout. If the clone has none, create it there with the goal, instructions, decisions, owner, statuses, dependencies, and checks. Keep it out of commits. Use `AskAstra.md` in this directory for decisions. Only the coordinator edits the working queue. Workers send their findings to the coordinator.
+4. Select a ready row, copy its assignment contract, create a worktree, and appoint a separate verifier. Accept a package when checks pass on the integrated SHA. On restart, recover leases, sessions, branches, and outcomes before calling providers again.
+5. Close delivery by running the journeys in the acceptance table. A Trello label, successful build, or configured provider alone cannot demonstrate the business outcome.
 
-Para ejecutar las puertas, desde el checkout en la sesión de integración:
+## Arquimedes inventory and dependencies
+
+The November 21 SSH check found Apple silicon, 16 GB RAM, over 170 GiB free, Git, Python 3.12 in `.venv`, `uv`, Gitleaks, JDK 21, Android SDK 35/build-tools 35.0.0, ADB, and DSH Desktop 0.2.2-rc.5. The installed CLI resolved both Pro and Flash patches. A live run still needs to verify billing access and the model that actually ran. The machine’s checkout was at `75c1f35` before receiving the packet.
+
+Run these checks from the integration checkout:
 
 ```sh
 export PATH="$HOME/.local/bin:$HOME/Library/Android/sdk/platform-tools:$PATH"
@@ -31,23 +35,24 @@ adb devices
 (cd android && ./gradlew testDebugUnitTest assembleRelease)
 ```
 
-**Dependencia nueva para I1:** una instancia PostgreSQL real de desarrollo y un cliente de migración para el diagnóstico. No aparecieron `psql`, `pg_ctl` ni Docker en los PATH de uso habitual. Elegir por defecto PostgreSQL local de la misma versión mayor que Render; instalar el servidor/cliente para el usuario de pruebas o usar un servicio PostgreSQL efímero de CI mientras se prepara el Mac. No conectar las pruebas de aislamiento a la base de producción. Docker y GitHub CLI son opcionales; Git, Actions y una instancia PostgreSQL accesible bastan. Para G1 usar un navegador con automatización y accesibilidad disponibles; provisionar sus dependencias en el entorno del proyecto. Una segunda sesión o emulador sirve como segundo POS, el teléfono físico queda reservado para los recorridos de aceptación. No se necesita OpenClaw.
+**New dependency for I1:** a real development PostgreSQL instance and a migration client for diagnostics. The usual PATH entries contained no `psql`, `pg_ctl`, or Docker. Default to local PostgreSQL matching Render’s major version. Install server/client for the test user or use an ephemeral PostgreSQL CI service while preparing the Mac. Keep isolation tests away from production. Git, Actions, and an accessible database suffice; Docker and the GitHub CLI are optional. For G1, provision browser automation and accessibility tools in the project environment. A second session or emulator can serve as the second POS while the physical phone runs acceptance scenarios. Direct Telegram delivery works without OpenClaw.
 
-## Ruta por decisión
+## Where to find a decision
 
-| Necesidad | Documento |
+| Need | Document |
 |---|---|
-| Identidad, aislamiento, API, migración | [Tenencia](02-contratos-y-tenencia.md) |
-| Menos pasos en caja, retorno tras interrupción, sugerencias de Trello | [Ergonomía](03-flujos-y-ergonomia.md) · [Matriz de tarjetas](trello-cobertura.md) |
-| Registro de tienda, QR de sesión, alta CLABE y cobro | [Identidad y pey](04-identidad-onboarding-y-pey.md) |
-| Venta sin red, recibo de mercancía, cierre, reposición, fiado | [Operación móvil](05-caja-offline-e-inventario.md) |
-| Página pública, APK y prueba comercial | [Landing y ventas](06-landing-y-comercial.md) |
-| Dueños del SaaS, indicadores, campañas y socio de datos | [Consola de plataforma](07-consola-saas-y-datos.md) |
-| Mail, CI, producción, versiones, respaldo y reversión | [Operación](08-operacion-y-despliegue.md) |
-| Pregunta que requiere decisión | [Cola manual](AskAstra.md) · [Telegram](telegram.md) |
+| Domain terms and approved bilingual usage | [Glossary](glossary.md) |
+| Identity, isolation, API, migration | [Tenancy](02-contratos-y-tenencia.md) |
+| Fewer checkout steps, resuming interrupted work, Trello suggestions | [Ergonomics](03-flujos-y-ergonomia.md) · [Card crosswalk](trello-cobertura.md) |
+| Store registration, login QR, CLABE registration, payment collection | [Identity and pey](04-identidad-onboarding-y-pey.md) |
+| Offline sale, goods receipt, till close, replenishment, store credit | [Mobile operations](05-caja-offline-e-inventario.md) |
+| Public page, APK, commercial experiment | [Landing page and sales](06-landing-y-comercial.md) |
+| SaaS operators, indicators, campaigns, data partner | [Platform console](07-consola-saas-y-datos.md) |
+| Email, CI, production, releases, backup, rollback | [Operations](08-operacion-y-despliegue.md) |
+| Question requiring a decision | [Manual queue](AskAstra.md) · [Telegram](telegram.md) |
 
-## Autoridad de ejecución
+## Execution authority
 
-Carlos eligió DeepSeek Pro y Flash para este repositorio y pidió CD sin aprobación humana rutinaria por versión. Usa únicamente esos modelos para el programa. Las decisiones anteriores de entrega demo sobre SQLite, PIN, CLABE en portal y despliegue manual requieren una decisión nueva y el procedimiento de aprobación de la mesa ya documentado. Solicita **una transición de política**, no una autorización por cada paquete. A partir de su habilitación, la integración verde en main despliega automáticamente. Mantén aislada la demo activa durante la migración.
+Carlos selected DeepSeek Pro and Flash for this repository and requested CD without routine human approval for each release. Use those two models for the program. The demo decisions on SQLite, PINs, portal-based CLABE registration, and manual deployment require a superseding decision under the steering group’s existing approval procedure. Request one policy transition. Once enabled, a passing integration on main deploys automatically. Keep the active demo isolated during migration.
 
-La creación de recursos con costo espera una cotización aprobada; la exportación real a socios requiere consentimiento, revisión y acuerdo; cada pago de prueba real de MXN 0.01 lo opera una persona. Trabaja con datos SIMULADOS hasta cumplir el requisito de cada integración. La actividad de desarrollo no habilita enviar secretos, CLABE, bases, mensajes de clientes ni datos comerciales identificables a los modelos. Antes de publicar evidencia revisa que sólo incluya fixtures seguros. Para este programa, los pilotos y las altas reales se habilitan por capacidad verificada.
+Obtain approval for the quote before provisioning paid resources. Real partner exports require consent, review, and agreement. A person carries out each live MXN 0.01 payment test. Use fixtures labeled **SIMULADO** until each integration meets its prerequisites. Keep secrets, CLABEs, databases, customer messages, and identifiable commercial data out of model inputs. Check that published evidence contains only safe fixtures. Enable live pilots and signups as each capability is verified.

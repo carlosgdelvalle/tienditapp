@@ -1,32 +1,32 @@
-# 05 · Caja offline, inventario, fiado ampliado y corte
+# 05 · Offline till, inventory, extended fiado, and closeout
 
-Estado: paquete de handoff para el equipo DSH. Redactado 21-nov-2026. Instrucciones de implementación para producción. No modifica el código del demo actual.
+Status: handoff package for the DSH team. Written 21-nov-2026. Implementation instructions for production. It does not modify the current demo code.
 
-## Propósito
+## Purpose
 
-Hacer que la caja funcione sin conexión con efectivo finalizado en el dispositivo, registrar entradas de mercancía fuera de línea pendientes de aprobación, y sincronizar con un outbox cifrado y atómico que sobrevive reinicios y actualizaciones. Amplía el fiado con límites, vencimientos, autorización, recordatorios y pagos, añade proveedores, órdenes de compra y recepciones, y formaliza el corte de caja.
+Make the till work offline with cash finalized on the device, record offline goods receipts pending approval, and synchronize with an encrypted, atomic outbox that survives restarts and updates. It extends fiado with limits, due dates, authorization, reminders, and payments, adds suppliers, purchase orders, and receipts, and formalizes the till closeout.
 
-## Contexto heredado y reglas de casa
+## Inherited context and house rules
 
-- El contrato v1 exige que todo cambio de stock deje un renglón en `inventory_movements` y que el servidor calcule precios y totales desde la base, sin confiar en precios del cliente (`docs/v1-contract.md`).
-- El contrato v2 define inventario con valor precio por existencias, ajuste absoluto y conteo por voz (`docs/v2-contract.md`).
-- Las reglas duras del proyecto siguen vigentes: los precios salen de la base, nunca del cliente ni de la IA, y todo lo simulado se etiqueta SIMULADO (`AGENTS.md`).
-- El demo permite stock negativo. En producción esa regla se sustituye por la política de última unidad y la varianza de auditoría de este documento.
+- The v1 contract requires every stock change to leave a row in `inventory_movements` and the server to calculate prices and totals from the database, without trusting client prices (`docs/v1-contract.md`).
+- The v2 contract defines inventory with value as price times stock, absolute adjustment, and voice count (`docs/v2-contract.md`).
+- The project's hard rules remain in force: prices come from the database, never from the client or the AI, and everything simulated is labeled SIMULADO (`AGENTS.md`).
+- The demo allows negative stock. In production that rule is replaced by the last-unit policy and the audit variance of this document.
 
-## Principios offline
+## Offline principles
 
-- Cuando no hay conexión, el dispositivo es la fuente de verdad local. Una base SQLite cifrada en el dispositivo guarda el estado y una cola de salida (outbox).
-- El dispositivo vende solo dentro de una autorización offline firmada por el servidor y con un snapshot canónico de precios también firmado.
-- Toda mutación local se confirma en la misma transacción que su evento de outbox. No existe un evento sin estado ni un estado sin evento.
-- La sincronización reproduce los eventos en orden y el servidor los aplica exactamente una vez con claves de idempotencia.
+- When there is no connection, the device is the local source of truth. An encrypted SQLite database on the device holds the state and an outbox.
+- The device sells only within an offline authorization signed by the server and with a canonical price snapshot, also signed.
+- Every local mutation is committed in the same transaction as its outbox event. There is no event without state and no state without an event.
+- Synchronization replays events in order and the server applies them exactly once with idempotency keys.
 
-## Autorización offline y snapshot de precios firmado
+## Offline authorization and signed price snapshot
 
-Las 12 horas son únicamente el plazo de una autorización offline (lease). No fuerzan un corte de caja ni un traspaso de turno.
+The 12 hours are only the duration of an offline authorization (lease). They do not force a till closeout or a shift handover.
 
-### Lease de autorización offline
+### Offline authorization lease
 
-Antes de quedar sin conexión, el dispositivo obtiene del servidor un lease firmado:
+Before going offline, the device obtains a signed lease from the server:
 
 ```json
 {
@@ -41,12 +41,12 @@ Antes de quedar sin conexión, el dispositivo obtiene del servidor un lease firm
 }
 ```
 
-- `expiresAt` es `issuedAt + 12 horas`. El servidor firma el lease con su clave de firma y lo vuelve a verificar en cada sincronización.
-- Vencido el lease, el dispositivo exige volver a autorizarse en línea antes de registrar más ventas. No implica cierre de caja ni cambio de turno. La recepción física offline requiere la misma autorización de dispositivo y permiso de inventario. Si expira el lease después de finalizar una operación legítima y antes del acuse, conservarla para sincronización o revisión; nunca usar la hora de llegada por sí sola para descartarla. Ante revocación, reloj incoherente o datos corruptos, retener y conciliar sin exponerlos al siguiente usuario.
+- `expiresAt` is `issuedAt + 12 hours`. The server signs the lease with its signing key and re-verifies it on every sync.
+- Once the lease expires, the device requires re-authorizing online before recording more sales. It does not imply a till closeout or a shift change. Offline physical receipt requires the same device authorization and inventory permission. If the lease expires after finishing a legitimate operation and before its acknowledgment, keep it for synchronization or review; never use the arrival time alone to discard it. On revocation, an incoherent clock, or corrupt data, retain and reconcile without exposing them to the next user.
 
-### Snapshot canónico de precios
+### Canonical price snapshot
 
-Junto al lease, el servidor entrega un snapshot de catálogo firmado:
+Along with the lease, the server delivers a signed catalog snapshot:
 
 ```json
 {
@@ -61,13 +61,13 @@ Junto al lease, el servidor entrega un snapshot de catálogo firmado:
 }
 ```
 
-- La venta offline calcula los totales con estos precios. El dispositivo nunca usa un precio tecleado por el cliente ni calculado localmente.
-- El evento de venta lleva `catalogVersion`. El servidor revalida la firma y recalcula los totales desde la versión canónica que originó el snapshot, preservada por tenant. Un precio actual posterior nunca sustituye el que se mostró al comprador.
-- Una actualización legítima posterior de tarifa no genera un déficit de caja. Si el importe enviado difiere de su propio snapshot, preservar la evidencia local y abrir revisión sin aceptar un precio arbitrario. La venta física no se reescribe.
+- The offline sale computes totals with these prices. The device never uses a price typed by the customer or computed locally.
+- The sale event carries `catalogVersion`. The server re-validates the signature and recalculates totals from the canonical version that produced the snapshot, preserved per tenant. A later current price never replaces the one shown to the buyer.
+- A later legitimate price update does not create a till shortfall. If the submitted amount differs from its own snapshot, preserve the local evidence and open a review without accepting an arbitrary price. The physical sale is not rewritten.
 
-## Outbox cifrado, atómico y durable
+## Encrypted, atomic, durable outbox
 
-### Estructura
+### Structure
 
 ```json
 {
@@ -84,190 +84,190 @@ Junto al lease, el servidor entrega un snapshot de catálogo firmado:
 }
 ```
 
-- `sequence` es monótono por dispositivo y permite reproducir en orden y detectar huecos.
-- `eventId` es un ULID generado por el dispositivo. El servidor lo usa como clave de idempotencia junto con `deviceId`.
-- El outbox es de solo anexar. Los eventos confirmados se marcan `acked` y se purgan solo tras confirmación del servidor.
+- `sequence` is monotonic per device and allows replay in order and detection of gaps.
+- `eventId` is a ULID generated by the device. The server uses it as the idempotency key together with `deviceId`.
+- The outbox is append-only. Confirmed events are marked `acked` and purged only after server confirmation.
 
-### Cifrado
+### Encryption
 
-- Cada evento se cifra con AEAD (AES-GCM) con una clave derivada y custodiada en Android Keystore. El texto en disco nunca muestra el payload en claro.
-- El contenedor lleva `v` y una etiqueta de integridad. Un evento corrupto se detecta por el tag y se pone en cuarentena, sin bloquear el resto de la cola.
-- La rotación de clave tras una actualización mantiene la lectura de versiones anteriores y re-cifra al escribir.
+- Each event is encrypted with AEAD (AES-GCM) using a derived key held in Android Keystore. The text on disk never shows the plaintext payload.
+- The container carries `v` and an integrity tag. A corrupt event is detected by the tag and quarantined without blocking the rest of the queue.
+- Key rotation after an update keeps reading previous versions and re-encrypts on write.
 
-### Durabilidad
+### Durability
 
-- El archivo del outbox sobrevive al reinicio de la app y a la actualización porque se escribe en almacenamiento interno y se migra por versión de esquema antes de usarse.
-- La escritura usa `fsync` o el equivalente de la capa de persistencia antes de reconocer la operación al usuario.
+- The outbox file survives app restarts and updates because it is written to internal storage and migrated per schema version before use.
+- The write uses `fsync` or the persistence layer's equivalent before acknowledging the operation to the user.
 
-### Sincronización
+### Synchronization
 
 ```mermaid
 sequenceDiagram
-    participant D as Dispositivo (offline)
-    participant S as Servidor
-    D->>D: venta en efectivo + evento en outbox (una transacción)
-    D->>S: envía eventos pendientes en orden (lote)
-    S->>S: verifica lease y snapshot, recalcula totales
-    S->>S: aplica por (deviceId, eventId) exactamente una vez
-    S->>D: ack por sequence
-    D->>D: marca acked y purga
+    participant D as Device (offline)
+    participant S as Server
+    D->>D: cash sale + outbox event (one transaction)
+    D->>S: sends pending events in order (batch)
+    S->>S: verifies lease and snapshot, recalculates totals
+    S->>S: applies by (deviceId, eventId) exactly once
+    S->>D: ack by sequence
+    D->>D: marks acked and purges
 ```
 
-- El servidor mantiene `outbox_applied(device_id, event_id, applied_at)` con restricción única.
-- La transacción central reserva ID y huella canónica del payload, aplica los efectos y guarda la respuesta antes del commit. El mismo evento devuelve el resultado original; el mismo ID con otro contenido se envía a revisión sin mutación. Acusar por operación, no por el mayor número observado.
-- Los conflictos se resuelven por tipo de operación y secuencia local, conservando por separado occurredAt y receivedAt. El reloj del teléfono no decide el orden entre cajas ni autoriza operaciones.
+- The server keeps `outbox_applied(device_id, event_id, applied_at)` with a unique constraint.
+- The central transaction reserves the ID and the payload's canonical fingerprint, applies the effects, and saves the response before commit. The same event returns the original result; the same ID with different content is sent to review without mutation. Acknowledge per operation, not by the highest observed number.
+- Conflicts are resolved by operation type and local sequence, keeping occurredAt and receivedAt separate. The phone clock does not decide the order between tills nor authorize operations.
 
-## Caja y efectivo offline
+## Offline till and cash
 
-- Una venta en efectivo se finaliza en el dispositivo como `paid_cash`, descuenta el stock local y encola `sale.created`.
-- El dispositivo asigna referencia estable al finalizar; el servidor puede agregar un número central sin sustituir el folio entregado. El folio nunca se reutiliza y queda estable entre reintentos.
-- La venta conserva `occurredAt` del dispositivo como hora de negocio.
-- El servidor no reescribe la venta física al sincronizar. Recalcula los totales con precios canónicos y, si difieren del cobro, conserva la venta tal como ocurrió y retiene la diferencia como déficit auditado.
+- A cash sale is finalized on the device as `paid_cash`, decrements local stock, and enqueues `sale.created`.
+- The device assigns a stable reference on completion; the server may add a central number without replacing the delivered folio. The folio is never reused and stays stable across retries.
+- The sale keeps the device's `occurredAt` as the business time.
+- The server does not rewrite the physical sale on sync. It recalculates totals with canonical prices and, if they differ from the charge, keeps the sale as it happened and retains the difference as an audited shortfall.
 
-## Inventario
+## Inventory
 
-### Venta de la última unidad
+### Last-unit sale
 
-- Una venta que consume la última unidad se honra. El stock puede quedar exactamente en 0 y la venta se registra íntegra.
-- Si dos cajas desconectadas venden la última pieza, registrar ambas ventas y ambos movimientos centrales. De una unidad inicial se llega a −1. Mostrar varianza al dueño; no truncar a cero, descartar ni retener la segunda venta. Cerrar la varianza con conteo y ajuste motivado. La recepción pendiente no encubre el faltante.
+- A sale that consumes the last unit is honored. Stock may end exactly at 0 and the sale is recorded in full.
+- If two disconnected tills sell the last piece, record both sales and both central movements. From one initial unit the balance reaches −1. Show the variance to the owner; do not truncate to zero, discard, or hold back the second sale. Close the variance with a count and a justified adjustment. The pending receipt does not cover up the shortage.
 
-### Varianza de auditoría
+### Audit variance
 
-- Un conteo físico que difiere del stock del sistema registra un movimiento `inventory_movements` con `reason='audit_variance'` y `delta_milli = contado - sistema`.
-- La varianza nunca se corrige en silencio. Queda visible con quién contó, cuándo y la diferencia.
+- A physical count that differs from the system stock records an `inventory_movements` row with `reason='audit_variance'` and `delta_milli = counted - system`.
+- The variance is never corrected silently. It stays visible with who counted, when, and the difference.
 
-### Recepción de mercancía offline
+### Offline goods receipt
 
-- Una entrada de mercancía registrada sin conexión se guarda como recepción `awaiting_approval`. No incrementa stock hasta que el dueño la aprueba.
-- Al aprobar, el servidor incrementa el stock y escribe `inventory_movements` con `reason='receipt'`.
+- A goods receipt recorded offline is saved as an `awaiting_approval` receipt. It does not increase stock until the owner approves it.
+- On approval, the server increases stock and writes `inventory_movements` with `reason='receipt'`.
 
-## Fiado ampliado
+## Extended fiado
 
-### Campos nuevos
+### New fields
 
-- `fiado_customers` añade `credit_limit_cents INTEGER NULL`, `due_days INTEGER NULL`, `active INTEGER NOT NULL DEFAULT 1` y `reminders_consent INTEGER NOT NULL DEFAULT 0`.
-- Los cargos `fiado_entries` de tipo `charge` añaden `due_at` (opcional) y `reminded_at` (opcional).
+- `fiado_customers` adds `credit_limit_cents INTEGER NULL`, `due_days INTEGER NULL`, `active INTEGER NOT NULL DEFAULT 1`, and `reminders_consent INTEGER NOT NULL DEFAULT 0`.
+- `fiado_entries` charges of type `charge` add `due_at` (optional) and `reminded_at` (optional).
 
-### Fiado offline como borrador
+### Offline fiado as a draft
 
-- Un cargo de fiado registrado sin conexión se guarda como `fiado_drafts`, no como `fiado_entries`. No es crédito finalizado hasta que el servidor lo confirma.
-- Al sincronizar, el servidor evalúa límite y vencimiento y convierte el borrador en cargo, o lo deja pendiente de autorización. El borrador conserva la intención original y no se reescribe.
+- A fiado charge recorded offline is saved as `fiado_drafts`, not as `fiado_entries`. It is not finalized credit until the server confirms it.
+- On sync, the server evaluates the limit and due date and converts the draft into a charge, or leaves it pending authorization. The draft keeps the original intent and is not rewritten.
 
-### Reglas
+### Rules
 
-- Un cargo no puede superar el límite de crédito disponible. Si lo supera, el sistema responde 409 `CREDIT_LIMIT_EXCEEDED`.
-- El dueño puede autorizar una excepción con `POST /api/fiado/overrides`, que deja rastro del motivo y del empleado.
-- Los vencimientos se calculan desde `due_days` del cliente o se fijan por cargo.
-- Los recordatorios se envían solo con consentimiento del cliente (`reminders_consent`) y se programan a través del outbox. Sin consentimiento no se envía nada.
-- Los pagos son abonos parciales o liquidación completa, con `fiado_entries` de tipo `payment` como en v1 y v3.2.
+- A charge cannot exceed the available credit limit. If it does, the system responds 409 `CREDIT_LIMIT_EXCEEDED`.
+- The owner can authorize an exception with `POST /api/fiado/overrides`, which leaves a trace of the reason and the employee.
+- Due dates are computed from the customer's `due_days` or set per charge.
+- Reminders are sent only with the customer's consent (`reminders_consent`) and are scheduled through the outbox. Without consent, nothing is sent.
+- Payments are partial installments or full settlement, with `fiado_entries` of type `payment` as in v1 and v3.2.
 
-### Contratos
+### Contracts
 
-- `PATCH /api/fiado/customers/{id}` body `{creditLimitCents?, dueDays?, active?, remindersConsent?}` (owner o `can_fiado`).
-- `POST /api/fiado/customers/{id}/charges` body `{amountCents, dueAt?, note?}` → valida el límite.
+- `PATCH /api/fiado/customers/{id}` body `{creditLimitCents?, dueDays?, active?, remindersConsent?}` (owner or `can_fiado`).
+- `POST /api/fiado/customers/{id}/charges` body `{amountCents, dueAt?, note?}` → validates the limit.
 - `POST /api/fiado/overrides` (owner) body `{customerId, amountCents, reason}`.
-- `GET /api/fiado/reminders?dueWithinDays=7` (owner) → vencidos y próximos con consentimiento.
-- `POST /api/fiado/customers/{id}/repayments` body `{amountCents, note?}` (abono o liquidación).
+- `GET /api/fiado/reminders?dueWithinDays=7` (owner) → overdue and upcoming with consent.
+- `POST /api/fiado/customers/{id}/repayments` body `{amountCents, note?}` (installment or settlement).
 
-## Proveedores, órdenes de compra y recepción
+## Suppliers, purchase orders, and receipts
 
-### Modelo
+### Model
 
-| Tabla | Propósito |
+| Table | Purpose |
 | --- | --- |
-| `suppliers` | Proveedor del tenant |
-| `purchase_orders` | Orden con estado `draft`, `issued`, `partial`, `received`, `canceled` |
-| `po_lines` | Renglones de la orden con cantidad pedida, recibida y costo unitario |
-| `receipts` | Recepción de mercancía con estado `awaiting_approval` o `approved` |
-| `receipt_lines` | Renglones recibidos por producto |
+| `suppliers` | Tenant's supplier |
+| `purchase_orders` | Order with state `draft`, `issued`, `partial`, `received`, `canceled` |
+| `po_lines` | Order lines with ordered and received quantity and unit cost |
+| `receipts` | Goods receipt with state `awaiting_approval` or `approved` |
+| `receipt_lines` | Lines received per product |
 
-### Contratos
+### Contracts
 
 - `GET/POST /api/suppliers`, `PATCH/DELETE /api/suppliers/{id}`.
 - `POST /api/purchase-orders` body `{supplierId, lines:[{productId, qtyMilli, unitCostCents?}]}`.
 - `POST /api/purchase-orders/{id}/issue`, `POST /api/purchase-orders/{id}/cancel`.
-- `POST /api/receipts` body `{purchaseOrderId, lines:[{productId, qtyMilli}]}` → crea recepción `awaiting_approval`.
-- `POST /api/receipts/{id}/approve` (owner) → registra el costo de compra por renglón, incrementa stock con `reason='receipt'` y avanza la orden a `partial` o `received`.
+- `POST /api/receipts` body `{purchaseOrderId, lines:[{productId, qtyMilli}]}` → creates an `awaiting_approval` receipt.
+- `POST /api/receipts/{id}/approve` (owner) → records the purchase cost per line, increases stock with `reason='receipt'`, and advances the order to `partial` or `received`.
 
-### Conciliación de tres vías
+### Three-way reconciliation
 
-- Pedido, recepción y factura se comparan por renglón. Una recepción que supera lo pedido se rechaza o requiere autorización. La orden queda `received` cuando todos sus renglones están recibidos.
-- El costo de compra en centavos se registra por renglón al aprobar la entrada y alimenta el costo promedio ponderado del informe (09-paquetes-y-aceptacion.md).
+- Order, receipt, and invoice are compared per line. A receipt that exceeds what was ordered is rejected or requires authorization. The order becomes `received` when all its lines are received.
+- The purchase cost in cents is recorded per line when the receipt is approved and feeds the weighted average cost of the report (09-paquetes-y-aceptacion.md).
 
-## Corte de caja
+## Till closeout
 
-- El corte de caja es independiente del lease offline de 12 horas.
-- Un turno se abre con fondo inicial y se cierra con el efectivo contado.
-- `expected_cents = fondo + ventas en efectivo + entradas - salidas`. La varianza es `contado - esperado`.
-- No se abre un turno nuevo sin cerrar el anterior.
+- The till closeout is independent of the 12-hour offline lease.
+- A shift opens with an opening float and closes with the counted cash.
+- `expected_cents = float + cash sales + inflows - outflows`. The variance is `counted - expected`.
+- A new shift is not opened without closing the previous one.
 
-El cierre en caja captura un recuento ciego y una entrega del empleado. Offline conserva el borrador. Con conexión y operaciones sincronizadas, el dueño acepta la entrega o registra discrepancia con causa. Mantener los estados abierto, contado, entregado, aceptado y observado, con identidad e instante por transición. Un turno aceptado conserva su evidencia.
+The till closeout captures a blind count and a handover from the employee. Offline keeps the draft. With a connection and synchronized operations, the owner accepts the handover or records a discrepancy with a cause. Keep the states open, counted, delivered, accepted, and observed, with identity and timestamp per transition. An accepted shift keeps its evidence.
 
-### Modelo
+### Model
 
 - `till_shifts(id, tenant_id, store_id, opened_by, opened_at, closed_by, closed_at, opening_float_cents, expected_cents, counted_cents, variance_cents, status)`.
-- `till_movements(id, shift_id, kind, amount_cents, sale_id, note, created_at)` con `kind` en `opening`, `cash_in`, `cash_out`, `sale`, `count`.
+- `till_movements(id, shift_id, kind, amount_cents, sale_id, note, created_at)` with `kind` in `opening`, `cash_in`, `cash_out`, `sale`, `count`.
 
-### Contratos
+### Contracts
 
-- `POST /api/till/open` body `{openingFloatCents}` → abre el turno.
-- `POST /api/till/close` body `{countedCents}` → registra conteo y entrega, calcula varianza y espera aceptación.
-- `POST /api/till/{id}/accept` (dueño) → acepta importe y motivo de diferencia o marca observado, comprobando versión y pendientes.
-- `GET /api/till/current` → turno abierto con esperado, contado y varianza.
+- `POST /api/till/open` body `{openingFloatCents}` → opens the shift.
+- `POST /api/till/close` body `{countedCents}` → records count and handover, computes variance, and waits for acceptance.
+- `POST /api/till/{id}/accept` (owner) → accepts the amount and difference reason or marks it observed, checking version and pending items.
+- `GET /api/till/current` → open shift with expected, counted, and variance.
 
-## Modos de fallo y recuperación
+## Failure modes and recovery
 
-| Fallo | Comportamiento | Recuperación |
+| Failure | Behavior | Recovery |
 | --- | --- | --- |
-| Sin conexión durante una venta | La venta queda en el outbox local | Se sincroniza al reconectar, en orden |
-| Lease offline vencido | El dispositivo pide autorización en línea | No se fuerzan corte ni traspaso |
-| Snapshot de precios sin firma o vencido | El dispositivo no puede vender offline | Vuelve a obtener snapshot y lease |
-| Reinicio o actualización de la app | El outbox persiste y se migra | Se continúa desde el último `sequence` |
-| Evento duplicado | El servidor no lo vuelve a aplicar | Idempotencia por `(deviceId, eventId)` |
-| Hueco en la secuencia | El dispositivo detecta eventos faltantes | Reenvía desde el último ack confirmado |
-| Evento corrupto | Se detecta por el tag AEAD | Se pone en cuarentena sin bloquear la cola |
-| Precio distinto al snapshot | El servidor recalcula y retiene la diferencia | Déficit auditado, sin reescribir la venta |
-| Venta de la última unidad | Stock queda en 0 y la venta se honra | Sin corrección posterior |
-| Varianza de conteo | Se registra como `audit_variance` | El dueño revisa y decide |
-| Cargo offline que excede el límite | Queda como borrador y se autoriza | El dueño decide al sincronizar |
-| Recordatorio sin consentimiento | No se envía | El consentimiento se respeta en el outbox |
+| No connection during a sale | The sale stays in the local outbox | It syncs on reconnect, in order |
+| Expired offline lease | The device requests online authorization | No closeout or handover is forced |
+| Unsigned or expired price snapshot | The device cannot sell offline | It fetches the snapshot and lease again |
+| App restart or update | The outbox persists and migrates | It continues from the last `sequence` |
+| Duplicate event | The server does not apply it again | Idempotency by `(deviceId, eventId)` |
+| Gap in the sequence | The device detects missing events | It resends from the last confirmed ack |
+| Corrupt event | Detected by the AEAD tag | It is quarantined without blocking the queue |
+| Price different from the snapshot | The server recalculates and retains the difference | Audited shortfall, without rewriting the sale |
+| Last-unit sale | Stock ends at 0 and the sale is honored | No later correction |
+| Count variance | Recorded as `audit_variance` | The owner reviews and decides |
+| Offline charge that exceeds the limit | It stays as a draft and is authorized | The owner decides on sync |
+| Reminder without consent | It is not sent | Consent is respected in the outbox |
 
-## Criterios de aceptación
+## Acceptance criteria
 
-- [ ] Una venta en efectivo sin conexión se finaliza con precios del snapshot firmado y llega al servidor al reconectar.
-- [ ] El servidor recalcula los totales y rechaza una venta con precios alterados, sin reescribir la venta física.
-- [ ] Un déficit entre cobro y total canónico se retiene y se audita, no se corrige en silencio.
-- [ ] Vencido el lease de 12 horas, el dispositivo pide autorización en línea y no se fuerza cierre ni traspaso.
-- [ ] El outbox persiste tras matar la app y tras actualizar de una versión a otra.
-- [ ] El archivo del outbox en disco no contiene el payload en claro.
-- [ ] Reenviar el mismo lote no duplica ventas ni movimientos.
-- [ ] Una venta de la última pieza lleva el stock a cero; dos ventas distintas desde dos POS llevan el saldo a −1 y abren una varianza. Repetir ambos lotes no modifica dinero ni stock.
-- [ ] Un conteo distinto registra `audit_variance` y no corrige en silencio.
-- [ ] Una recepción offline queda `awaiting_approval` y solo incrementa stock al aprobar.
-- [ ] Un cargo offline de fiado queda como borrador y solo se finaliza al sincronizar.
-- [ ] Un recordatorio de fiado solo se envía con consentimiento y a través del outbox.
-- [ ] El corte de caja calcula la varianza correcta y no permite abrir sin cerrar.
+- [ ] An offline cash sale is finalized with prices from the signed snapshot and reaches the server on reconnect.
+- [ ] The server recalculates totals and rejects a sale with altered prices, without rewriting the physical sale.
+- [ ] A shortfall between the charge and the canonical total is retained and audited, not corrected silently.
+- [ ] Once the 12-hour lease expires, the device requests online authorization and no closeout or handover is forced.
+- [ ] The outbox persists after killing the app and after updating from one version to another.
+- [ ] The outbox file on disk does not contain the plaintext payload.
+- [ ] Resending the same batch does not duplicate sales or movements.
+- [ ] A last-piece sale takes stock to zero; two different sales from two POS take the balance to −1 and open a variance. Repeating both batches changes neither money nor stock.
+- [ ] A different count records `audit_variance` and does not correct silently.
+- [ ] An offline receipt stays `awaiting_approval` and only increases stock on approval.
+- [ ] An offline fiado charge stays as a draft and is only finalized on sync.
+- [ ] A fiado reminder is only sent with consent and through the outbox.
+- [ ] The till closeout computes the correct variance and does not allow opening without closing.
 
-## Puertas
+## Gates
 
-- [ ] Matriz offline en pruebas de dispositivo: venta, recepción, fiado en borrador, reinicio y actualización, cada una con verificación de sincronización.
-- [ ] Prueba de idempotencia del outbox con lotes repetidos y secuencias desordenadas.
-- [ ] Prueba de cifrado que inspecciona el archivo en disco y exige que no aparezca el payload en claro.
-- [ ] Prueba de migración de esquema del outbox entre dos versiones consecutivas.
-- [ ] Prueba de snapshot firmado que rechaza precios alterados y lease vencido.
-- [ ] Prueba de regresión de inventario que cubre última unidad, varianza y recepción.
+- [ ] Offline matrix in device tests: sale, receipt, draft fiado, restart, and update, each with sync verification.
+- [ ] Outbox idempotency test with repeated batches and out-of-order sequences.
+- [ ] Encryption test that inspects the file on disk and requires that the plaintext payload does not appear.
+- [ ] Outbox schema migration test between two consecutive versions.
+- [ ] Signed snapshot test that rejects altered prices and an expired lease.
+- [ ] Inventory regression test covering last unit, variance, and receipt.
 
-## Proveniencia
+## Provenance
 
-- Patrón transactional outbox: <https://microservices.io/patterns/data/transactional-outbox.html>
-- Android Keystore (custodia de claves del dispositivo): <https://developer.android.com/privacy-and-security/keystore>
-- Contrato v1 heredado: `docs/v1-contract.md`
-- Contrato v2 heredado: `docs/v2-contract.md`
+- Transactional outbox pattern: <https://microservices.io/patterns/data/transactional-outbox.html>
+- Android Keystore (device key custody): <https://developer.android.com/privacy-and-security/keystore>
+- Inherited v1 contract: `docs/v1-contract.md`
+- Inherited v2 contract: `docs/v2-contract.md`
 
-## Decisiones fijadas
+## Locked decisions
 
-- Las 12 horas son solo el plazo de la autorización offline. No fuerzan cierre de caja ni traspaso de turno.
-- La venta offline usa precios de un snapshot canónico firmado por el servidor y nunca montos del cliente.
-- La venta física no se reescribe al sincronizar. Los déficits se retienen y se auditan.
-- El fiado offline es un borrador hasta la confirmación del servidor. Los recordatorios exigen consentimiento y salen por el outbox.
-- Los folios los asigna el servidor o un rango pre-asignado al dispositivo, sin reutilización.
+- The 12 hours are only the offline authorization duration. They do not force a till closeout or shift handover.
+- The offline sale uses prices from a canonical snapshot signed by the server and never amounts from the client.
+- The physical sale is not rewritten on sync. Shortfalls are retained and audited.
+- Offline fiado is a draft until server confirmation. Reminders require consent and go out through the outbox.
+- Folios are assigned by the server or a range pre-assigned to the device, without reuse.

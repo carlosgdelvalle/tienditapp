@@ -1,185 +1,185 @@
-# 06 · Landing pública, oferta y APK piloto
+# 06 · Public landing page, offer, and pilot APK
 
-## Uso por DSH
+## Use by DSH
 
-Este documento es la instrucción completa para la página pública de Abarpay, la oferta comercial y la distribución del APK piloto. DSH significa DeepSeek Harness. La base de código es `main` en `75c1f35`, revisada el 21-nov-2026.
+This document is the complete instruction set for Abarpay's public page, commercial offer, and pilot APK distribution. DSH means DeepSeek Harness. The codebase is `main` at `75c1f35`, reviewed on 21-Nov-2026.
 
-El alcance público confirma una oferta de autoservicio `Gratis`, un piloto `Control` de MXN 149 por tienda al mes con cobro manual, y una invitación a expresar interés en el futuro piloto guiado `Formalización` de MXN 399 al mes durante tres meses. El dossier financiero es una investigación futura. La distribución del piloto usa un APK Android firmado en el dominio del producto.
+The public scope confirms a self-service `Gratis` offer, a `Control` pilot at MXN 149 per store per month with manual billing, and an invitation to express interest in the future guided `Formalización` pilot at MXN 399 per month for three months. The financial dossier is future research. Pilot distribution uses a signed Android APK on the product domain.
 
-DSH debe seguir este orden:
+DSH must follow this order:
 
-1. Implementar primero la página y sus estados reales con datos y precios versionados.
-2. Conectar cada CTA a un destino existente. Un botón sin destino o un enlace que promete una función no publicada bloquea el paquete.
-3. Instrumentar eventos de campaña, visita, CTA, registro verificado, tienda creada, primera venta, Control pagado, devolución y retención, sin datos bancarios ni datos de clientes.
-4. Verificar afirmaciones contra la build desplegada, la versión del APK y el contrato de cada flujo.
-5. Validar responsividad, teclado, lector de pantalla, contraste y reducción de movimiento antes de aceptar.
+1. Implement the page and its real states first, with versioned data and prices.
+2. Connect each CTA to an existing destination. A button without a destination, or a link that promises an unpublished feature, blocks the package.
+3. Instrument campaign, visit, CTA, verified registration, store creation, first sale, paid Control, refund, and retention events without bank data or customer data.
+4. Verify claims against the deployed build, the APK version, and each flow's contract.
+5. Validate responsiveness, keyboard use, screen-reader support, contrast, and reduced motion before acceptance.
 
-Un cambio de precio, una promesa comercial nueva o una prueba con dinero requiere autorización del responsable del producto. La página puede usar fixtures `SIMULADO` para producto y métricas mientras la implementación real avanza.
+A price change, a new commercial promise, or a test involving money requires authorization from the product owner. The page may use `SIMULADO` fixtures for product and metrics while the real implementation is in progress.
 
-## Estado actual y destinos
+## Current state and destinations
 
-| Ruta | Estado en `75c1f35` | Uso público requerido |
+| Route | State in `75c1f35` | Required public use |
 |---|---|---|
-| `/` | Redirige a `/console`. | Mostrar la landing pública. La consola queda en una ruta separada. |
-| `/console` | Consola del dueño con PIN compartido y vistas de tienda. | Uso interno durante la transición. La meta es entrada del dueño por QR y sesión propia. |
-| `/invite/{token}` | Página de invitación con enlace a la app. | Mantenerla y probar liga vencida, reutilizada y aceptación correcta. |
-| `/empezar` | No existe. | Destino del CTA `Empezar gratis`. Debe abrir alta real o una lista de espera honesta, con estado visible. |
-| `/entrar` | No existe. | Destino del CTA `Entrar a mi tienda`. Debe iniciar el desafío de acceso por QR. |
-| `/apk-piloto` | No existe. | Entrega del APK firmado o explicación del estado del piloto. Nunca sirve un archivo sin firma ni hash. |
+| `/` | Redirects to `/console`. | Show the public landing page. The console remains on a separate route. |
+| `/console` | Owner console with a shared PIN and store views. | Internal use during the transition. The target is owner entry by QR and a dedicated session. |
+| `/invite/{token}` | Invitation page with a link to the app. | Keep it and test expired, reused, and correctly accepted links. |
+| `/empezar` | Does not exist. | Destination for the `Empezar gratis` CTA. It must open real sign-up or an honest waiting list with a visible state. |
+| `/entrar` | Does not exist. | Destination for the `Entrar a mi tienda` CTA. It must start the QR access challenge. |
+| `/apk-piloto` | Does not exist. | Delivery of the signed APK or an explanation of pilot status. Never serve a file without a signature and hash. |
 
-DSH puede usar otras rutas si el coordinador las aprueba, siempre que cada CTA tenga una prueba de destino y no quede un enlace muerto.
+DSH may use other routes if the coordinator approves them, provided every CTA has a destination test and no dead link remains.
 
-## Posicionamiento
+## Positioning
 
-La landing vende control operativo para una tienda pequeña. La promesa central es cobrar, saber quién debe y reponer con información del negocio. La prueba es el producto real en operación, no una lista abstracta de tecnología.
+The landing page sells operational control for a small store. The central promise is to collect payment, know who owes money, and restock with information from the business. The proof is the real product in operation, not an abstract list of technology.
 
-| Elemento | Decisión |
+| Element | Decision |
 |---|---|
-| Público | Dueño de tiendita o negocio pequeño en México que cobra en efectivo, paga CoDi y anota deudas. |
-| Trabajo principal | Cerrar una venta, cobrar una deuda y decidir qué comprar sin perder claridad. |
-| Objetivo a demostrar antes de publicarlo | Efectivo y comprobantes disponibles sin conexión, fiado en línea con saldo e historial, CoDi con confirmación del servidor y stock compartido al sincronizar. |
-| Tono | Directo, operativo y en español mexicano. Habla de la tienda, no de la arquitectura. |
-| Prueba visual | Capturas o grabación del build aceptado, con datos ficticios etiquetados. |
-| Autoridad de precios | Tabla versionada del producto. Un experimento no cambia el precio cobrado. |
+| Audience | Owner of a small neighborhood store or small business in Mexico who takes cash, accepts CoDi, and records debts. |
+| Primary job | Complete a sale, collect a debt, and decide what to buy without losing clarity. |
+| Objective to demonstrate before publishing | Cash and receipts available offline, online credit sales with balance and history, CoDi with server confirmation, and stock shared when registers synchronize. |
+| Tone | Direct, operational, and in Mexican Spanish. Talk about the store, not the architecture. |
+| Visual proof | Screenshots or a recording of the accepted build, with fictional data labeled as such. |
+| Price authority | Versioned product table. An experiment does not change the charged price. |
 
-## Reglas de veracidad
+## Truthfulness rules
 
-| Capacidad | Afirmación permitida | Afirmación prohibida |
+| Capability | Permitted claim | Prohibited claim |
 |---|---|---|
-| Efectivo offline | `Registra ventas en efectivo y comprobantes en el teléfono cuando no hay señal.` | `Todo Abarpay funciona sin internet.` |
-| Fiado | `Consulta saldos y registra cargos o abonos con conexión.` | `Autoriza fiado sin conexión` o `cobra deudas automáticamente`. |
-| CoDi | `Muestra el QR y confirma el pago cuando el servidor lo verifica.` | `Pago garantizado`, `dinero inmediato` o `sin riesgo`. |
-| Inventario | `Comparte existencias cuando las cajas se sincronizan. Las diferencias se revisan.` | `Inventario exacto en tiempo real` sin prueba de cada caja. |
-| Comunidad | `Participación opcional, apagada por defecto, con beneficio y retiro explicados.` | `Vendemos tus datos` o `datos anónimos garantizados`. |
-| Seguridad | `Datos separados por tienda y accesos por membresía.` | `100% seguro`, `bancos certifican todo` o una certificación no obtenida. |
-| APK piloto | `Instala una versión firmada, verificable y con sus notas de versión.` | `Descarga el APK` junto a un archivo sin firma, sin hash o de origen desconocido. |
-| Formalización | `Piloto guiado de tres meses, sin renovación automática y con contador externo.` | `Trámite fiscal incluido`, `contador incluido` o `dossier bancario disponible`. |
+| Offline cash | `Registra ventas en efectivo y comprobantes en el teléfono cuando no hay señal.` | `Todo Abarpay funciona sin internet.` |
+| Credit sales | `Consulta saldos y registra cargos o abonos con conexión.` | `Autoriza fiado sin conexión` or `cobra deudas automáticamente`. |
+| CoDi | `Muestra el QR y confirma el pago cuando el servidor lo verifica.` | `Pago garantizado`, `dinero inmediato` or `sin riesgo`. |
+| Inventory | `Comparte existencias cuando las cajas se sincronizan. Las diferencias se revisan.` | `Inventario exacto en tiempo real` without evidence from every till. |
+| Community | `Participación opcional, apagada por defecto, con beneficio y retiro explicados.` | `Vendemos tus datos` or `datos anónimos garantizados`. |
+| Security | `Datos separados por tienda y accesos por membresía.` | `100% seguro`, `bancos certifican todo` or a certification the product has not earned. |
+| Pilot APK | `Instala una versión firmada, verificable y con sus notas de versión.` | `Descarga el APK` next to an unsigned file, a file without a hash, or one of unknown origin. |
+| Formalización | `Piloto guiado de tres meses, sin renovación automática y con contador externo.` | `Trámite fiscal incluido`, `contador incluido` or `dossier bancario disponible`. |
 
-No se publica un número de clientes, ahorro, aumento de ventas, tiempo de activación o beneficio del piloto de datos sin fuente, fecha, muestra y método. Si falta alguno, la sección muestra `Sin datos suficientes` o se omite.
+Do not publish a customer count, savings, sales increase, activation time, or data-pilot benefit without a source, date, sample, and method. If any element is missing, the section shows `Sin datos suficientes` or is omitted.
 
-## Copia de la primera pantalla
+## First-screen copy
 
-### Navegación
+### Navigation
 
-- Marca enlazada a `/`.
-- Enlaces `Cómo funciona`, `Planes`, `Preguntas`.
-- CTA secundario `Entrar a mi tienda`.
+- Brand linked to `/`.
+- Links `Cómo funciona`, `Planes`, `Preguntas`.
+- Secondary CTA `Entrar a mi tienda`.
 
-### Contenido exacto
+### Exact content
 
 **H1**
 
 > Cobra, controla lo que te deben y sabe qué reponer.
 
-**Párrafo**
+**Paragraph**
 
 > Abarpay reúne la venta, el efectivo, el fiado, el inventario y CoDi en el teléfono de tu tienda. El efectivo y sus comprobantes quedan en el teléfono cuando falla la conexión. Al volver la señal, todo se sincroniza para que tu equipo trabaje con el mismo estado.
 
-**CTA principal**
+**Primary CTA**
 
 > Empezar gratis
 
-**CTA de regreso**
+**Return CTA**
 
 > Entrar a mi tienda
 
-**CTA de piloto**
+**Pilot CTA**
 
 > Instalar APK piloto firmado
 
-**Microcopia bajo los botones**
+**Microcopy below the buttons**
 
 > Gratis incluye historial y exportación. Control cuesta MXN 149 por tienda al mes y se cobra manualmente. La web no procesa cargos automáticos.
 
-**Prueba visual**
+**Visual proof**
 
-La imagen principal muestra una venta en efectivo con cambio, el estado `Guardado en el teléfono` y un comprobante. Si el build aceptado no contiene esa función, la imagen y la promesa de offline se retiran hasta que exista evidencia.
+The main image shows a cash sale with change, the status `Guardado en el teléfono`, and a receipt. If the accepted build does not contain that feature, the image and the offline promise are removed until evidence exists.
 
-## Secciones de la página
+## Page sections
 
-### 1. La operación de hoy
+### 1. Today's operation
 
-**Título**
+**Title**
 
 > Tu tienda, en orden desde el primer cobro.
 
-**Copia**
+**Copy**
 
 > Abre el catálogo, cobra, registra un gasto y revisa lo que pasó hoy. El dueño ve la tienda completa. Cada empleado ve solo lo que necesita para su turno.
 
-Tres pruebas visuales, cada una con etiqueta `SIMULADO` cuando use datos ficticios:
+Three visual proofs, each labeled `SIMULADO` when it uses fictional data:
 
-1. `Cobrar` con productos, total y cambio.
-2. `Inicio` con ventas, cobrado, fiado por cobrar y productos bajos.
-3. `Inventario` con existencia, último movimiento y alerta de reposición.
+1. `Cobrar` with products, total, and change.
+2. `Inicio` with sales, amount collected, credit owed, and low-stock products.
+3. `Inventario` with stock, latest movement, and a restock alert.
 
-### 2. Efectivo y comprobantes sin conexión
+### 2. Offline cash and receipts
 
-**Título**
+**Title**
 
 > La caja sigue cuando la señal no.
 
-**Copia**
+**Copy**
 
 > Cobra en efectivo, calcula el cambio y entrega un comprobante con una referencia estable aunque no haya internet. El teléfono conserva la venta y el movimiento de existencia. Al reconectar, envía la operación una sola vez y muestra si quedó pendiente, sincronizada o necesita atención.
 
-**Aclaración**
+**Clarification**
 
 > CoDi, fiado, invitaciones y cambios de cuenta necesitan conexión. Abarpay muestra qué se puede terminar en el teléfono y qué falta del servidor.
 
-**Prueba requerida**
+**Required proof**
 
-Video corto del teléfono en modo avión, una venta, el comprobante, el reinicio y la sincronización. La grabación se reemplaza si la versión cambia.
+A short video of the phone in airplane mode showing a sale, the receipt, a restart, and synchronization. The recording is replaced if the version changes.
 
-### 3. CoDi a la cuenta de la tienda
+### 3. CoDi to the store account
 
-**Título**
+**Title**
 
 > El QR es el inicio. La confirmación es la que cuenta.
 
-**Copia**
+**Copy**
 
 > Abarpay crea el cobro CoDi para la cuenta activa de tu tienda. El pago se marca como confirmado cuando el servidor verifica la transacción. Una captura de pantalla no cambia el estado.
 
-Pasos concisos:
+Concise steps:
 
-1. Registra la cuenta receptora y espera su activación.
-2. Genera el QR desde la venta.
-3. Consulta el estado hasta recibir la confirmación verificada.
+1. Register the receiving account and wait for activation.
+2. Generate the QR from the sale.
+3. Check the status until verified confirmation is received.
 
-**Aclaración**
+**Clarification**
 
 > La activación bancaria puede tardar hasta cinco días hábiles. La página no promete disponibilidad inmediata ni un banco específico hasta que la cuenta esté activa.
 
-### 4. Fiado con historia
+### 4. Credit sales with history
 
-**Título**
+**Title**
 
 > Lo que te deben, con nombre y con historial.
 
-**Copia**
+**Copy**
 
 > Registra una venta fiada con el cliente correcto. Consulta el saldo, registra un abono parcial o liquida la deuda. Cada movimiento conserva fecha, responsable y nota. El fiado se confirma con conexión para no duplicar una deuda desde dos teléfonos.
 
-No mostrar montos de deuda de personas reales. La demo usa nombres ficticios y una etiqueta visible `SIMULADO`.
+Do not show debt amounts for real people. The demo uses fictional names and a visible `SIMULADO` label.
 
-### 5. Reposición con una acción siguiente
+### 5. Restocking with a next action
 
-**Título**
+**Title**
 
 > Sabe qué falta y qué sigue.
 
-**Copia**
+**Copy**
 
 > Las existencias bajas se convierten en una lista de trabajo. Revisa el producto, arma el pedido con tu proveedor, recibe la mercancía y publica la entrada cuando esté aprobada. Si dos cajas vendieron la última unidad, Abarpay conserva ambas ventas y abre una diferencia para revisar.
 
-**Estado**
+**Status**
 
-La sección se publica solo si el flujo de pedido y recepción existe en el build aceptado. Mientras sea un borrador, usar `Estamos preparando esta función` y un CTA `Me interesa el piloto`.
+The section is published only if the order and receiving flow exists in the accepted build. While it is a draft, use `Estamos preparando esta función` and a `Me interesa el piloto` CTA.
 
-### 6. Hecho para una tienda que no se detiene
+### 6. Built for a store that does not stop
 
-Tres columnas con afirmaciones verificables:
+Three columns with verifiable claims:
 
 | Columna | Texto |
 |---|---|
@@ -187,27 +187,27 @@ Tres columnas con afirmaciones verificables:
 | Con tu equipo | `Invita por liga o QR y asigna permisos por persona.` |
 | Para decidir | `Revisa ventas, deudas y reposición con periodos y fuentes claras.` |
 
-### 7. Historial y exportación siempre disponibles
+### 7. History and export always available
 
-**Título**
+**Title**
 
 > Lo que registraste sigue siendo tuyo.
 
-**Copia**
+**Copy**
 
 > El plan Gratis incluye historial y exportación. Si usas Control o participas en un piloto de datos, puedes consultar y recuperar tus registros. Cambiar de opinión sobre la comunidad no borra tu historial.
 
-Evitar `propiedad absoluta` o promesas legales no revisadas. La copia describe acceso operativo mientras el aviso de privacidad y los términos definan la relación jurídica completa.
+Avoid `propiedad absoluta` and unreviewed legal promises. The copy describes operational access while the privacy notice and terms define the complete legal relationship.
 
-## Planes
+## Plans
 
 ### Gratis
 
-**Precio**
+**Price**
 
 > MXN 0
 
-**Texto**
+**Text**
 
 > Incluye caja, catálogo, inventario básico, registro de ventas, CoDi sin recargo de Abarpay, historial y exportación. La web no procesa cargos automáticos.
 
@@ -215,19 +215,19 @@ Evitar `propiedad absoluta` o promesas legales no revisadas. La copia describe a
 
 > Empezar gratis
 
-El servidor aplica la matriz por tienda. El aislamiento, la comprobación de permisos y la confirmación verificada de CoDi son universales. Nunca bloquea la consulta o exportación de registros ya creados.
+The server applies the matrix per store. Isolation, permission checks, and verified CoDi confirmation are universal. It never blocks consultation or export of records that have already been created.
 
 ### Control
 
-**Precio**
+**Price**
 
 > MXN 149 por tienda al mes
 
-**Etiqueta**
+**Label**
 
 > Piloto con cobro manual
 
-**Texto**
+**Text**
 
 > Control incluye permisos por empleado, alertas de reposición, herramientas de conciliación y reportes de margen y fiado. Se activa para una tienda después de confirmar el pago del periodo. La facturación es manual y no existe cargo automático desde la landing. La continuación se confirma antes de emitir el siguiente cobro manual. Si no se paga el siguiente periodo, las automatizaciones de Control se suspenden y conservas historial y exportación.
 
@@ -235,7 +235,7 @@ El servidor aplica la matriz por tienda. El aislamiento, la comprobación de per
 
 > Me interesa Control
 
-**Términos visibles**
+**Visible terms**
 
 - Precio por tienda y por mes.
 - Cobro manual fuera de esta página.
@@ -243,19 +243,19 @@ El servidor aplica la matriz por tienda. El aislamiento, la comprobación de per
 - Impuestos y factura se muestran en la cotización aplicable.
 - Las funciones de Control se listan desde la matriz de producto. Las no publicadas no se incluyen.
 
-No afirmar `sin límites`, `ilimitado`, `cancelación instantánea` ni `garantía de devolución` hasta aprobar esas condiciones.
+Do not claim `sin límites`, `ilimitado`, `cancelación instantánea`, or `garantía de devolución` until those conditions are approved.
 
 ### Formalización
 
-**Precio**
+**Price**
 
 > MXN 399 al mes durante 3 meses
 
-**Etiqueta**
+**Label**
 
 > Próximo piloto · registro de interés, sin renovación automática
 
-**Texto**
+**Text**
 
 > Estamos preparando tres meses de Control con acompañamiento para alta o actualización en el RFC, preparación para facturar y un primer cierre para tu contador. Al terminar vuelves a Gratis o eliges Control. El contador se cotiza aparte. Hoy puedes registrar interés; no hay cargo ni renovación automática.
 
@@ -263,20 +263,20 @@ No afirmar `sin límites`, `ilimitado`, `cancelación instantánea` ni `garantí
 
 > Me interesa el piloto
 
-**Aclaraciones**
+**Clarifications**
 
 - La página no presenta Formalización como trámite fiscal terminado.
 - La página no promete aceptación bancaria ni crédito.
 - El contador externo define alcance, honorarios y responsabilidades aparte.
 - Al terminar los tres meses, la continuidad requiere una decisión nueva.
 
-### Dossier financiero
+### Financial dossier
 
-**Etiqueta**
+**Label**
 
 > Investigación futura
 
-**Texto**
+**Text**
 
 > Estamos evaluando un expediente que tú, incluso en Gratis, podrías revisar y compartir con una financiera específica. Distinguiría ventas de caja y cobros confirmados. Probaríamos una tarifa fija que pagaría la financiera por expediente entregado. La financiera decide el crédito. Hoy sólo registramos interés.
 
@@ -284,9 +284,9 @@ No afirmar `sin límites`, `ilimitado`, `cancelación instantánea` ni `garantí
 
 > Me interesa el expediente
 
-El CTA abre una explicación o formulario de interés. No se presenta como solicitud de crédito ni como producto vendible.
+The CTA opens an explanation or interest form. It is not presented as a credit application or as a sellable product.
 
-### Matriz comparativa
+### Comparison matrix
 
 | Capacidad | Gratis | Control | Formalización |
 |---|---|---|---|
@@ -300,30 +300,30 @@ El CTA abre una explicación o formulario de interés. No se presenta como solic
 | Renovación automática | No aplica | No, cobro manual | No |
 | Precio | MXN 0 | MXN 149 al mes por tienda | MXN 399 al mes por 3 meses |
 
-La expresión `Según build aceptado` solo puede sustituirse por `Sí` cuando la versión publicada tenga evidencia del flujo y la prueba física correspondiente.
+The expression `Según build aceptado` may be replaced by `Sí` only when the published version has evidence of the flow and the corresponding physical test.
 
-## APK piloto firmado
+## Signed pilot APK
 
-La sección de descarga contiene estos campos obligatorios. Si un campo falta, el botón queda deshabilitado y la página explica qué falta.
+The download section contains these required fields. If a field is missing, the button is disabled and the page explains what is missing.
 
-| Campo | Contenido |
+| Field | Content |
 |---|---|
-| Versión | Nombre y código, por ejemplo el baseline actual `1.2.3` y `15` cuando el artefacto coincida. |
-| Fecha | Fecha de compilación en zona de México. |
-| Revisión fuente | SHA de Git que produjo el APK. |
-| SHA-256 | Hash del archivo exacto publicado. |
-| Firma | Huella del certificado y resultado de verificación. |
-| Compatibilidad | Android mínimo soportado por la build, `API 26` en el baseline. |
-| Notas | Funciones incluidas, límites y cambios de datos locales. |
-| Instrucciones | Instalación, actualización, respaldo y recuperación. |
+| Versión | Name and code, for example the current baseline `1.2.3` and `15` when the artifact matches. |
+| Fecha | Build date in Mexico's time zone. |
+| Revisión fuente | Git SHA that produced the APK. |
+| SHA-256 | Hash of the exact published file. |
+| Firma | Certificate fingerprint and verification result. |
+| Compatibilidad | Minimum Android supported by the build, `API 26` in the baseline. |
+| Notas | Included features, limits, and local data changes. |
+| Instrucciones | Installation, update, backup, and recovery. |
 
-Copias:
+Copy:
 
-**Título**
+**Title**
 
 > Prueba Abarpay en el teléfono de tu tienda.
 
-**Texto**
+**Text**
 
 > El piloto se instala con un APK firmado. Antes de descargar, revisa la versión, el SHA-256 y las notas. La actualización conserva los datos locales autorizados.
 
@@ -331,75 +331,75 @@ Copias:
 
 > Instalar APK piloto firmado
 
-**Estado no disponible**
+**Unavailable state**
 
 > El APK piloto aún no está publicado. Déjanos tu interés y te avisaremos cuando exista una versión firmada y verificada.
 
-**CTA alternativo**
+**Alternative CTA**
 
 > Solicitar el APK piloto
 
-No se permite un botón que descargue desde una URL temporal, un archivo debug, un enlace vencido de Cloudflare o un binario cuya firma no coincida con los App Links.
+A button that downloads from a temporary URL, a debug file, an expired Cloudflare link, or a binary whose signature does not match the App Links is not permitted.
 
-## Comunidad y datos
+## Community and data
 
-**Título**
+**Title**
 
 > Tú decides si compartes. Gratis sigue teniendo historial y exportación.
 
-**Copia**
+**Copy**
 
 > Podemos pedir tu permiso para usar información agregada de tienda en un piloto con un socio de abasto. La participación empieza apagada. Antes de activarla verás qué campos se usan, para qué decisión, qué recibe el socio, cuánto se conserva y cómo salir. La salida detiene contribuciones futuras y conserva las reglas de los reportes ya entregados. Tus datos de clientes y tu cuenta bancaria no forman parte del reporte agregado.
 
-**Controles visibles**
+**Visible controls**
 
-- Interruptor `Participar en el piloto de datos`, apagado por defecto.
-- Enlace al aviso de privacidad y al propósito vigente.
-- Fecha de versión del consentimiento.
-- Botón `Dejar de participar` con confirmación y siguiente paso.
-- Enlace `Descargar mi historial` disponible incluso sin participación.
+- Toggle `Participar en el piloto de datos`, off by default.
+- Link to the privacy notice and the current purpose.
+- Consent version date.
+- Button `Dejar de participar` with confirmation and next step.
+- Link `Descargar mi historial` available even without participation.
 
-La página no usa la frase `datos anónimos` como garantía jurídica. Puede decir `datos agregados con controles de divulgación`. La revisión legal ocurre antes de una entrega externa real.
+The page does not use the phrase `datos anónimos` as a legal guarantee. It may say `datos agregados con controles de divulgación`. Legal review occurs before any real external delivery.
 
-## Medición de campañas
+## Campaign measurement
 
-La medición sostiene la mejora de la página y la operación comercial. No se convierte en una promesa de retorno publicitario.
+Measurement supports improvement of the page and commercial operations. It does not become a promise of advertising return.
 
-| Evento | Campos permitidos | Uso |
+| Event | Permitted fields | Use |
 |---|---|---|
-| `landing_view` | ruta, variante, UTM permitidos, dispositivo y fecha | Saber qué versión vio la persona. |
-| `cta_click` | CTA, variante, campaña, actor responsable | Medir intención y destino. |
-| `registration_verified` | tienda nueva o existente, campaña, actor | Separar alta verificada de correo o visita. |
-| `store_created` | identificador interno no comercial, campaña, actor | Medir activación inicial. |
-| `first_sale_completed` | medio, tienda interna, campaña, actor | Medir continuidad hasta una venta real. |
-| `control_paid` | periodo, importe de software, campaña, actor | Medir ingreso cobrado, no una intención. |
-| `refund` | periodo, importe, motivo agregado, campaña | Separar ingreso bruto y neto. |
-| `retention_checkpoint` | cohorte, periodo, estado activo | Medir uso posterior. |
-| `consent_changed` | versión, estado, fecha | Auditar participación. |
+| `landing_view` | route, variant, permitted UTMs, device, and date | Know which version the person saw. |
+| `cta_click` | CTA, variant, campaign, responsible actor | Measure intent and destination. |
+| `registration_verified` | new or existing store, campaign, actor | Separate verified sign-up from email or visit. |
+| `store_created` | non-commercial internal identifier, campaign, actor | Measure initial activation. |
+| `first_sale_completed` | channel, internal store, campaign, actor | Measure continuity through a real sale. |
+| `control_paid` | period, software amount, campaign, actor | Measure collected revenue, not intent. |
+| `refund` | period, amount, aggregate reason, campaign | Separate gross and net revenue. |
+| `retention_checkpoint` | cohort, period, active state | Measure later use. |
+| `consent_changed` | version, state, date | Audit participation. |
 
-Reglas:
+Rules:
 
-1. Guardar campaña, UTM, variante y actor responsable en cada evento pertinente.
-2. No enviar CLABE, tokens, nombre de cliente, teléfono, deuda, dirección, contenido de venta ni identificadores de pago a analítica o publicidad.
-3. Usar un ID interno de tienda con acceso restringido. No usar correo como clave pública.
-4. Distinguir leads, altas, tiendas activas, ventas, Control pagado y retención. No sumar etapas que no son comparables.
-5. Si faltan costos o la atribución está incompleta, mostrar `Sin datos suficientes` para CAC y ROI.
-6. Registrar la atribución superpuesta de campañas y no borrar duplicados por conveniencia.
-7. Una prueba de precio o copy se evalúa con cobros reales y retención, no solo clics.
+1. Store campaign, UTM, variant, and responsible actor on every relevant event.
+2. Do not send CLABE, tokens, customer name, phone number, debt, address, sale content, or payment identifiers to analytics or advertising.
+3. Use an internal store ID with restricted access. Do not use email as a public key.
+4. Distinguish leads, sign-ups, active stores, sales, paid Control, and retention. Do not add stages that are not comparable.
+5. If costs are missing or attribution is incomplete, show `Sin datos suficientes` for CAC and ROI.
+6. Record overlapping campaign attribution and do not delete duplicates for convenience.
+7. Evaluate a price or copy test using real charges and retention, not clicks alone.
 
-### Experimentos iniciales
+### Initial experiments
 
-| Experimento | Variantes | Métrica principal | Guardas |
+| Experiment | Variants | Primary metric | Guards |
 |---|---|---|---|
-| Primera pantalla | Promesa completa contra promesa centrada en efectivo | CTA a alta verificada | Legibilidad, comprensión y reclamos aprobados. |
-| CTA de entrada | `Entrar a mi tienda` visible contra enlace secundario | Sesiones web aprobadas | Fallo de cámara con código manual. |
-| Tarjeta Control | Precio y cobro manual visibles contra detalle plegado | Inicio de alta de Control | No ocultar el precio. |
-| APK piloto | Descarga directa contra solicitud guiada | Instalación completada | Firma, versión y hash presentes. |
-| Comunidad | Explicación breve contra ejemplo de reporte | Consentimiento informado | Apagado por defecto y salida visible. |
+| First screen | Full value proposition versus a cash-focused proposition | CTA to verified sign-up | Legibility, comprehension, and approved claims. |
+| Entry CTA | `Entrar a mi tienda` as a prominent action versus a secondary link | Approved web sessions | Camera failure with manual code. |
+| Control card | Price and manual billing displayed upfront versus in expandable details | Start of Control sign-up | Do not hide the price. |
+| Pilot APK | Direct download versus a guided request | Completed installation | Signature, version, and hash present. |
+| Community | Short explanation versus a sample report | Informed consent | Off by default and visible exit. |
 
-Las entrevistas se registran aparte de la conversión. La disposición a pagar se prueba con cargos reales autorizados. Un clic en `Me interesa` no cuenta como ingreso.
+Interviews are recorded separately from conversion. Willingness to pay is tested with authorized real charges. A click on `Me interesa` does not count as revenue.
 
-## Objeciones y respuestas
+## Objections and answers
 
 | Objeción | Respuesta pública |
 |---|---|
@@ -413,87 +413,87 @@ Las entrevistas se registran aparte de la conversión. La disposición a pagar s
 | ¿Comparten mis datos? | Solo con consentimiento para el piloto descrito. Participación apagada por defecto. Los datos de clientes y la cuenta bancaria quedan fuera del reporte agregado. |
 | ¿Por qué piden el APK en vez de Google Play? | El piloto distribuye una build firmada desde el dominio del producto. La ficha de Google Play es una etapa separada. |
 
-## Estados responsivos y de disponibilidad
+## Responsive and availability states
 
-| Estado | Escritorio | Móvil | Acción |
+| State | Desktop | Mobile | Action |
 |---|---|---|---|
-| Alta abierta | CTA principal y handoff por teléfono. | `Empezar gratis` abre alta o descarga del APK piloto disponible. | Ambos destinos deben responder. |
-| Alta en lista de espera | Formulario o explicación del estado. | La misma promesa y la misma fecha de revisión. | No presentar como disponible lo que aún no lo está. |
-| QR disponible | Muestra QR y código manual, con vencimiento. | `Entrar a mi tienda` inicia el mismo desafío. | Negar, reintentar y caducar con texto claro. |
-| APK disponible | Ficha con versión y SHA-256. | Botón de descarga y notas. | Verificar firma antes de publicar. |
-| APK no disponible | Explicación y CTA de interés. | La misma explicación sin enlace roto. | Registrar interés, no simular descarga. |
-| Error de red | Conserva la última sección y ofrece reintento. | Igual. | No borra un formulario completado. |
+| Sign-up open | Primary CTA and phone handoff. | `Empezar gratis` opens sign-up or download of the available pilot APK. | Both destinations must respond. |
+| Sign-up on waiting list | Form or explanation of status. | The same promise and the same review date. | Do not present as available what is not yet available. |
+| QR available | Shows QR and manual code with expiration. | `Entrar a mi tienda` starts the same challenge. | Deny, retry, and expire with clear text. |
+| APK available | Details with version and SHA-256. | Download button and notes. | Verify the signature before publishing. |
+| APK unavailable | Explanation and interest CTA. | The same explanation without a broken link. | Record interest, do not simulate download. |
+| Network error | Preserves the last section and offers retry. | Same. | Does not erase a completed form. |
 
-La página debe funcionar a 320 CSS px de ancho y en escritorio sin desplazamiento horizontal. La acción principal permanece visible y los bloques de precio no se convierten en tablas ilegibles en móvil.
+The page must work at 320 CSS px width and on desktop without horizontal scrolling. The primary action remains visible and price blocks do not become illegible tables on mobile.
 
-## Accesibilidad de la landing
+## Landing-page accessibility
 
-1. Un solo `h1` y jerarquía de encabezados coherente.
-2. Enlace de salto al contenido principal.
-3. Foco visible y orden lógico de tabulación.
-4. Contraste mínimo 4.5:1 para texto normal y 3:1 para texto grande.
-5. Texto al 200% sin pérdida de contenido ni acciones.
-6. Controles de al menos 24 por 24 CSS px, con espacio suficiente.
-7. Estados de precio, disponibilidad y comunidad con texto además de color.
-8. Imágenes informativas con texto alternativo. Imágenes decorativas vacías.
-9. Video sin reproducción automática con sonido. Controles accesibles y transcripción cuando explique un flujo.
-10. Formularios con etiquetas, ayuda, error asociado y conservación de datos.
-11. Movimiento reducido respetado.
-12. Ningún texto comercial se oculta en una imagen.
+1. A single `h1` and a coherent heading hierarchy.
+2. Skip link to the main content.
+3. Visible focus and logical tab order.
+4. Minimum contrast of 4.5:1 for normal text and 3:1 for large text.
+5. Text at 200% without loss of content or actions.
+6. Controls at least 24 by 24 CSS px, with sufficient spacing.
+7. Price, availability, and community states conveyed with text as well as color.
+8. Informative images with alternative text. Decorative images empty.
+9. Video without autoplay with sound. Accessible controls and a transcript when it explains a flow.
+10. Forms with labels, help, associated errors, and retained data.
+11. Reduced motion respected.
+12. No commercial text hidden in an image.
 
-Verificar con teclado, lector de pantalla, zoom y una prueba móvil. La meta es WCAG 2.2 AA. [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
+Verify with a keyboard, screen reader, zoom, and a mobile test. The target is WCAG 2.2 AA. [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 
-## Pruebas de aceptación
+## Acceptance tests
 
-### Contenido y verdad comercial
+### Content and commercial truth
 
-1. La primera pantalla contiene exactamente `Cobra, controla lo que te deben y sabe qué reponer.`
-2. Existen y funcionan `Empezar gratis`, `Entrar a mi tienda` e `Instalar APK piloto firmado` o su estado alternativo documentado.
-3. Gratis muestra MXN 0 e incluye historial y exportación.
-4. Control muestra MXN 149 por tienda al mes y cobro manual.
-5. Formalización muestra MXN 399 al mes durante tres meses, sin renovación automática y con contador pagado aparte.
-6. El dossier aparece como investigación futura sin precio ni disponibilidad inventados.
-7. Comunidad está apagada por defecto, explica propósito y retiro, y no condiciona historial ni exportación.
-8. Cada cifra de producto tiene fuente, fecha y versión.
-9. No aparece ningún dato de cliente, CLABE, credencial, identificador de pago o captura de deuda real.
+1. The first screen contains exactly `Cobra, controla lo que te deben y sabe qué reponer.`
+2. `Empezar gratis`, `Entrar a mi tienda`, and `Instalar APK piloto firmado`, or their documented alternative state, exist and work.
+3. Gratis shows MXN 0 and includes history and export.
+4. Control shows MXN 149 per store per month and manual billing.
+5. Formalización shows MXN 399 per month for three months, without automatic renewal and with an accountant paid separately.
+6. The dossier appears as future research without an invented price or availability.
+7. Community is off by default, explains purpose and withdrawal, and does not condition history or export.
+8. Every product figure has a source, date, and version.
+9. No customer data, CLABE, credential, payment identifier, or screenshot of real debt appears.
 
-### Rutas y CTA
+### Routes and CTAs
 
-1. `/` responde la landing y no redirige a la consola.
-2. `Empezar gratis` llega a alta o lista de espera y conserva campaña permitida.
-3. `Entrar a mi tienda` llega al desafío y ofrece código manual si falla la cámara.
-4. El CTA de APK entrega solo una versión firmada o muestra el estado no disponible.
-5. El APK publicado muestra versión, revisión fuente, SHA-256, huella de firma, notas e instrucciones.
-6. La actualización en sitio conserva carrito, ventas pendientes, comprobantes y datos locales autorizados.
-7. Las rutas de invitación existentes siguen funcionando.
+1. `/` serves the landing page and does not redirect to the console.
+2. `Empezar gratis` reaches sign-up or waiting list and preserves the permitted campaign.
+3. `Entrar a mi tienda` reaches the challenge and offers a manual code if the camera fails.
+4. The APK CTA delivers only a signed version or shows the unavailable state.
+5. The published APK shows version, source revision, SHA-256, signature fingerprint, notes, and instructions.
+6. In-place update preserves cart, pending sales, receipts, and authorized local data.
+7. Existing invitation routes continue to work.
 
-### Medición
+### Measurement
 
-1. Cada evento lleva variante, campaña y actor responsable cuando aplique.
-2. No se envían datos bancarios, de deuda o de clientes a analítica.
-3. La suma de eventos no confunde visita con registro, venta con cobro, ni Control pagado con interés.
-4. Devoluciones y cancelaciones se restan del ingreso cobrado.
-5. CAC y ROI muestran `Sin datos suficientes` si falta información.
-6. Una prueba de piloto real enlaza la campaña, el cobro manual y la retención del periodo.
+1. Every event carries variant, campaign, and responsible actor when applicable.
+2. No bank, debt, or customer data is sent to analytics.
+3. Event totals do not confuse visit with registration, sale with payment, or paid Control with interest.
+4. Refunds and cancellations are subtracted from collected revenue.
+5. CAC and ROI show `Sin datos suficientes` if information is missing.
+6. A real pilot test links the campaign, manual charge, and period retention.
 
-### Accesibilidad y rendimiento
+### Accessibility and performance
 
-1. Recorrido completo con teclado en escritorio.
-2. Prueba con lector de pantalla en primera pantalla, planes, comunidad y formulario.
-3. Texto al 200% sin recortes ni solapamientos.
-4. Contraste medido en todos los estados.
-5. Ancho móvil de 320 CSS px sin desplazamiento horizontal.
-6. La imagen principal no bloquea el LCP ni carga videos sin acción del usuario.
-7. Los estados de error y carga son accesibles y no dependen solo del color.
+1. Complete keyboard traversal on desktop.
+2. Screen-reader test on the first screen, plans, community, and form.
+3. Text at 200% without clipping or overlap.
+4. Contrast measured in every state.
+5. Mobile width of 320 CSS px without horizontal scrolling.
+6. The main image does not block LCP or load videos without user action.
+7. Error and loading states are accessible and do not rely on color alone.
 
-## Registro de campañas
+## Campaign log
 
-Cada campaña necesita un propietario, propósito, fecha, canal, UTM, variante, presupuesto o costo conocido, audiencia, consentimiento aplicable y criterio de continuidad. Si el costo no existe, la página no publica ROI. Si la atribución es compartida, el registro conserva la superposición.
+Each campaign needs an owner, purpose, date, channel, UTM, variant, known budget or cost, audience, applicable consent, and continuation criterion. If the cost does not exist, the page does not publish ROI. If attribution is shared, the log preserves the overlap.
 
-La aprobación de una campaña incluye la promesa comercial, la versión de la landing y el destino del CTA. Un cambio de precio o de disponibilidad invalida la aprobación anterior.
+Approval of a campaign includes the commercial promise, landing-page version, and CTA destination. A change in price or availability invalidates the previous approval.
 
-## Condición de cierre para DSH
+## DSH completion condition
 
-Una lista de espera o un aviso de APK pendiente sólo sirven en preapertura. G2 exige alta de autoservicio, primer cobro en efectivo, entrada QR y APK piloto firmado descargable. Los formularios de interés de Formalización y expediente no activan planes ni generan ingresos.
+A waiting list or notice of a pending APK is useful only in pre-launch. G2 requires self-service sign-up, a first cash sale, QR entry, and a downloadable signed pilot APK. Formalización and dossier interest forms do not activate plans or generate revenue.
 
-El paquete público se acepta con la landing desplegada detrás de una ruta aprobada, todos los CTA con destino probado, precios y estados reales, APK firmado con hash verificable cuando se ofrezca descarga, medición sin datos sensibles, revisión WCAG 2.2 AA y captura de la versión revisada en móvil y escritorio. Un recurso ausente queda como estado explícito, nunca como promesa implícita.
+The public package is accepted with the landing page deployed behind an approved route, every CTA with a tested destination, real prices and states, a signed APK with verifiable hash when download is offered, measurement without sensitive data, a WCAG 2.2 AA review, and a capture of the reviewed version on mobile and desktop. A missing resource remains an explicit state, never an implicit promise.
