@@ -43,3 +43,5 @@ jobs:
         run: |
           pip install -r app/requirements.txt
           python -m pytest -q app/tests
+      - name: Pruebas aisladas del notificador de DSH
+        run: python -m pytest -q scripts/tests

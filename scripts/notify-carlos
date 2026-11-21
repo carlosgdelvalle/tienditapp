@@ -1,0 +1,679 @@
+#!/usr/bin/env python3
+"""Notificador local DSH a Telegram, solo saliente y con plantilla fija.
+
+Envía a un chat privado aprobado un aviso con el identificador de pregunta, la
+revisión y el indicador «Trabajo independiente», leídos de AskAstra.md en el
+formato acordado:
+
+    ### Q-001 · r1
+    Trabajo independiente: sí
+
+No envía texto arbitrario, no imprime secretos ni cuerpos de error y nunca
+configura ni borra el webhook del bot. Solo usa la biblioteca estándar de Python
+y HTTPS directo a api.telegram.org, sin proxies ni redirecciones.
+
+Uso:
+    scripts/notify-carlos Q-001                # envía si esa revisión no fue enviada
+    scripts/notify-carlos Q-001 --preview      # muestra el mensaje sin red ni estado
+    scripts/notify-carlos --whoami             # getMe, confirma la identidad del bot
+    scripts/notify-carlos Q-001 --resolve-sent     # marca como enviado tras revisar a mano
+    scripts/notify-carlos Q-001 --resolve-unsent   # limpia un registro incierto o interrumpido
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import http.client
+import json
+import os
+import re
+import secrets
+import ssl
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+API_HOST = "api.telegram.org"
+SECURITY_BIN = "/usr/bin/security"
+KEYCHAIN_SERVICE_DEFAULT = "abarpay-dsh-telegram"
+
+QID_RE = re.compile(r"^Q-\d{3}$")
+HEADING_RE = re.compile(r"^\s*###\s+(Q-\d{3})\s*[·.\-|]\s*r(\d+)\s*$")
+CAN_CONTINUE_RE = re.compile(
+    r"^\s*Trabajo\s+independiente\s*:\s*(sí|si|no)\s*$", re.IGNORECASE
+)
+BOT_TOKEN_RE = re.compile(r"^[0-9]{5,}:[A-Za-z0-9_-]{30,}$")
+
+MESSAGE_TEMPLATE = (
+    "Abarpay DSH\n"
+    "Pregunta {qid} · r{revision}\n"
+    "Trabajo independiente: {can_continue}"
+)
+
+TELEGRAM_ERROR_HINTS = {
+    400: "solicitud inválida (revisa chat_id y plantilla)",
+    401: "token del bot inválido",
+    403: "el bot no puede escribir a ese chat",
+    404: "método o recurso no disponible",
+}
+
+DEFAULT_TIMEOUT = 30
+MAX_TRANSPORT_ATTEMPTS = 3
+MAX_429_ATTEMPTS = 3
+MAX_429_WAIT_SECONDS = 60.0
+MAX_TRANSPORT_WAIT = 30.0
+BACKOFF_BASE = 2.0
+
+
+def _http_error_message(status, error_code):
+    error_code = error_code if type(error_code) is int else None
+    message = f"Telegram respondió {status}"
+    if error_code is not None:
+        message += f" (error {error_code})"
+    hint = TELEGRAM_ERROR_HINTS.get(error_code)
+    if hint:
+        message += f": {hint}"
+    return message
+
+
+class NotifyError(Exception):
+    """Error con un mensaje seguro para el usuario y un código de salida."""
+
+    def __init__(self, message, exit_code=1):
+        super().__init__(message)
+        self.exit_code = exit_code
+
+
+class TelegramApiError(NotifyError):
+    """Error definitivo devuelto por la API de Telegram, sin eco del cuerpo."""
+
+    def __init__(self, status, error_code):
+        self.status = status
+        self.error_code = error_code
+        super().__init__(_http_error_message(status, error_code))
+
+
+class TransportNotSent(Exception):
+    """Fallo de transporte antes de conectar; es seguro reintentar."""
+
+
+class DispatchUncertain(Exception):
+    """La petición pudo enviarse pero no se confirmó la respuesta."""
+
+
+class TelegramClient:
+    """Cliente mínimo de la API de Telegram sobre HTTPS directo.
+
+    Usa http.client a propósito: no sigue redirecciones y no lee variables de
+    proxy, de modo que el token no se filtra a un intermediario. Distingue los
+    fallos previos a la conexión (reintentables) de los posteriores (inciertos).
+    """
+
+    def __init__(self, token, timeout=DEFAULT_TIMEOUT):
+        self.token = token
+        self.timeout = timeout
+
+    def _request(self, method, path, payload=None):
+        headers = {"Accept": "application/json"}
+        body = None
+        if payload is not None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            headers["Content-Type"] = "application/json; charset=utf-8"
+        connection = http.client.HTTPSConnection(
+            API_HOST, timeout=self.timeout, context=ssl.create_default_context()
+        )
+        try:
+            try:
+                connection.connect()
+            except (OSError, http.client.HTTPException) as exc:
+                raise TransportNotSent from exc
+            try:
+                connection.request(method, path, body=body, headers=headers)
+                response = connection.getresponse()
+                raw = response.read()
+            except (OSError, http.client.HTTPException) as exc:
+                raise DispatchUncertain from exc
+            return response.status, raw, response.getheader("Retry-After")
+        finally:
+            connection.close()
+
+    def send_message(self, chat_id, text):
+        path = f"/bot{self.token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "disable_web_page_preview": True,
+        }
+        return self._request("POST", path, payload)
+
+    def read_method(self, method):
+        status, raw, _ = self._request("GET", f"/bot{self.token}/{method}")
+        data = _decode(raw)
+        if status != 200 or data.get("ok") is not True:
+            raise TelegramApiError(status, data.get("error_code"))
+        return data["result"]
+
+    def get_me(self):
+        return self.read_method("getMe")
+
+
+def _decode(raw):
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return {"ok": False, "error_code": None}
+    if not isinstance(data, dict):
+        return {"ok": False, "error_code": None}
+    return data
+
+
+def _retry_after_seconds(payload, header):
+    parameters = payload.get("parameters") or {}
+    value = parameters.get("retry_after")
+    if value is None and header:
+        try:
+            value = int(header)
+        except (TypeError, ValueError):
+            value = None
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        seconds = 1.0
+    return max(0.0, seconds)
+
+
+def send_once(client, chat_id, text):
+    """Un único intento HTTP. Devuelve (tipo, valor) sin filtrar cuerpos.
+
+    Tipos: sent (message_id), transport, uncertain, ratelimited (retry_after)
+    o definitive ((status, error_code)).
+    """
+    try:
+        status, raw, retry_after_header = client.send_message(chat_id, text)
+    except TransportNotSent:
+        return ("transport", None)
+    except DispatchUncertain:
+        return ("uncertain", None)
+
+    data = _decode(raw)
+    if status == 200 and data.get("ok"):
+        message_id = (data.get("result") or {}).get("message_id")
+        if isinstance(message_id, int):
+            return ("sent", message_id)
+        return ("uncertain", None)
+    if status == 429:
+        return ("ratelimited", _retry_after_seconds(data, retry_after_header))
+    if 400 <= status < 500:
+        return ("definitive", (status, data.get("error_code")))
+    return ("uncertain", None)
+
+
+def dispatch(client, chat_id, text, sleep_func=time.sleep):
+    """Envía con reintentos acotados y devuelve (tipo, valor).
+
+    Respeta retry_after en los 429 y, si supera el tope, difiere en lugar de
+    reintentar antes de tiempo. La entrega incierta no se reintenta sola.
+    """
+    transport_attempts = 0
+    ratelimit_attempts = 0
+    while True:
+        kind, value = send_once(client, chat_id, text)
+        if kind == "sent":
+            return ("sent", value)
+        if kind == "transport":
+            transport_attempts += 1
+            if transport_attempts < MAX_TRANSPORT_ATTEMPTS:
+                sleep_func(min(BACKOFF_BASE ** transport_attempts, MAX_TRANSPORT_WAIT))
+                continue
+            return ("definitive", None)
+        if kind == "uncertain":
+            return ("uncertain", None)
+        if kind == "definitive":
+            return ("definitive", value)
+        if kind == "ratelimited":
+            retry_after = value
+            ratelimit_attempts += 1
+            if ratelimit_attempts < MAX_429_ATTEMPTS and retry_after <= MAX_429_WAIT_SECONDS:
+                sleep_func(retry_after)
+                continue
+            return ("deferred", retry_after)
+
+
+def _utcnow():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _utcnow_offset(seconds):
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + seconds))
+
+
+def _fsync_dir(path):
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+class StateStore:
+    """Deduplicación persistente por (pregunta, revisión).
+
+    Un flock exclusivo se mantiene durante toda la operación (reserva, envío y
+    registro), de modo que las ejecuciones simultáneas se serializan y la
+    resolución manual no interfiere con un envío en curso. La reserva «pending»
+    se persiste con fsync antes de la red, de modo que una caída tras la
+    respuesta no vuelve a enviar el aviso.
+    """
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.lock_path = Path(str(path) + ".lock")
+
+    def _load(self):
+        if not self.path.exists():
+            return {"version": 1, "records": {}}
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as exc:
+            raise NotifyError(
+                f"estado ilegible en {self.path}; resuélvelo a mano antes de continuar"
+            ) from exc
+        if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("records"), dict):
+            raise NotifyError(f"estado inesperado en {self.path}; resuélvelo a mano")
+        return data
+
+    def _save(self, data):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2, sort_keys=True, ensure_ascii=False)
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, self.path)
+        _fsync_dir(self.path.parent)
+
+    def exclusive(self, fn):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.lock_path, "a+") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                data = self._load()
+                return fn(data)
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def normalize_qid(raw):
+    qid = str(raw).strip().upper()
+    if not QID_RE.match(qid):
+        raise NotifyError(f"identificador inválido '{raw}'; usa el formato Q-001")
+    return qid
+
+
+def read_question(source_path, qid):
+    qid = normalize_qid(qid)
+    if not source_path.exists():
+        raise NotifyError(
+            f"no se encontró {source_path}. Crea la entrada con el formato de "
+            f"docs/produccion/AskAstra.md o indica otra ruta con --source/ASK_ASTRA_FILE."
+        )
+    try:
+        text = source_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise NotifyError(f"no se pudo leer {source_path}: {exc}") from exc
+
+    lines = text.splitlines()
+    entries = {}
+    current = None
+    for line in lines:
+        heading = HEADING_RE.fullmatch(line)
+        if heading:
+            current = None
+            if heading.group(1) == qid:
+                revision = int(heading.group(2))
+                if revision in entries:
+                    raise NotifyError(f"{qid} tiene dos entradas para la misma revisión.")
+                current = entries[revision] = []
+        elif line.startswith("#"):
+            current = None
+        elif current is not None:
+            current.append(line.strip())
+
+    if not entries:
+        raise NotifyError(f"No hay una entrada vigente para {qid}.")
+    revision = max(entries)
+    can_continue = None
+    topic = ""
+    for line in entries[revision]:
+        flag = CAN_CONTINUE_RE.fullmatch(line)
+        if flag:
+            can_continue = "no" if flag.group(1).lower() == "no" else "sí"
+        if line.startswith("Tema del aviso:"):
+            key = line.partition(":")[2].strip().lower()
+            topic = {
+                "presupuesto": "Aprobar presupuesto",
+                "acceso": "Habilitar acceso",
+                "proveedor": "Confirmar condiciones del proveedor",
+                "piloto": "Decidir sobre el piloto",
+                "dispositivo": "Preparar el teléfono de pruebas",
+                "criterio": "Resolver una decisión de producto",
+            }.get(key, "")
+        if line.startswith("Estado:") and line.partition(":")[2].strip().lower() != "abierta":
+            raise NotifyError(f"{qid} ya no está abierta.")
+    if can_continue is None:
+        raise NotifyError(f"Falta Trabajo independiente: sí|no en {qid} r{revision}.")
+    return qid, revision, can_continue, topic
+
+
+def build_message(qid, revision, can_continue, topic=""):
+    message = MESSAGE_TEMPLATE.format(qid=qid, revision=revision, can_continue=can_continue)
+    return f"{message}\nDecisión: {topic}" if topic else message
+
+
+def keychain_read(service, account):
+    """Lee un secreto del llavero de macOS sin imprimirlo nunca."""
+    try:
+        result = subprocess.run(
+            [SECURITY_BIN, "find-generic-password", "-s", service, "-a", account, "-w"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise NotifyError(f"no se encontró {SECURITY_BIN}; Keychain no está disponible") from exc
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def load_token(service, account):
+    token = keychain_read(service, account)
+    if not token:
+        raise NotifyError(
+            f"no se encontró el token del bot en Keychain (servicio '{service}', cuenta '{account}'). "
+            "Configúralo con Keychain Access; pasos en docs/produccion/telegram.md."
+        )
+    token = token.strip()
+    if not BOT_TOKEN_RE.match(token):
+        raise NotifyError("el token del bot en Keychain no tiene el formato esperado (no se mostrará).")
+    return token
+
+
+def load_chat_id(service, account):
+    raw = keychain_read(service, account)
+    if not raw:
+        raise NotifyError(
+            f"no se encontró el chat_id en Keychain (servicio '{service}', cuenta '{account}'). "
+            "Configúralo con Keychain Access; pasos en docs/produccion/telegram.md."
+        )
+    try:
+        chat_id = int(str(raw).strip())
+    except ValueError as exc:
+        raise NotifyError("el chat_id debe ser un entero positivo.") from exc
+    if chat_id <= 0:
+        raise NotifyError("el chat_id debe ser positivo: solo se admiten chats privados aprobados.")
+    return chat_id
+
+
+def _keychain_names():
+    return KEYCHAIN_SERVICE_DEFAULT, "bot-token", "chat-id"
+
+
+def default_source_path():
+    configured = os.environ.get("ASK_ASTRA_FILE")
+    if configured:
+        return Path(configured).expanduser()
+    return REPO_ROOT / "docs" / "produccion" / "AskAstra.md"
+
+
+def default_state_path():
+    configured = os.environ.get("ABARPAY_DSH_STATE_DIR")
+    if configured:
+        return Path(configured).expanduser() / "notify-carlos-state.json"
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support" / "abarpay-dsh"
+    else:
+        base = Path.home() / ".local" / "state" / "abarpay-dsh"
+    return base / "notify-carlos-state.json"
+
+
+def _timeout():
+    try:
+        return float(os.environ.get("ABARPAY_DSH_TIMEOUT", DEFAULT_TIMEOUT))
+    except ValueError:
+        return DEFAULT_TIMEOUT
+
+
+def _print_preview(message):
+    print("Vista previa del mensaje que se enviaría:")
+    print(message)
+    service, _token_account, chat_account = _keychain_names()
+    print(f"Destino (chat_id): Keychain servicio '{service}', cuenta '{chat_account}'")
+
+
+def _run_whoami(timeout):
+    service, token_account, _chat_account = _keychain_names()
+    token = load_token(service, token_account)
+    client = TelegramClient(token, timeout)
+    me = client.get_me()
+    name = me.get("username") or me.get("first_name") or str(me.get("id"))
+    print(f"Bot verificado: @{name} (id {me.get('id')}, is_bot {me.get('is_bot')})")
+    print("Confirma que es el bot que emparejaste antes de usar el notificador.")
+    return 0
+
+
+def _print_resolution_instructions(qid, revision):
+    print("Resolución manual:", file=sys.stderr)
+    print(f"  scripts/notify-carlos {qid} --resolve-sent    (si se entregó)", file=sys.stderr)
+    print(f"  scripts/notify-carlos {qid} --resolve-unsent  (si NO se entregó)", file=sys.stderr)
+
+
+def _failure_message(payload):
+    if payload is None:
+        return "no se pudo conectar con Telegram tras varios intentos"
+    status, code = payload
+    return _http_error_message(status, code)
+
+
+def _dispatch_and_record(data, state, client, chat_id, qid, revision, message):
+    now = _utcnow()
+    records = data.setdefault("records", {})
+    qid_records = records.setdefault(qid, {})
+    key = f"r{revision}"
+    existing = qid_records.get(key)
+
+    if existing is not None:
+        status = existing.get("status")
+        if status == "sent":
+            print(f"{qid} r{revision} ya fue enviada (message_id {existing.get('message_id')}); se omite.")
+            return 0
+        if status == "uncertain":
+            _print_resolution_instructions(qid, revision)
+            return 2
+        retry_before = existing.get("retry_before")
+        if retry_before and retry_before > now:
+            print(f"{qid} r{revision}: en espera por límite de Telegram hasta {retry_before}.", file=sys.stderr)
+            return 2
+        if retry_before:
+            existing["retry_before"] = None
+        else:
+            print(
+                f"{qid} r{revision}: hay un envío pendiente sin confirmar (interrumpido o en curso); "
+                "verifica a mano y resuélvelo.",
+                file=sys.stderr,
+            )
+            _print_resolution_instructions(qid, revision)
+            return 2
+    else:
+        existing = {"status": "pending"}
+        qid_records[key] = existing
+
+    existing["updated_at"] = now
+    existing.setdefault("created_at", now)
+    state._save(data)
+
+    outcome = dispatch(client, chat_id, message)
+    kind, payload = outcome
+    now = _utcnow()
+
+    if kind == "sent":
+        existing["status"] = "sent"
+        existing["message_id"] = payload
+        existing["updated_at"] = now
+        state._save(data)
+        print(f"enviada {qid} r{revision} (message_id {payload})")
+        return 0
+
+    if kind == "uncertain":
+        existing["status"] = "uncertain"
+        existing["note"] = "entrega no confirmada"
+        existing["updated_at"] = now
+        state._save(data)
+        print(f"{qid} r{revision}: entrega no confirmada; se registró como 'uncertain'.", file=sys.stderr)
+        _print_resolution_instructions(qid, revision)
+        return 2
+
+    if kind == "deferred":
+        retry_after = payload
+        existing["retry_before"] = _utcnow_offset(retry_after)
+        existing["updated_at"] = now
+        state._save(data)
+        print(
+            f"{qid} r{revision}: Telegram pidió esperar {int(retry_after)}s; "
+            f"reintenta después de {existing['retry_before']}.",
+            file=sys.stderr,
+        )
+        return 2
+
+    qid_records.pop(key, None)
+    if not qid_records:
+        records.pop(qid, None)
+    state._save(data)
+    print(f"{qid} r{revision}: {_failure_message(payload)}", file=sys.stderr)
+    return 1
+
+
+def _resolve(data, state, qid, revision, resolve_sent):
+    records = data.setdefault("records", {})
+    qid_records = records.get(qid, {})
+    key = f"r{revision}"
+    existing = qid_records.get(key)
+    if not existing or existing.get("status") not in {"uncertain", "pending"} or existing.get("retry_before"):
+        print(f"{qid} r{revision}: no hay entrega dudosa que resolver.", file=sys.stderr)
+        return 1
+    if resolve_sent:
+        existing["status"] = "sent"
+        existing["message_id"] = None
+        existing["resolved_manually"] = True
+        existing["updated_at"] = _utcnow()
+        print(f"{qid} r{revision}: registro marcado como enviado (resolución manual).")
+    else:
+        qid_records.pop(key, None)
+        if not qid_records:
+            records.pop(qid, None)
+        print(f"{qid} r{revision}: registro eliminado; se reenviará en la próxima ejecución.")
+    state._save(data)
+    return 0
+
+
+def discover_destination(client):
+    # Consultar una única página sin offset conserva las actualizaciones.
+    if client.read_method("getWebhookInfo").get("url"):
+        raise NotifyError("Hay un webhook activo. Obtén tu chat ID del operador existente; el envío directo seguirá funcionando.")
+    phrase = "abarpay-pair-" + secrets.token_hex(12)
+    print(f"Envía este texto en privado al bot y pulsa Intro: {phrase}")
+    input()
+    matches = set()
+    for update in client.read_method("getUpdates?limit=100&timeout=0"):
+        message = update.get("message") or {}
+        chat = message.get("chat") or {}
+        sender = message.get("from") or {}
+        if (message.get("text") == phrase and chat.get("type") == "private"
+                and isinstance(chat.get("id"), int) and chat["id"] > 0
+                and sender.get("id") == chat["id"] and not sender.get("is_bot")):
+            matches.add(chat["id"])
+    if len(matches) != 1:
+        raise NotifyError("No hay una coincidencia privada única. Verifica la frase o usa el ID conocido; no se consumieron actualizaciones.")
+    print(f"Guarda este ID en tu llavero local como chat-id: {matches.pop()}")
+    return 0
+
+
+def _run(args):
+    timeout = _timeout()
+    if args.pair:
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            raise NotifyError("El emparejamiento requiere una Terminal privada e interactiva de Carlos.")
+        service, token_account, _ = _keychain_names()
+        return discover_destination(TelegramClient(load_token(service, token_account), timeout))
+    if args.whoami:
+        return _run_whoami(timeout)
+    if args.question is None:
+        print("Indica una pregunta, por ejemplo: scripts/notify-carlos Q-001", file=sys.stderr)
+        print("Usa --help para ver todas las opciones.", file=sys.stderr)
+        return 2
+
+    qid = normalize_qid(args.question)
+    source = Path(args.source).expanduser() if args.source else default_source_path()
+    state = StateStore(Path(args.state).expanduser() if args.state else default_state_path())
+
+    qid, revision, can_continue, topic = read_question(source, qid)
+    message = build_message(qid, revision, can_continue, topic)
+
+    if args.preview:
+        _print_preview(message)
+        return 0
+
+    if args.resolve_sent or args.resolve_unsent:
+        return state.exclusive(
+            lambda data: _resolve(data, state, qid, revision, args.resolve_sent)
+        )
+
+    service, token_account, chat_account = _keychain_names()
+    token = load_token(service, token_account)
+    chat_id = load_chat_id(service, chat_account)
+    client = TelegramClient(token, timeout)
+    return state.exclusive(
+        lambda data: _dispatch_and_record(data, state, client, chat_id, qid, revision, message)
+    )
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="notify-carlos",
+        description="Notificador local DSH a Telegram (solo saliente, plantilla fija).",
+    )
+    parser.add_argument("question", nargs="?", help="identificador de pregunta, p. ej. Q-001")
+    parser.add_argument("--source", help="ruta a AskAstra.md (por defecto ASK_ASTRA_FILE o docs/produccion/AskAstra.md)")
+    parser.add_argument("--state", help="ruta al archivo de estado (por defecto ABARPAY_DSH_STATE_DIR o carpeta local)")
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--preview", action="store_true", help="muestra el mensaje sin enviar ni tocar el estado")
+    action.add_argument("--pair", action="store_true", help="identifica sólo tu chat privado por frase única; uso manual")
+    action.add_argument("--whoami", action="store_true", help="consulta getMe y muestra la identidad del bot")
+    action.add_argument("--resolve-sent", action="store_true", help="marca como enviado un registro incierto o interrumpido")
+    action.add_argument("--resolve-unsent", action="store_true", help="elimina un registro incierto o interrumpido")
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    try:
+        return _run(args)
+    except NotifyError as exc:
+        print(f"notify-carlos: {exc}", file=sys.stderr)
+        return exc.exit_code
+    except Exception as exc:
+        print(f"notify-carlos: error inesperado ({type(exc).__name__}); consulta docs/produccion/telegram.md", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
