@@ -16,3 +16,6 @@ node_modules/
 
 # Entregables locales (APK firmado)
 dist/
+
+# Worklog local del coordinador DSH (fuera de commits)
+docs/worklog.md
