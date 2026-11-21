@@ -27,6 +27,7 @@ class FakePey:
         concept: str,
         expiration_sec: int,
         sale_id: str,
+        bank_account_id: str | None = None,
     ) -> dict[str, Any]:
         if self.create_timeout:
             raise PeyTimeout("SIMULADO: timeout al crear QR")
@@ -34,12 +35,15 @@ class FakePey:
             raise self.create_error
         self.counter += 1
         qr_id = "qr_sim_" + str(self.counter)
-        self.qrs[qr_id] = {
+        qr: dict[str, Any] = {
             "amountCents": amount_cents,
             "concept": concept,
             "expirationSec": expiration_sec,
             "saleId": sale_id,
         }
+        if bank_account_id is not None:
+            qr["bankAccountId"] = bank_account_id
+        self.qrs[qr_id] = qr
         self.transactions.setdefault(qr_id, [])
         return {
             "id": qr_id,

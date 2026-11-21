@@ -64,6 +64,7 @@ from .auth import AuthConfig
 from .auth_routes import register as register_auth_routes
 from .identity import MemoryIdentityStore
 from .sync_routes import register as register_sync_routes
+from .routes_onboarding import register as register_onboarding_routes
 
 logger = logging.getLogger("abarpay")
 
@@ -142,6 +143,7 @@ def create_app(
 
     _install_routes(app)
     _install_identity_and_sync(app)
+    _install_onboarding(app)
     return app
 
 
@@ -158,6 +160,16 @@ def _install_identity_and_sync(app: FastAPI) -> None:
         auth_config=AuthConfig(secure_cookies=False, cookie_samesite="lax"),
     )
     register_sync_routes(app)
+
+
+def _install_onboarding(app: FastAPI) -> None:
+    """Wire the M1 onboarding + bank-account router (SIMULADO memory store).
+
+    The default store is the SIMULADO in-memory reference; production swaps in
+    server/onboarding.PostgresOnboardingStore via routes_onboarding.register.
+    """
+
+    register_onboarding_routes(app)
 
 
 # ---------------------------------------------------------------------------
@@ -1784,9 +1796,11 @@ def _install_routes(app: FastAPI) -> None:
     @api.post("/sales")
     def create_sale(
         body: SaleIn,
+        request: Request,
         conn: sqlite3.Connection = Depends(get_db),
         settings: Settings = Depends(get_settings),
         pey_client: Any | None = Depends(get_pey),
+        x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
     ):
         merged: dict[int, int] = {}
         for item in body.items:
@@ -1795,6 +1809,28 @@ def _install_routes(app: FastAPI) -> None:
             merged[item.productId] = merged.get(item.productId, 0) + item.qtyMilli
         if not merged:
             raise HTTPException(status_code=400, detail="La venta no tiene productos")
+
+        # Multi-tenant collection routing: a PEY/CoDi charge must resolve the
+        # tenant's ACTIVE bank account (SIMULADO tenant identity via X-Tenant-Id,
+        # mirroring routes_onboarding). Without the header the legacy
+        # single-tenant demo path is used and no bankAccountId is sent.
+        bank_account_id: str | None = None
+        if body.paymentMethod == "pey" and x_tenant_id:
+            service = getattr(request.app.state, "onboarding_service", None)
+            active = (
+                service.resolve_active_bank_account(x_tenant_id)
+                if service is not None
+                else None
+            )
+            if active is None:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "code": "NO_ACTIVE_BANK_ACCOUNT",
+                        "message": "No hay cuenta bancaria activa para cobrar",
+                    },
+                )
+            bank_account_id = active.id
 
         sale_id = "sale_" + uuid.uuid4().hex[:20]
         now = _now()
@@ -1951,6 +1987,7 @@ def _install_routes(app: FastAPI) -> None:
                 concept=concept,
                 expiration_sec=settings.pey_expiration_seconds,
                 sale_id=sale_id,
+                bank_account_id=bank_account_id,
             )
         except PeyTimeout:
             sale = _mark_pey_por_conciliar(
