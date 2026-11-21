@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Corre lo mismo que la CI: escaneo de secretos y pruebas de la app.
+# Corre lo mismo que la CI: escaneo de secretos y pruebas (servidor + app).
 # Uso: ./scripts/verificar.sh   (con el entorno de Python de app/requirements.txt activado)
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -17,6 +17,7 @@ else
 fi
 
 echo "== Pruebas =="
+python -m pytest -q server/tests || fallas=1
 python -m pytest -q app/tests || fallas=1
 
 if [ "$fallas" -ne 0 ]; then echo "VERIFICAR: FALLÓ"; exit 1; fi
