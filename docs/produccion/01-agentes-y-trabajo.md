@@ -15,6 +15,8 @@ One Pro coordinator owns contracts and integration. To investigate independent q
 
 To request a peer check, send the coordinator the package ID, SHA, and question. The coordinator dispatches or schedules a session within the concurrency budget. The verifier can ask the author directly about a contract. Both record the specific case. Use a third opinion for a material disagreement with an answerable question. Every review has an owner responsible for the outcome.
 
+The [coordinator prompt](00-EMPIEZA-AQUI.md) defines when to escalate an unresolved critical question from Pro High to an independent Pro Max verifier. Set effort on the intended session and check the effective setting. The bundled profile patches select the model only.
+
 ## Start DSH on Arquimedes
 
 The shipped `headless` profile in DSH Desktop 0.2.2-rc.5 included `subagent`, `subagent_fork`, profile patches, stdin input, and resumption by ID. The default profile selected Flash. Specify the model explicitly for each process. From the repo root, with a signed-in session or provider credential provisioned by the operator for the selected mode:
@@ -24,7 +26,7 @@ DSH_BIN="/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/d
 PLAN_ROOT="$(pwd)/docs/produccion"
 "$DSH_BIN" headless --help
 "$DSH_BIN" headless --patch "$PLAN_ROOT/perfiles/pro.yml" --permission-mode workspace-write \
-  'Read docs/produccion/00-EMPIEZA-AQUI.md. Start with E0 and recover the coordinator state.'
+  'Follow the coordinator prompt in docs/produccion/00-EMPIEZA-AQUI.md. Use High by default and assign Max only for the verifier escalations specified there.'
 ```
 
 For a worktree worker, select the [Flash](perfiles/flash.yml) or [Pro](perfiles/pro.yml) patch explicitly. Set `ASSIGNMENT_FILE` to the coordinator’s local assignment file. The CLI reads the assignment from stdin:

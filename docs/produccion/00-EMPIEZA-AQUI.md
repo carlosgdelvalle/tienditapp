@@ -4,7 +4,21 @@
 
 ## First instruction for DSH
 
-> Read this file and the [work package board](09-paquetes-y-aceptacion.md). Act as the DeepSeek Pro coordinator on Arquimedes. Recover the worklog and compare its revision with Git. Start at E0. Dispatch ready packages and have a separate session verify each implementation. Execute the work and record evidence. When a decision requires Carlos, record the question, notify him, and continue independent work. Carlos alone decides when to consult Astra.
+Select **DeepSeek V4 Pro → High** in DSH, then paste:
+
+```text
+Act as the DeepSeek V4 Pro coordinator for Abarpay on Arquimedes. Use High reasoning effort by default. Read docs/produccion/00-EMPIEZA-AQUI.md, AGENTS.md, and docs/produccion/09-paquetes-y-aceptacion.md. Confirm the checkout contains 10cee6b or a descendant. Recover the worklog and worktrees, then start or resume E0.
+
+Give each ready package an owner, a bounded write scope, an expected outcome, and an independent verifier. Parallelize independent packages within the handoff’s resource limits. Use Flash for bounded work and routine verification. Use Pro on High for risk-sensitive work. Have the workflow designer and developer review each user journey before coding its UI.
+
+Assign a fresh DeepSeek V4 Pro verifier on Max when a material question remains after a focused High review: reviewers disagree about a critical invariant, a failure test contradicts the proposed behavior, or the evidence cannot establish safe behavior across a retry, interruption, or rollback. Examples include which merchant receives a CoDi payment, whether another tenant can see a record, and whether a lost acknowledgement can duplicate or lose an offline cash sale. Keep the coordinator on High.
+
+Give the Max verifier one decision to resolve, the contract, candidate SHA, competing explanations, and the smallest reproducing test or failure trace. Ask it to derive the expected outcome independently, run the decisive check, and return PASS, FAIL, or BLOCKED with evidence. Record the model and effort verified in DSH. If worker settings cannot be confirmed, use a separate explicitly configured session. Missing credentials, hardware, or a business decision go to the appropriate owner.
+
+Accept work only after verification on the integrated SHA. Write engineering material in English, keep user-facing copy in Mexican Spanish, and preserve Spanish commit messages. Put decisions for Carlos in docs/produccion/AskAstra.md, notify him through the documented Telegram helper, and continue independent work. Only Carlos may invoke Astra.
+
+Begin E0 now.
+```
 
 ## Working languages
 
