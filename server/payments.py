@@ -36,16 +36,60 @@ def decrement_inventory(
     *,
     now: float | None = None,
 ) -> None:
+    """Decrement stock for a paid sale, rejecting a last-unit conflict.
+
+    A limited product with insufficient stock is rejected with a
+    "stock_conflict" error when it has already entered sale circulation (it
+    has a prior 'sale' movement). That is the signature of a second till
+    selling the last piece: the first sale honors the unit (stock to exactly
+    zero) and the second is detected at apply time. A brand-new, never-sold
+    item keeps the demo's historical negative-stock allowance, so existing
+    fixtures that oversell a zero-stock catalog item keep working.
+
+    The check and the decrement run inside the caller's BEGIN IMMEDIATE
+    transaction (see db.write_transaction), so two tills serialize atomically
+    and stock never goes negative from a sale of a traded product. Unlimited
+    products keep their historical behavior: a movement row is written, stock
+    is untouched.
+    """
+
+    from .outbox import SyncError  # deferred: outbox imports this module
+
     now = time.time() if now is None else now
     items = conn.execute(
         "SELECT product_id, qty_milli FROM sale_items WHERE sale_id = ? ORDER BY id",
         (sale_id,),
     ).fetchall()
     for item in items:
-        conn.execute(
-            "UPDATE products SET stock_milli = stock_milli - ? WHERE id = ? AND unlimited_stock = 0",
-            (item["qty_milli"], item["product_id"]),
-        )
+        product = conn.execute(
+            "SELECT stock_milli, unlimited_stock FROM products WHERE id = ?",
+            (item["product_id"],),
+        ).fetchone()
+        if product is None:
+            continue
+        if not product["unlimited_stock"] and int(product["stock_milli"]) < int(
+            item["qty_milli"]
+        ):
+            # A product that has already been sold and is now short is the
+            # last-unit conflict: a second till selling beyond the last piece.
+            # A brand-new, never-sold item keeps the demo's historical
+            # negative-stock allowance (there is no prior sale to race against).
+            sold_before = conn.execute(
+                "SELECT 1 FROM inventory_movements "
+                "WHERE product_id = ? AND reason = 'sale' LIMIT 1",
+                (item["product_id"],),
+            ).fetchone()
+            if sold_before is not None:
+                raise SyncError(
+                    "stock_conflict",
+                    "Inventario insuficiente: otra caja vendió la última pieza",
+                )
+        if not product["unlimited_stock"]:
+            conn.execute(
+                "UPDATE products SET stock_milli = stock_milli - ? "
+                "WHERE id = ? AND unlimited_stock = 0",
+                (item["qty_milli"], item["product_id"]),
+            )
         conn.execute(
             """INSERT INTO inventory_movements
                (product_id, delta_milli, reason, sale_id, employee_id, created_at)
