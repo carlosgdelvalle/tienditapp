@@ -118,6 +118,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                android.util.Log.e("abarpay", "work error: " + e.javaClass.simpleName + ": " + e.message, e)
                 when (e) {
                     is IllegalStateException -> state.update { it.copy(message = e.message) }
                     is ApiFailure -> state.update { it.copy(message = e.message, online = true) }
