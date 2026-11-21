@@ -116,7 +116,12 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                state.update { it.copy(message = e.message ?: "No pudimos conectar. Intenta de nuevo.") }
+                val msg = when (e) {
+                    is ApiFailure -> e.message
+                    is IllegalStateException -> e.message
+                    else -> null
+                }
+                state.update { it.copy(message = msg ?: "No pudimos conectar. Intenta de nuevo.") }
             } finally {
                 state.update { it.copy(busy = false) }
             }
