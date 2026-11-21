@@ -65,6 +65,8 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val ownerPrefs = app.getSharedPreferences("abarpay_owner", 0)
     private var repo: ShopRepository = DemoRepository()
+    // Cobros en efectivo sin conexión: outbox cifrado + replay al reconectar.
+    private val coordinator = SaleCoordinator(app)
     private val state: MutableStateFlow<ShopState>
     val ui: StateFlow<ShopState>
     private var checking = false
@@ -163,6 +165,22 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 tasks = if (isOwner || employee != null) tasks ?: it.tasks else it.tasks,
                 tab = if (employee != null && !canUseTabs(employee, it.tab)) TAB_HOME else it.tab,
             )
+        }
+        // Renueva el arrendamiento sin conexión y, al volver a tener red, replica
+        // las ventas pendientes del outbox (sin tocar el flujo en línea).
+        syncOffline(bootstrap.store.id)
+    }
+
+    private suspend fun syncOffline(storeId: String) {
+        val current = state.value
+        if (current.simulated || current.server.isBlank()) return
+        coordinator.attach(storeId)
+        runCatching { coordinator.acquireLease(current.server) }
+        val result = runCatching { coordinator.replay(current.server) }.getOrNull() ?: return
+        if (result.sent == 0) return
+        when {
+            result.acked == result.sent -> message("Ventas sin conexión sincronizadas con el servidor.")
+            result.rejected > 0 -> message("Algunas ventas quedaron por revisar al sincronizar.")
         }
     }
 
@@ -763,14 +781,69 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 loadSummary()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 if (e is ApiFailure && definitelyRejected(e.code)) {
                     if (snapshot.simulated || prefs.edit().putBoolean("creating", false).commit()) {
                         state.update { it.copy(uncertain = false) }
                     }
+                    throw e
+                }
+                // Servidor inalcanzable (no hubo respuesta HTTP): una venta en
+                // efectivo se finaliza en el teléfono y se sincroniza al reconectar.
+                if (method == PAYMENT_CASH && !snapshot.simulated && e !is ApiFailure) {
+                    finalizeOfflineCashSale(snapshot, employee, estimate, cashReceivedCents)
+                    return@work
                 }
                 throw e
             }
+        }
+    }
+
+    private fun finalizeOfflineCashSale(snapshot: ShopState, employee: Employee, totalCents: Long, cashReceivedCents: Long?) {
+        val storeId = snapshot.bootstrap?.store?.id.orEmpty()
+        check(storeId.isNotBlank()) { "Actualiza el catálogo antes de vender sin conexión" }
+        coordinator.attach(storeId)
+        coordinator.offlineBlocker()?.let { reason ->
+            prefs.edit().putBoolean("creating", false).commit()
+            state.update { it.copy(uncertain = false) }
+            error(reason)
+        }
+        snapshot.bootstrap?.products?.let { coordinator.seedLocalStock(it) }
+        val received = cashReceivedCents ?: totalCents
+        val catalogVersion = coordinator.snapshot()?.catalogVersion ?: 0L
+        val result = coordinator.finalizeOfflineCashSale(
+            employeeId = employee.id,
+            cart = snapshot.cart,
+            totalCents = totalCents,
+            cashReceivedCents = received,
+            catalogVersion = catalogVersion,
+        )
+        val sale = Sale(
+            id = result.reference,
+            totalCents = result.totalCents,
+            chargedCents = received,
+            status = "paid_cash",
+            paymentMethod = PAYMENT_CASH,
+            cashReceivedCents = received,
+            changeCents = received - result.totalCents,
+            note = "Guardada en el teléfono. Se sincronizará al reconectar.",
+            createdAt = System.currentTimeMillis() / 1000.0,
+        )
+        if (!persistSale(sale)) {
+            state.update { it.copy(uncertain = false) }
+            error("La venta se guardó en el teléfono, pero no se pudo proteger el comprobante.")
+        }
+        prefs.edit().putBoolean("creating", false).commit()
+        state.update {
+            it.copy(
+                sale = sale,
+                uncertain = false,
+                qrHidden = false,
+                linkCode = null,
+                message = "Venta guardada sin conexión. Se sincronizará al reconectar.",
+            )
         }
     }
 

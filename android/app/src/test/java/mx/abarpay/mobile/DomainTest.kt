@@ -71,7 +71,7 @@ class DomainTest {
             "https://shop.example/api", "https://shop.example?token=value", "https://shop.example#secret").forEach {
             assertTrue(it, runCatching { normalizeServer(it, false) }.isFailure)
         }
-        assertTrue(runCatching { normalizeServer("http://192.168.0.2:8000", true) }.isFailure)
+        assertEquals("http://192.168.0.2:8000", normalizeServer("http://192.168.0.2:8000", true))
     }
 
     @Test fun cashInputParsesPesosToCents() {

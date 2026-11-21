@@ -239,13 +239,15 @@ fun parseCashCents(raw: String): Long? {
     return pesos * 100 + cents
 }
 
-/** Only HTTPS, except the emulator host in debug builds. */
+/** HTTPS siempre en release; en debug se permite http:// para cualquier host
+ *  (un teléfono físico vía `adb reverse`). Se conservan las guardas de ruta
+ *  raíz y sin query. */
 fun normalizeServer(input: String, debug: Boolean): String {
     val uri = URI(input.trim())
     require(uri.host != null && uri.userInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
         (uri.path.isNullOrBlank() || uri.path == "/")) { "Usa la dirección raíz del servidor, sin claves ni rutas" }
-    require(uri.scheme == "https" || (debug && uri.scheme == "http" && uri.host == "10.0.2.2")) {
-        "Usa HTTPS. En debug se permite http://10.0.2.2:8000 para el emulador."
+    require(uri.scheme == "https" || (debug && uri.scheme == "http")) {
+        "Usa HTTPS. En debug se permite http:// para un teléfono físico (adb reverse)."
     }
     return input.trim().trimEnd('/')
 }

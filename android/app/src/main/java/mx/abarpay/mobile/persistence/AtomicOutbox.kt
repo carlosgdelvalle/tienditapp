@@ -349,27 +349,36 @@ private class OutboxDatabase(context: Context) :
                 acked INTEGER NOT NULL DEFAULT 0,
                 receipt TEXT,
                 created_at INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(acked, sequence);
-
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(acked, sequence)")
+        db.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS local_sales (
                 reference TEXT PRIMARY KEY,
                 event_id TEXT NOT NULL,
                 total_cents INTEGER NOT NULL,
                 status TEXT NOT NULL,
                 created_at INTEGER NOT NULL
-            );
-
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS local_stock (
                 product_id INTEGER PRIMARY KEY,
                 stock_milli INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
-            );
-
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS kv (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
-            );
+            )
             """.trimIndent(),
         )
     }
