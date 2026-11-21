@@ -94,19 +94,22 @@ class PeyClient:
         concept: str,
         expiration_sec: int,
         sale_id: str,
+        bank_account_id: str | None = None,
     ) -> dict[str, Any]:
         amount_pesos = round(int(amount_cents) / 100, 2)
-        return self._call(
-            "POST",
-            "/codi/qr",
-            {
-                "amount": amount_pesos,
-                "concept": concept[:40],
-                "expiration": int(expiration_sec),
-                "generateImage": True,
-                "metadata": {"saleId": sale_id},
-            },
-        )
+        body: dict[str, Any] = {
+            "amount": amount_pesos,
+            "concept": concept[:40],
+            "expiration": int(expiration_sec),
+            "generateImage": True,
+            "metadata": {"saleId": sale_id},
+        }
+        # In multi-tenant the tenant's ACTIVE bank account must always be sent,
+        # otherwise the charge lands on the API key's default account and mixes
+        # tenant funds. Omitted only for the legacy single-tenant demo call.
+        if bank_account_id is not None:
+            body["bankAccountId"] = bank_account_id
+        return self._call("POST", "/codi/qr", body)
 
     def qr_transactions(self, qr_id: str) -> list[dict[str, Any]]:
         encoded = quote(qr_id, safe="")
