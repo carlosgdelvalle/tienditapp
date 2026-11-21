@@ -168,3 +168,140 @@ PY
 ```
 
 The reference verification against the original export was done during writing. The document does not depend on `/Users/carlos/Downloads` to be read or run.
+
+## Journey reconciliation (D1)
+
+Every product card maps to exactly one primary journey; the unnumbered duplicate T58 closes with T57 (both F-04). Secondary journeys are noted where a card spans two surfaces.
+
+| Journey | Cards (Trello short ref) |
+|---|---|
+| F-01 · Registration / signup / first sale | T8, T69, T70, T87, T90 |
+| F-02 · Cash sale + offline receipt | T16, T17, T18, T19, T23, T24, T28, T63 |
+| F-03 · CoDi charge | T9, T20, T21, T22, T25, T26, T27, T60, T61, T62, T64, T88 |
+| F-04 · Store credit fiado | T48, T49, T50, T51, T52, T53, T54, T55, T56, T57, T58, T59, T65, T81, T82, T83, T84 |
+| F-05 · Goods receiving | T42, T43, T44, T45, T80 |
+| F-06 · Till close + handover | T12, T66, T67, T73 |
+| F-07 · Replenishment | T38, T39, T40, T41, T46, T47, T75, T79 |
+| F-08 · Catalog / inventory / codes | T10, T11, T29, T30, T31, T76, T77, T78 |
+| F-09 · Invitation / access / handover | T13, T14, T15, T71, T86, T91 |
+| F-10 · Reports / reconciliation / export | T32, T33, T34, T35, T36, T37, T72, T74, T85, T89 |
+| F-11 · Owner console sign-in by QR | T68 |
+| F-12 · Landing / signup / continuity | T7 |
+
+**Counts:** mapped **85 / 85**; unmapped **0**; journeys without card coverage (gaps) **0** — all twelve flows F-01..F-12 have at least one card.
+
+**Notes.** Cards T61, T62, T64, T25, T26, T27 and T51 are "defer" payment/link channels; they map to F-03/F-04 as variants of payment-method selection (T19) and are reported unavailable until the provider exists. The "duplicate" cards (T58, T73, T79, T80, T83, T84, T90, T91) inherit the journey of their canonical card. F-05, F-06, F-07, F-11 and F-12 have no implemented Android UI at base SHA 6656f1e (their cards are "build"); this is a build gap, not a coverage gap.
+
+## Developer sign-off checklist (D1)
+
+A paired developer must discuss each card with the operations designer and sign off BEFORE any UI for that card/screen is built. Check the box when signed off. "duplicate" and "defer" cards are signed off together with their canonical card or when the dependency is confirmed, respectively. Disposition follows the reconciliation table above.
+
+### F-01 · Registration / signup / first sale
+- [ ] T8 · Alta e identidad del negocio — build
+- [ ] T69 · Identidad inicial incorrecta — already covered
+- [ ] T70 · Empleados heredados en primer alta — already covered
+- [ ] T87 · Plantillas de tareas — build
+- [ ] T90 · Ajustes de identidad y banco — duplicate (canonical T8, T9)
+
+### F-02 · Cash sale + offline receipt
+- [ ] T16 · Consulta de productos — already covered
+- [ ] T17 · Carrito — already covered
+- [ ] T18 · Dictado para agregar — already covered
+- [ ] T19 · Selección de medio — build
+- [ ] T23 · Descuento de inventario — already covered
+- [ ] T24 · Entrega del producto — build
+- [ ] T28 · Cobro en efectivo — build
+- [ ] T63 · Medio efectivo — already covered
+
+### F-03 · CoDi charge
+- [ ] T9 · Cuenta bancaria — build
+- [ ] T20 · Generación de QR — already covered
+- [ ] T21 · Confirmación bancaria — already covered
+- [ ] T22 · Avisos de pago — build
+- [ ] T25 · Cobro push — defer
+- [ ] T26 · Cobro por liga — defer
+- [ ] T27 · Terminal con tarjetas — defer
+- [ ] T60 · Medio QR — already covered
+- [ ] T61 · Medio liga — defer
+- [ ] T62 · Medio push — defer
+- [ ] T64 · Medio tarjeta — defer
+- [ ] T88 · Conciliación CoDi en soporte — build
+
+### F-04 · Store credit fiado
+- [ ] T48 · Fiado y cliente — already covered
+- [ ] T49 · Límites de fiado — build
+- [ ] T50 · Confirmación de fiado — build
+- [ ] T51 · Liga por WhatsApp — defer
+- [ ] T52 · Deuda y cartera — build
+- [ ] T53 · Entrega fiada y stock — already covered
+- [ ] T54 · Recordatorios — build
+- [ ] T55 · Bloqueo de nuevos fiados — build
+- [ ] T56 · Pago parcial o total — build
+- [ ] T57 · Conciliación de abonos — build
+- [ ] T58 · Conciliación de abonos — duplicate (canonical T57)
+- [ ] T59 · Liquidación y elegibilidad — build
+- [ ] T65 · Medio fiado — already covered
+- [ ] T81 · Detalle de fiado — build
+- [ ] T82 · Contacto para avisos — build
+- [ ] T83 · Límites y bloqueo en consola — duplicate (canonical T49, T55)
+- [ ] T84 · Detalle, ligas y cobros — duplicate (canonical T52, T56)
+
+### F-05 · Goods receiving
+- [ ] T42 · Recepción y conteo — build
+- [ ] T43 · Entrada de inventario — build
+- [ ] T44 · Diferencias de recepción — build
+- [ ] T45 · Aprobación de stock — build
+- [ ] T80 · Recepción y aprobación en consola — duplicate (canonical T42..T45)
+
+### F-06 · Till close + handover
+- [ ] T12 · Puntos de venta — build
+- [ ] T66 · Cierre de caja — build
+- [ ] T67 · Entrega al dueño — build
+- [ ] T73 · Consola de cierre de efectivo — duplicate (canonical T66, T67)
+
+### F-07 · Replenishment
+- [ ] T38 · Faltantes para compra — already covered
+- [ ] T39 · Registro de proveedor — build
+- [ ] T40 · Pedido y aprobación — build
+- [ ] T41 · Envío al proveedor — build
+- [ ] T46 · Alerta de reabastecimiento — build
+- [ ] T47 · Disponibilidad tras reposición — build
+- [ ] T75 · Acción desde stock bajo — build
+- [ ] T79 · Proveedor en catálogo — duplicate (canonical T39)
+
+### F-08 · Catalog / inventory / codes
+- [ ] T10 · Catálogo y precios — already covered
+- [ ] T11 · Inventario inicial — already covered
+- [ ] T29 · Inventario y agotados — already covered
+- [ ] T30 · Historial de movimientos — build
+- [ ] T31 · Sincronización entre cajas — build
+- [ ] T76 · Motivo de ajustes — build
+- [ ] T77 · Historial por producto — build
+- [ ] T78 · Existencias negativas — build
+
+### F-09 · Invitation / access / handover
+- [ ] T13 · Invitación por QR o liga — already covered
+- [ ] T14 · Registro del empleado — build
+- [ ] T15 · Autorización y acceso — build
+- [ ] T71 · Administración de empleados — build
+- [ ] T86 · Identidad del registrante — build
+- [ ] T91 · Acceso a roles desde Ajustes — duplicate (canonical T71)
+
+### F-10 · Reports / reconciliation / export
+- [ ] T32 · Tablero y filtros — build
+- [ ] T33 · Desglose por medio — build
+- [ ] T34 · Diferencias y fallos — build
+- [ ] T35 · Ventas por producto — build
+- [ ] T36 · Ventas por empleado o caja — build
+- [ ] T37 · Inventario y exportación — build
+- [ ] T72 · Inicio por empleado y medio — build
+- [ ] T74 · Definición de indicadores — build
+- [ ] T85 · Filtros de gastos — build
+- [ ] T89 · Módulo de reportes — build
+
+### F-11 · Owner console sign-in by QR
+- [ ] T68 · Identidad visual de consola — already covered
+
+### F-12 · Landing / signup / continuity
+- [ ] T7 · Descarga e instalación — build
+

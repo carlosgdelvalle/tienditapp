@@ -329,6 +329,257 @@ Interruptions. Abandoned signup, install without permission, APK not yet publish
 
 Acceptance. `S-17`, `S-11`, `S-14` and `S-18`. Each CTA has a destination test. The landing page uses WCAG 2.2 AA, keyboard and mobile. Conversion is measured only with consented events. The complete commercial copy lives in `06-landing-y-comercial.md`.
 
+## D1 · Per-journey walkthroughs — steps, recovery and accessibility
+
+Industrial-engineering material for package **D1 Workflows** (base SHA 6656f1e). English prose; user-facing strings are quoted verbatim in Mexican Spanish from the Android client (mx.abarpay.mobile) and the owner console (server/static/console.html). The eight journeys named in the package map onto the twelve flows as follows:
+
+| Named journey | Flows |
+|---|---|
+| Registration / login | F-01, F-09, F-11, F-12 |
+| Catalog | F-08 (and the catalog step inside F-02) |
+| Checkout / payment | F-02 (cash), F-03 (CoDi) |
+| Till close | F-06 |
+| Inventory / goods receipt | F-05, F-08 |
+| Store credit "fiado" | F-04 |
+| Replenishment | F-07 |
+| Owner console | F-10, F-11 (plus console surfaces of F-06 and F-08) |
+
+Flows F-05, F-06, F-07, F-11 and F-12 are **not yet implemented** in the Android client; their steps are design-level and their strings are the planned state copy already fixed in the "State copy" table below, except where an existing surface already shows a related string. Every verbatim string below was read from the code at the working revision.
+
+### J-01 · Registration / signup, first product, first sale (F-01) — Android owner onboarding
+
+**Steps and verbatim copy**
+1. **Open a clean install; confirm owner identity and store.** Verbatim: "Configura tu negocio en un minuto. Este paso es solo para el dueño y no se repite." → "¿Qué quieres lograr?" with the chips "Organizar mis ventas y gastos", "Controlar lo que me deben", "Gestionar mejor mi inventario", "Ver estadísticas avanzadas" and the skip "Omitir" ("Elige todas las metas que quieras o toca Omitir. Se guardan solo en este teléfono.").
+2. **Capture name and business.** Verbatim: "Sobre ti" → "Tu nombre (dueño)"; "Tu negocio"; "¿Qué vendes?" ("Elige todo lo que aplique. La app lo guarda en este teléfono para tu catálogo.").
+3. **Optional store photo.** Verbatim: "Opcional. Se sube a tu servidor y se muestra en la consola del dueño." → "Tomar foto" / "Cambiar foto".
+4. **Finish onboarding.** Verbatim: "Empezar". Home then greets "Hola, [nombre]" with tabs "Inicio", "Cobrar", "Fiado", "Inventario", "Reportes".
+5. **First cash sale.** "Cobrar" → "Efectivo" → "Efectivo recibido (MXN)" → "Cambio: X" → "Cobrar en efectivo".
+6. **Receipt and next task.** "Cobro en efectivo registrado" → "Compartir comprobante" → "Nuevo cobro".
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1–3 (fields) | Each onboarding field persists on this phone only. If the app is killed, reopening resumes at the pending field; do not recreate an already-created store. |
+| 3 (photo) | Camera denial is non-blocking: "No pudimos abrir la cámara. Puedes continuar sin foto." The owner can continue without a photo. |
+| 4→5 (finish) | If the store was already created, reuse it — never seed a second store or foreign staff (S-01, S-15). |
+| 5→6 (first sale) | If the sale outcome is uncertain, check its reference ("Venta: [id]") before repeating; the retry is idempotent (S-08). |
+
+**Accessibility** — TalkBack reads each field label and the current step before the input; the multi-select goal chips and skip announce selection state. Text must hold at 200% with no clipped buttons; "Empezar" stays the sole primary action. Web has no surface here (Android-only); the equivalent identity actions on web are J-11/J-12.
+
+### J-02 · Cash sale and offline receipt (F-02) — Android checkout
+
+**Steps and verbatim copy**
+1. **Search or scan a product, set quantity.** Verbatim: "Escanear código", "Escribir venta o código" / "Ocultar venta por texto", "O escribe el código", section "Catálogo" / "Rápidos" ("Los más vendidos del negocio"). Scanner overlay: "Acerca el código; se agrega solo".
+2. **Review lines, total, projected stock.** Verbatim: "Total", "Tu carrito está vacío.".
+3. **Choose cash and capture received.** Verbatim: "Forma de pago" → "Efectivo" → "Efectivo recibido (MXN)" (placeholder "Ej. 100.00") → "Recibido:" → "Cambio: X" / "Faltan X".
+4. **Confirm once.** Verbatim: "Cobrar en efectivo".
+5. **Show reference, sync state and receipt.** Verbatim: headline "Cobro en efectivo registrado"; "Venta: [id]", "Recibido", "Cambio: X"; offline state copy "Cobro en efectivo guardado en el teléfono. Se sincronizará al volver la conexión."; "Compartir comprobante".
+6. **Sync when connection recovers.** Verbatim (queue problem): "Requiere atención. Conservamos los datos y te mostramos cómo resolverlo."; uncertain: "Conservamos esta venta, pero no pudimos recuperar su conexión. No estamos consultando el servidor; bloqueamos otro intento hasta revisarla."
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1–3 (cart) | Cart and received amount are preserved across rotation, lock and voice-return (S-11). A call or lock during cart building resumes with the same lines. |
+| 3→4 (double tap) | The confirm button disables while the request is in flight; the double tap cannot submit twice. |
+| 4→5 (commit) | Forced close or restart after commit does not discard the sale; it is a durable local operation with immutable line and sale IDs (S-08, S-12). |
+| 5→6 (network drop / lost ACK) | The operation re-sends and the server acknowledges idempotently: one central sale, one receipt, one movement per line, one cash intake. |
+| 2/5 (last unit) | If two disconnected registers sold the last unit, both sales are preserved and an auditable inventory difference is opened (S-07). |
+
+**Accessibility** — TalkBack must read total, change, state and reference in order (actor → product → quantity → total → method → confirmation). Amount, method and state are never color-only ("Cambio:" carries the word plus the icon). 200% text must not overlap the amount with the confirm button. Android targets ≥ 48 dp. Web not applicable.
+
+### J-03 · CoDi charge with verified confirmation (F-03) — Android checkout
+
+**Steps and verbatim copy**
+1. **Choose CoDi, review amount and demo mode.** Verbatim: "PEY / CoDi" → "Monto a cobrar"; demo banner "MODO DEMO · PEY cobra $0.01 MXN" / "Modo demo: se cobra $0.01 MXN".
+2. **Generate the QR with an active account.** Verbatim: "Generar QR PEY"; "Genera el QR CoDi. Solo el servidor puede confirmar el pago."; simulated: "SIMULADO · Este símbolo no sirve para pagar".
+3. **Check state without adding to collections.** Verbatim: "Consultar estado"; "Esperando confirmación del servidor…"; "Pago confirmado por el servidor con PEY."; "El pago está por conciliar. Consultaremos de nuevo; no vuelvas a cobrar."; "Cobro vencido. Un pago tardío todavía puede llegar; conservamos la referencia."; "PEY rechazó el cobro. No se generó un pago."
+4. **Update to paid only on a confirmed server response.** Verbatim: "¡Pago PEY confirmado!"; guardrail "El QR y una captura del cliente no prueban el pago. Solo el servidor puede confirmarlo."
+5. **Receipt and next sale.** Verbatim: "Compartir comprobante", "Nuevo cobro"; uncertain reference kept via "Reportar problema" and "Cancelar cobro" with the dialog "¿Cancelar este cobro?" / "Cancela solo si el cliente no ha pagado. No se devuelve dinero. Un pago posterior se revisará por separado." → "Sí, cancelar cobro".
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1→2 (QR active, app close) | The sale persists; reopening shows the QR or its status — never a fresh duplicate charge (S-11). |
+| 2 (creation timeout / inactive account) | The UI shows unavailable or pending ("QR no disponible o vencido. Conserva esta venta; no generes otro cobro."); it never fakes success (S-16). |
+| 3 (expiry / late payment) | "Cobro vencido…" keeps the reference; a late payment still reconciles (S-03, S-08). |
+| 3→4 (duplicate webhook) | The server applies one valid event idempotently; a different amount stays "por conciliar" (S-08). |
+| any (network change) | The uncertain screen blocks a second attempt and instructs review rather than recharging. |
+
+**Accessibility** — TalkBack announces state, amount, validity and each action; a screenshot must never be announced as "Pagado" (state copy forbids it). States carry text, not color alone. 200% text keeps the QR caption and buttons unclipped. Web support reconciliation surface: keyboard and focus per J-10.
+
+### J-04 · Store credit "fiado" (F-04) — Android + owner console
+
+**Steps and verbatim copy**
+1. **Find or create the customer.** Verbatim: tab "Fiado"; "Agregar cliente"; dialog "Nuevo cliente de fiado" / "Se guarda en el servidor. No pidas datos sensibles." with "Nombre" and "Teléfono (opcional)". List "Buscar cliente", "No hay clientes registrados todavía.".
+2. **Review balance, overdue debt, limit and eligibility.** Verbatim: "Saldo pendiente" and the list line "[nombre] · Saldo X"; "Los abonos reducen el saldo y quedan registrados en el servidor." (limits/due-date are not yet in the UI — T49/T52 build).
+3. **Record amount, due date and conditions.** Verbatim (charge path): "Cobrar a fiado" → headline "Fiado registrado" → "Crédito del cliente" / "Saldo después de la venta" / "La venta quedó a crédito. Registra abonos desde la pestaña Fiado." (due date and conditions are planned: T50 build).
+4. **Confirm the charge and deduct stock once, without collections.** Same verbatim as step 3; the sale state is "credit", not collected.
+5. **Collect a partial payment or settlement.** Verbatim: "Abono" → "Abonar $X" presets, "Liquidar saldo", "Monto en pesos" (placeholder "Ej. 50.00"), "Nota (opcional)", "Registrar abono"; result "Abono registrado. Saldo: [X].". Console: "Liquidación de [monto] registrada".
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1–2 (customer without contact) | A legacy customer without phone is still usable; contact/consent is corrected later (T82 build). |
+| 3→4 (network loss on confirm) | The phone may keep a draft offline but never finalizes debt, limit or exception; finalize only on reconnect (S-04). |
+| 4 (double payment / concurrent settlement) | Idempotent: a repeated event leaves a single movement and balance (S-08). |
+| 5 (register handover mid-flow) | The charge/payment history preserves charge, payment, actor and date; the new session resumes from the server state. |
+
+**Accessibility** — TalkBack reads balance, due date and state; permission-denied control is announced ("Tu perfil no puede registrar abonos") rather than silently hidden. 200% text keeps the balance and preset buttons unclipped. Web console: the fiado detail and payment rows operate with keyboard and visible focus.
+
+### J-05 · Physical goods receiving without a network (F-05) — Android (design; not yet implemented)
+
+**Steps and planned copy**
+1. **Open the cached order.** Design: the received order is found from cache; no existing screen today.
+2. **Confirm provider, folio and physical date.** Planned state copy: "Mercancía recibida en este teléfono. Falta aprobación para publicar existencia."
+3. **Capture received quantity per product** (busy hands; large targets).
+4. **Show missing or surplus with a reason.** Planned: difference of 2 out of 10, with reason and next action.
+5. **Save local receipt and "Pendiente de aprobar" state.**
+6. **Sync, review and approve once.** Central approval publishes stock exactly once.
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1–3 (forced close / low battery) | The local receiving operation persists with observed quantities, differences, actor and receipt; reopen to resume (S-05, S-12). |
+| 4 (unexpected product) | It is flagged for resolution instead of silently ignored. |
+| 5→6 (intermittent network / double receiving) | Intake is published once; a duplicate receipt opens a traceable case without doubling inventory (S-08). |
+| 6 (simultaneous console approval) | Approval is idempotent; stock increases once. |
+
+**Accessibility** — Capture, difference, state and actions all carry text and are readable by TalkBack; touch targets ≥ 48 dp for one-hand operation. Web console receiving must work with keyboard and visible focus (S-14).
+
+### J-06 · Till close, handover and acceptance of cash (F-06) — Android + owner console (design; not yet implemented)
+
+**Steps and planned copy**
+1. **Prepare the cut with period and register visible.** Existing related verbatim on Reports: "Reportes · hoy", "Día del negocio: Ciudad de México".
+2. **Show expected cash and pending operations.** Existing related verbatim: "[N] cobro(s) por conciliar. Revísalos antes de cerrar caja."
+3. **Capture counted and a reason on difference.** Planned: expected vs counted with difference and reason.
+4. **Record the handover with date, actor and receipt.** Planned: handover receipt.
+5. **Owner reviews and accepts or marks a discrepancy.** Planned: "not-accepted" state with responsible parties.
+6. **Close the shift with final state and next action.** Planned: final closed state.
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1–2 (unsynced sales) | Pending operations are listed and prevent a final close; they are not silently dropped (S-12). |
+| 3–4 (screen reload / partial handover) | The count and handover draft persist; reopening resumes rather than restarting the count. |
+| 5 (absent owner) | The handover stays open for the owner; the register is not reconciled because the employee finished capturing. |
+| 4–5 (double tap) | Acceptance is idempotent; correction after acceptance is an audited adjustment, not a silent rewrite. |
+
+**Accessibility** — Totals and difference are read in full with correct focus on Android and keyboard navigation on the web console (S-14, S-06). Difference is never color-only.
+
+### J-07 · Restock alert and order to provider (F-07) — Android + console (design; not yet implemented)
+
+**Steps and planned copy**
+1. **Open the alert from Inicio or Inventario.** Existing related verbatim: "Inventario bajo".
+2. **Review product, stock, minimum and provider.** Design.
+3. **Add proposed quantity and other items.** Design: preloaded product and suggested quantity.
+4. **Review total, unit and conditions.** Design.
+5. **Approve and share/send through the available channel.** Planned: if no channel, keep a draft and never claim delivery (S-16).
+6. **Receive goods through J-05 (F-05).**
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1 (no assigned provider) | The alert still opens; the provider step is shown as missing, not blocked silently. |
+| 3–5 (duplicate order / uncertain send) | Orders carry folio and state; sending is idempotent and never claims delivery without confirmation. |
+| 5–6 (different quantities) | Differences are captured at receiving (J-05), not at order time. |
+| 4–5 (simultaneous approval) | Approval is idempotent (S-08). |
+
+**Accessibility** — The alert → order path is operable end-to-end with TalkBack and 200% text; the preloaded product/quantity is announced before the order is confirmed.
+
+### J-08 · Catalog, inventory and codes (F-08) — Android + owner console
+
+**Steps and verbatim copy**
+1. **Search, filter or scan.** Verbatim: "Buscar producto" (inventory) / "Buscar por nombre o aliases" (console); scanner "Escanear código". Unknown code: "Código sin enlazar" / "El código [X] no está en el catálogo. Elige el producto para enlazarlo."
+2. **Consult price and availability in explicit text.** Verbatim: "Inventario bajo"; "Sin límite de inventario" / "Sin límite"; price + unit per line.
+3. **Create or edit an item per permission.** Verbatim: "Nuevo artículo" / "Editar artículo" → "Guardar" / "Agregar"; console "Artículo agregado al catálogo." / "Artículo actualizado."
+4. **Adjust stock with a reason and see the trace.** Verbatim (mobile): "Ajuste simple: una unidad por toque. Cada cambio queda registrado en el servidor."; voice: "Contar por voz" / "Dicta en español: «doce coca colas». La app te muestra la cantidad y tú confirmas antes de guardar." → "Confirma tu conteo" / "Guardar conteo" → "Inventario actualizado: …". Delete (Android): "¿Borrar del catálogo?" / "Sí, borrar". Delete (console, native confirm): "¿Borrar «[nombre]» del catálogo? Esta acción no se puede deshacer." → "Artículo borrado del catálogo."
+5. **Confirm the charge interface reflects current data or last sync time.** Verbatim: availability label plus "· Inventario bajo" as applicable.
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1 (unknown code / broken image) | Unknown code offers a link-to-product action; a broken image never hides price or name. |
+| 2 (outdated price) | Price always comes from the database; the UI shows the last sync time instead of a stale figure. |
+| 3 (concurrent edits) | Last write is reconciled server-side; the UI never overwrites past sales with a price change. |
+| 4 (negative stock) | Explicit per-environment rule (S-13); neither environment writes negative stock by permission rebase. |
+| 1/4 (product without stock) | Availability is shown and adjustments are audited (S-13). |
+
+**Accessibility** — Search, scan, 200% text and TalkBack on Android; on web, the same authorized result with keyboard and visible focus. Adjustments announce actor, previous and new value (S-14).
+
+### J-09 · Invitation, access and staff handover (F-09) — Android + console
+
+**Steps and verbatim copy**
+1. **Owner generates a link or QR.** Verbatim: "Crear invitación" → "Comparte la invitación" → "QR de la invitación"; "La invitación vence en 7 días y solo se puede aceptar una vez."
+2. **Employee sees the store identity and accepts with their name.** Verbatim: "Abrimos tu invitación…" / "Estamos revisando la invitación con el servidor." → "Ponle tu apodo" / "Así te verán el dueño y tus compañeros en Abarpay." → "La invitación es para [nombre]." → "¿Cómo te dicen en el negocio?" → "Aceptar invitación".
+3. **Membership is created/activated once.** Verbatim (post-accept): "Tu perfil queda ligado a este teléfono. Si cambias de teléfono, pide otra invitación."
+4. **App shows only allowed tabs and actions.** Verbatim: "Puede cobrar", "Puede fiar", "Puede editar inventario", "Reportes" → "Solo el dueño"; tabs are "Inicio", "Cobrar", "Fiado", "Inventario", "Reportes" (owner only for Reports).
+5. **Owner revokes or changes permissions from a team surface.** Console team management (T71 build).
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1–2 (expired/reused link) | The link fails with a clear action; reuse fails (S-08). |
+| 2 (install without profile) | "Conecta tu perfil" + "Este teléfono no tiene un perfil enlazado. Si te invitaron, abre el enlace o el QR que te compartieron y la app se abrirá sola para que elijas tu apodo." → "Reintentar". |
+| 4 (revocation with pending work) | Logout/revocation does not discard authorized local work; recovery of pending operations is assigned to an authorized person. |
+| 5 (second employee on the same device) | The profile is bound to the phone; a handover never mixes carts, pending charges or another person's data (S-11). |
+
+**Accessibility** — TalkBack reads the store identity and permissions before acceptance; permission denial is a server response, not just a hidden button. 200% text and 48 dp targets. Web console team view: keyboard and focus (S-14, S-15).
+
+### J-10 · Reports, reconciliation and export (F-10) — owner console (web) + Android Reports tab
+
+**Steps and verbatim copy**
+1. **Choose period and store.** Verbatim (Android today): "Reportes · hoy", "Día del negocio: Ciudad de México". (Console range/period filters are T89 build.)
+2. **Review sold, collected, credit, pending and expenses with definitions.** Verbatim: "Venta total del día", "Efectivo", "Productos más vendidos", "Aún no hay ventas del día."; console "Últimas ventas" / "Todavía no hay ventas hoy.", "Dinero que salió hoy del negocio".
+3. **Filter by employee, register or method.** Verbatim (related): "Ventas a crédito de clientes conocidos. El saldo lo calcula el servidor."; expense filters are T85 build.
+4. **Open a sale or event that explains a difference.** Verbatim (fallback): "Reporte no disponible" / "No recibimos los datos del servidor. No sabemos el total de hoy." → "Reintentar".
+5. **Export and compare totals.** Design (T37/T89 build): export matches the screen and filters.
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 1–2 (pending sync / unconfirmed CoDi) | Pending items appear separately and never inflate collected totals (S-10, S-12). |
+| 3 (late cancellation) | Canceled items are excluded once; the screen states their treatment. |
+| 5 (interrupted export) | The export re-runs and reproduces the same data as the screen. |
+| any (time-zone change) | Business date is fixed to Ciudad de México ("Día del negocio: Ciudad de México"). |
+
+**Accessibility** — Web reports operate with keyboard and screen reader; Android totals and states are read in full. Period, source and treatment of each indicator are visible text, not implied by color (S-14).
+
+### J-11 · Owner sign-in to the console by QR (F-11) — web + Android (design; PIN today)
+
+**Steps and verbatim copy**
+1. **Open "Entrar a mi tienda".** Today the console asks a PIN: "PIN de dueño" under "Vista de demostración del negocio. No usa cuentas ni sesiones de producción."
+2. **Show QR and short code with expiry.** Design.
+3. **Scan from the owner's app and review store + browser.** Design; camera fallback strings already exist: "La cámara necesita permiso" → "Permitir cámara".
+4. **Approve or deny explicitly.** Design.
+5. **Computer obtains the session and enters the correct console.** Verbatim (post-login): "Sesión de la dueña" / "Consola de la dueña"; stale PIN: "Tu PIN dejó de ser válido. Vuelve a entrar."
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 3 (camera without permission / rotation) | A manual-code (camera-free) alternative is required; rotation preserves the challenge. |
+| 2–3 (expired challenge / closed browser) | Expiry reports what happened and offers to regenerate (S-09, S-11). |
+| 4 (approval from another account) | Reuse, wrong account or revoked membership fails with a clear action (S-09). |
+
+**Accessibility** — The manual-code alternative is keyboard and screen-reader operable; the QR is not the only entry. Focus stays on the initiating browser (S-09, S-14).
+
+### J-12 · Landing, signup and continuity through the first sale (F-12) — web (design; copy in 06-landing-y-comercial.md)
+
+**Steps and verbatim copy**
+1. **Read a checkable promise.** Planned CTA copy: "Empezar gratis", "Entrar a mi tienda".
+2. **Choose mobile signup, QR entry or signed pilot APK.** Design.
+3. **Complete identity and store without foreign example data.** Reuses J-01 onboarding copy.
+4. **Complete the first cash sale or first useful task.** Reuses J-01/J-02 copy.
+5. **Record attribution without sensitive data.** Design (S-18 consent).
+
+**Recovery after interruption**
+| Step | Recovery path |
+|---|---|
+| 2 (APK not published / install without permission) | The page explains the state and offers an available action (S-17). |
+| 3 (abandoned signup) | Progress is saved at each step; returning resumes rather than restarting. |
+| 4–5 (expired QR) | A return from an expired QR is recoverable with a regenerated code. |
+
+**Accessibility** — WCAG 2.2 AA on web: keyboard and zoom; mobile CTAs meet touch-target sizing; measurement is consented-only (S-17, S-18).
+
 ## Accessibility requirements
 
 The goal is WCAG 2.2 level AA on web and equivalent behavior on Android. The applicable standard is [WCAG 2.2](https://www.w3.org/TR/WCAG22/).
