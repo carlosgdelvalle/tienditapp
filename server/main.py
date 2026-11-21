@@ -72,6 +72,7 @@ from .routes_purchasing import register as register_purchasing_routes
 from .routes_landing import register as register_landing_routes, landing_page_response
 from .routes_fiado import register as register_fiado_routes
 from .routes_aggregate import register as register_aggregate_routes
+from .routes_analytics import register as register_analytics_routes
 
 logger = logging.getLogger("abarpay")
 
@@ -157,6 +158,7 @@ def create_app(
     register_landing_routes(app)
     register_fiado_routes(app)
     register_aggregate_routes(app)
+    register_analytics_routes(app)
     return app
 
 
