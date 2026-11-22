@@ -98,10 +98,15 @@ def test_last_unit_conflict_between_two_tills(client, db):
     second_sale = ack["receipt"]["saleId"]
     assert second_sale != first_sale
     stock_after_sales = db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0]
+    assert stock_after_sales == -1000
     movements_after_sales = db.execute(
-        "SELECT id, sale_id, delta_milli, reason FROM inventory_movements WHERE product_id = 1 ORDER BY id",
+        "SELECT sale_id, delta_milli, reason, employee_id, created_at "
+        "FROM inventory_movements WHERE product_id = 1 ORDER BY id",
     ).fetchall()
-    assert any(row["sale_id"] == first_sale and row["delta_milli"] == -1000 for row in movements_after_sales)
+    assert [tuple(row) for row in movements_after_sales] == [
+        (first_sale, -1000, "sale", 1, base),
+        (second_sale, -1000, "sale_oversell", 1, base + 1),
+    ]
 
     for lease, event, original in (
         (lease_a, first_event, first["acks"][0]),
@@ -112,7 +117,8 @@ def test_last_unit_conflict_between_two_tills(client, db):
         assert replay["receipt"] == original["receipt"]
     assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == stock_after_sales
     assert db.execute(
-        "SELECT id, sale_id, delta_milli, reason FROM inventory_movements WHERE product_id = 1 ORDER BY id",
+        "SELECT sale_id, delta_milli, reason, employee_id, created_at "
+        "FROM inventory_movements WHERE product_id = 1 ORDER BY id",
     ).fetchall() == movements_after_sales
 
     sales = db.execute(

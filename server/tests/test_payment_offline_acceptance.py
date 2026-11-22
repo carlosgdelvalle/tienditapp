@@ -65,6 +65,15 @@ def test_verified_codi_settles_once_when_another_till_sells_the_last_unit(
         "SELECT status, pey_tx_id FROM sales WHERE id = ?", (pending["id"],),
     ).fetchone()
     assert tuple(sale_row) == ("paid_pey", transaction_id)
+    movements = db.execute(
+        "SELECT product_id, delta_milli, reason, employee_id, created_at "
+        "FROM inventory_movements WHERE sale_id = ?",
+        (pending["id"],),
+    ).fetchall()
+    assert len(movements) == 1
+    assert tuple(movements[0])[:4] == (1, -1000, "sale_oversell", 2)
+    assert movements[0]["created_at"] > 0
+    assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == -1000
 
 
 def test_offline_cash_uses_issued_price_after_catalog_edit_and_lost_ack(client, db):
