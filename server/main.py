@@ -40,7 +40,7 @@ from .db import (
 )
 from .parser import line_total_cents, normalize, parse_count, parse_expense, parse_text
 from .payments import apply_payment, restore_inventory, decrement_inventory
-from .outbox import SyncError
+from .outbox import SyncError, cash_intent_matches, sale_id_from_event
 from .pey import PeyClient, PeyError, PeyTimeout, payload_cents, verify_webhook
 from .reports import build_today_report, fiado_outstanding_cents, today_expenses_cents
 from .serializers import (
@@ -1816,6 +1816,7 @@ def _install_routes(app: FastAPI) -> None:
         settings: Settings = Depends(get_settings),
         pey_client: Any | None = Depends(get_pey),
         x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+        idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
     ):
         merged: dict[int, int] = {}
         for item in body.items:
@@ -1847,13 +1848,40 @@ def _install_routes(app: FastAPI) -> None:
                 )
             bank_account_id = active.id
 
-        sale_id = "sale_" + uuid.uuid4().hex[:20]
+        idempotent_cash = (
+            body.paymentMethod == "cash"
+            and bool(idempotency_key)
+            and bool(idempotency_key.strip())
+        )
+        sale_id = (
+            sale_id_from_event(idempotency_key)
+            if idempotent_cash
+            else "sale_" + uuid.uuid4().hex[:20]
+        )
         now = _now()
         cash_received: int | None = None
         change_cents: int | None = None
 
         try:
             with write_transaction(conn):
+                if idempotent_cash:
+                    existing = conn.execute(
+                        "SELECT * FROM sales WHERE id = ?", (sale_id,)
+                    ).fetchone()
+                    if existing is not None:
+                        if not cash_intent_matches(
+                            conn,
+                            existing,
+                            employee_id=body.employeeId,
+                            payment_method=body.paymentMethod,
+                            merged_items=merged,
+                            cash_received_cents=body.cashReceivedCents,
+                        ):
+                            raise HTTPException(
+                                status_code=409,
+                                detail="Idempotency-Key reusada con contenido distinto",
+                            )
+                        return _serialize_sale(conn, sale_id)
                 employee = _require_employee(conn, body.employeeId)
                 products: list[sqlite3.Row] = []
                 for product_id in merged:

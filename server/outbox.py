@@ -39,6 +39,13 @@ EVENT_INVENTORY_ADJUST = "inventory.adjust"
 
 SUPPORTED_EVENT_TYPES = {EVENT_SALE_CREATED, EVENT_INVENTORY_ADJUST}
 
+# catalogVersion values that predate durable server snapshots. 0 means the
+# device had no snapshot loaded; 1 is the historical demo/test placeholder.
+# Those journals are priced from the live catalog under the documented legacy
+# policy. Any other version must resolve to a persisted snapshot, otherwise the
+# event is routed to review instead of being silently repriced.
+LEGACY_CATALOG_VERSIONS = {0, 1}
+
 OUTBOX_TABLES_SQL = """
 CREATE TABLE IF NOT EXISTS outbox_devices (
     device_id TEXT PRIMARY KEY,
@@ -61,6 +68,25 @@ CREATE TABLE IF NOT EXISTS outbox_applied (
 
 CREATE INDEX IF NOT EXISTS idx_outbox_applied_sequence
     ON outbox_applied(tenant_id, device_id, sequence);
+
+CREATE TABLE IF NOT EXISTS catalog_snapshots (
+    store_id TEXT NOT NULL,
+    catalog_version INTEGER NOT NULL,
+    as_of INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    fingerprint TEXT NOT NULL,
+    PRIMARY KEY (store_id, catalog_version)
+);
+
+CREATE TABLE IF NOT EXISTS catalog_snapshot_items (
+    store_id TEXT NOT NULL,
+    catalog_version INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    price_cents INTEGER NOT NULL,
+    unit TEXT NOT NULL,
+    unlimited_stock INTEGER NOT NULL,
+    PRIMARY KEY (store_id, catalog_version, product_id)
+);
 """
 
 
@@ -173,6 +199,56 @@ def apply_event(
 
         fingerprint = canonical_fingerprint(event_type, payload, catalog_version)
         if event_type == EVENT_SALE_CREATED:
+            # Cross-entrypoint idempotency: POST /api/sales with an
+            # Idempotency-Key equal to this eventId derives the same sale id.
+            # If that online commit already landed, return its sale unchanged.
+            sale_id = sale_id_from_event(event_id)
+            prior = conn.execute(
+                "SELECT * FROM sales WHERE id = ?", (sale_id,)
+            ).fetchone()
+            if prior is not None:
+                employee_id = _int_field(payload, "employeeId")
+                payment_method = str(payload.get("paymentMethod") or "cash").strip()
+                merged_items = _merge_items(_coerce_items(payload.get("items")))
+                if prior["store_id"] != store_id or not cash_intent_matches(
+                    conn,
+                    prior,
+                    employee_id=employee_id,
+                    payment_method=payment_method,
+                    merged_items=merged_items,
+                    cash_received_cents=payload.get("cashReceivedCents"),
+                ):
+                    return {
+                        "applied": False,
+                        "duplicate": False,
+                        "conflict": True,
+                        "error": "idempotency_conflict",
+                        "receipt": None,
+                    }
+                receipt = _receipt_from_sale(prior)
+                conn.execute(
+                    """INSERT INTO outbox_applied
+                       (tenant_id, device_id, event_id, sequence, event_type,
+                        fingerprint, receipt, applied_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        tenant_id,
+                        device_id,
+                        event_id,
+                        sequence,
+                        event_type,
+                        fingerprint,
+                        json.dumps(receipt, ensure_ascii=False, separators=(",", ":")),
+                        now,
+                    ),
+                )
+                return {
+                    "applied": False,
+                    "duplicate": True,
+                    "conflict": False,
+                    "error": None,
+                    "receipt": receipt,
+                }
             receipt = _apply_sale_created(
                 conn,
                 store_id=store_id,
@@ -180,6 +256,7 @@ def apply_event(
                 payload=payload,
                 occurred_at=occurred_at,
                 now=now,
+                catalog_version=catalog_version,
             )
         elif event_type == EVENT_INVENTORY_ADJUST:
             receipt = _apply_inventory_adjust(
@@ -227,6 +304,7 @@ def _apply_sale_created(
     payload: dict[str, Any],
     occurred_at: int,
     now: float,
+    catalog_version: Any = None,
 ) -> dict[str, Any]:
     """Finalize an offline cash sale as `paid_cash` with DB catalog prices.
 
@@ -245,13 +323,23 @@ def _apply_sale_created(
     merged = _merge_items(_coerce_items(payload.get("items")))
     employee = _require_employee(conn, store_id, _int_field(payload, "employeeId"))
 
+    price_map = _price_map_for(conn, store_id, catalog_version)
     total_cents = 0
-    lines: list[tuple[sqlite3.Row, int, int]] = []
+    lines: list[tuple[sqlite3.Row, int, int, int]] = []
     for product_id, qty_milli in merged.items():
         product = _require_product(conn, store_id, product_id)
-        line_total = line_total_cents(int(product["price_cents"]), qty_milli)
+        if price_map is not None:
+            if product["id"] not in price_map:
+                raise SyncError(
+                    "catalog_version_unavailable",
+                    "El producto no está en la versión del catálogo emitida",
+                )
+            unit_price = price_map[product["id"]]
+        else:
+            unit_price = int(product["price_cents"])
+        line_total = line_total_cents(unit_price, qty_milli)
         total_cents += line_total
-        lines.append((product, qty_milli, line_total))
+        lines.append((product, qty_milli, line_total, unit_price))
 
     cash_received = total_cents
     if payload.get("cashReceivedCents") is not None:
@@ -262,7 +350,7 @@ def _apply_sale_created(
         )
     change_cents = cash_received - total_cents
 
-    sale_id = _sale_id_from_event(event_id)
+    sale_id = sale_id_from_event(event_id)
     note = payload.get("note")
     conn.execute(
         """INSERT INTO sales
@@ -284,7 +372,7 @@ def _apply_sale_created(
             note,
         ),
     )
-    for product, qty_milli, line_total in lines:
+    for product, qty_milli, line_total, unit_price in lines:
         conn.execute(
             """INSERT INTO sale_items
                (sale_id, product_id, name, unit, qty_milli,
@@ -296,7 +384,7 @@ def _apply_sale_created(
                 product["name"],
                 product["unit"],
                 qty_milli,
-                product["price_cents"],
+                unit_price,
                 line_total,
             ),
         )
@@ -380,15 +468,112 @@ def _decode_receipt(raw: str | None) -> dict[str, Any] | None:
     return decoded if isinstance(decoded, dict) else None
 
 
-def _sale_id_from_event(event_id: str) -> str:
+def sale_id_from_event(event_id: str) -> str:
     """Stable central folio derived from the idempotency key.
 
     Deriving it deterministically means the folio is never reused and stays
-    identical across retries even if the receipt itself were ever lost.
+    identical across retries and across entrypoints (offline sync and
+    POST /api/sales with an Idempotency-Key), even if the receipt were lost.
     """
 
     slug = "".join(ch for ch in str(event_id) if ch.isalnum()).lower()
     return "sale_" + (slug or uuid.uuid4().hex[:20])
+
+
+def _price_map_for(
+    conn: sqlite3.Connection, store_id: str, catalog_version: Any
+) -> dict[int, int] | None:
+    """Canonical unit prices for the event's catalog version.
+
+    Returns None for legacy journals (no durable snapshot): those are priced
+    from the live catalog under the documented legacy policy. A non-legacy
+    version must resolve to a persisted snapshot; otherwise the event is routed
+    to review (SyncError) instead of being silently repriced.
+    """
+
+    version = _catalog_version_int(catalog_version)
+    if version is None or version in LEGACY_CATALOG_VERSIONS:
+        return None
+    header = conn.execute(
+        "SELECT 1 FROM catalog_snapshots WHERE store_id = ? AND catalog_version = ?",
+        (store_id, version),
+    ).fetchone()
+    if header is None:
+        raise SyncError(
+            "catalog_version_unavailable",
+            "No se puede verificar el precio emitido: vuelve a autorizar en línea",
+        )
+    rows = conn.execute(
+        "SELECT product_id, price_cents FROM catalog_snapshot_items "
+        "WHERE store_id = ? AND catalog_version = ?",
+        (store_id, version),
+    ).fetchall()
+    return {int(row["product_id"]): int(row["price_cents"]) for row in rows}
+
+
+def _catalog_version_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise SyncError("catalog_version_invalid", "Versión del catálogo inválida")
+
+
+def cash_intent_matches(
+    conn: sqlite3.Connection,
+    sale: sqlite3.Row,
+    *,
+    employee_id: int,
+    payment_method: str,
+    merged_items: dict[int, int],
+    cash_received_cents: Any,
+) -> bool:
+    """True when an incoming cash intent equals the stored sale.
+
+    The same idempotency key must map to the same logical operation. A
+    different employee, payment method, item set or cash received is a content
+    conflict, not a duplicate, so it is routed to review without mutation.
+    """
+
+    if int(sale["employee_id"]) != int(employee_id):
+        return False
+    if sale["payment_method"] != payment_method:
+        return False
+    stored = conn.execute(
+        "SELECT product_id, qty_milli FROM sale_items "
+        "WHERE sale_id = ? ORDER BY product_id, qty_milli",
+        (sale["id"],),
+    ).fetchall()
+    if [(int(row["product_id"]), int(row["qty_milli"])) for row in stored] != sorted(
+        merged_items.items()
+    ):
+        return False
+    if cash_received_cents is None:
+        # Exact change: the sale stored the total as the cash received.
+        return int(sale["cash_received_cents"]) == int(sale["total_cents"])
+    try:
+        return int(sale["cash_received_cents"]) == int(cash_received_cents)
+    except (TypeError, ValueError):
+        return False
+
+
+def _receipt_from_sale(sale: sqlite3.Row) -> dict[str, Any]:
+    """Rebuild the sale.created receipt for a sale committed by another path."""
+
+    return {
+        "eventType": EVENT_SALE_CREATED,
+        "saleId": sale["id"],
+        "reference": sale["id"],
+        "status": sale["status"],
+        "paymentMethod": sale["payment_method"],
+        "totalCents": int(sale["total_cents"]),
+        "chargedCents": int(sale["charged_cents"]),
+        "cashReceivedCents": sale["cash_received_cents"],
+        "changeCents": sale["change_cents"],
+        "occurredAt": sale["created_at"],
+        "appliedAt": sale["created_at"],
+    }
 
 
 def _int_field(payload: dict[str, Any], key: str) -> int:

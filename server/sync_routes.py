@@ -107,10 +107,25 @@ def _snapshot_canonical(snapshot: dict[str, Any]) -> str:
     )
 
 
+def _catalog_fingerprint(items: list[dict[str, Any]]) -> str:
+    """Deterministic full-hash fingerprint of a catalog snapshot's items."""
+
+    canonical = "|".join(
+        f"{item['productId']}:{item['unit']}:{item['priceCents']}:"
+        f"{1 if item['unlimitedStock'] else 0}"
+        for item in items
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _catalog_snapshot(
     conn, store_id: str, now: int, expires_at: int
-) -> dict[str, Any]:
-    """Current catalog as a signed snapshot (prices come from the database)."""
+) -> tuple[dict[str, Any], str]:
+    """Current catalog as a signed snapshot plus its durable fingerprint.
+
+    Prices come from the database. The full fingerprint is stored server-side
+    so a later replay can recompute totals from the exact issued version.
+    """
 
     rows = conn.execute(
         "SELECT id, unit, price_cents, unlimited_stock "
@@ -126,19 +141,49 @@ def _catalog_snapshot(
         }
         for row in rows
     ]
-    canonical = "|".join(
-        f"{i['productId']}:{i['unit']}:{i['priceCents']}:{1 if i['unlimitedStock'] else 0}"
-        for i in items
-    )
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    catalog_version = int(digest[:8], 16)
+    fingerprint = _catalog_fingerprint(items)
     return {
         "v": SNAPSHOT_VERSION,
-        "catalogVersion": catalog_version,
+        "catalogVersion": int(fingerprint[:8], 16),
         "asOf": now,
         "expiresAt": expires_at,
         "items": items,
-    }
+    }, fingerprint
+
+
+def _persist_snapshot(
+    conn, store_id: str, snapshot: dict[str, Any], fingerprint: str
+) -> None:
+    """Durably store the issued snapshot keyed by (store, catalog version)."""
+
+    version = int(snapshot["catalogVersion"])
+    conn.execute(
+        """INSERT OR REPLACE INTO catalog_snapshots
+           (store_id, catalog_version, as_of, expires_at, fingerprint)
+           VALUES (?, ?, ?, ?, ?)""",
+        (
+            store_id,
+            version,
+            int(snapshot["asOf"]),
+            int(snapshot["expiresAt"]),
+            fingerprint,
+        ),
+    )
+    for item in snapshot["items"]:
+        conn.execute(
+            """INSERT OR REPLACE INTO catalog_snapshot_items
+               (store_id, catalog_version, product_id, price_cents, unit,
+                unlimited_stock)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                store_id,
+                version,
+                item["productId"],
+                item["priceCents"],
+                item["unit"],
+                1 if item["unlimitedStock"] else 0,
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +274,9 @@ def register(app) -> None:
         }
         lease["signature"] = _sign(settings, _lease_canonical(lease))
 
-        snapshot = _catalog_snapshot(conn, store_id, now, expires_at)
+        snapshot, fingerprint = _catalog_snapshot(conn, store_id, now, expires_at)
+        with write_transaction(conn):
+            _persist_snapshot(conn, store_id, snapshot, fingerprint)
         snapshot["signature"] = _sign(settings, _snapshot_canonical(snapshot))
 
         return {"lease": lease, "snapshot": snapshot}
