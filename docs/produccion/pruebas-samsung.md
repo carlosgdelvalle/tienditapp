@@ -29,7 +29,7 @@ The phone launcher calls the app **Abarpay QA** and its package is `mx.abarpay.m
 4. On the Mac, open `http://127.0.0.1:8011/console`, select **Mostrar código QR**, and scan it with the Samsung. Compare the code and store before selecting **Sí, abrir la consola**. Check that the same browser opens the correct store. A separate browser and a repeated exchange must be refused.
 5. Add a product priced at MXN 18.00 in the console. Record a cash sale with MXN 20.00 received. Match the receipt reference, MXN 2.00 change and the single sale against PostgreSQL.
 
-Label the SMS and store fixtures **SIMULADO** in the test record. Record physical camera approval and real carrier delivery separately. Repeat the message check with an authorized Mexican SIM and an approved transport before the pilot.
+Label the SMS and store fixtures **SIMULADO** in the test record. Record physical camera approval and real carrier delivery separately. Repeat the message check with an authorized Mexican SIM and an approved transport before the pilot. See the [LabsMobile setup and simulated SMS notes](labsmobile-sms.md).
 
 ## Offline cash on the physical phone
 
