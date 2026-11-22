@@ -78,7 +78,7 @@ def sync(client: TestClient, lease: dict, events: list[dict]) -> dict:
 
 
 def test_last_unit_conflict_between_two_tills(client, db):
-    # One unit of product 1 remains; two disconnected tills both sell it.
+    # Both tills already accepted cash. The stock shortage must stay auditable.
     db.execute("UPDATE products SET stock_milli = 1000 WHERE id = 1")
     db.commit()
 
@@ -92,27 +92,28 @@ def test_last_unit_conflict_between_two_tills(client, db):
     )
     assert first["acks"][0]["applied"] is True
 
-    second = sync(
-        client, lease_b,
-        [sale_event("till-b", 1, "01HXTILLB00000000000000001", base + 1)],
-    )
-    ack = second["acks"][0]
-    assert ack["applied"] is False
-    assert ack["error"] == "stock_conflict"
+    second_event = sale_event("till-b", 1, "01HXTILLB00000000000000001", base + 1)
+    ack = sync(client, lease_b, [second_event])["acks"][0]
+    assert ack["applied"] is True
+    first_sale = first["acks"][0]["receipt"]["saleId"]
+    second_sale = ack["receipt"]["saleId"]
+    assert second_sale != first_sale
 
-    # Exactly one sale, one payment, one movement; stock never goes negative.
-    assert db.execute(
-        "SELECT stock_milli FROM products WHERE id = 1"
-    ).fetchone()[0] == 0
-    assert db.execute(
-        "SELECT COUNT(*) FROM sales WHERE store_id = ?", (STORE_ID,)
-    ).fetchone()[0] == 1
-    assert db.execute(
-        "SELECT COUNT(*) FROM payments WHERE source = 'offline_outbox'"
-    ).fetchone()[0] == 1
-    assert db.execute(
-        "SELECT COUNT(*) FROM inventory_movements WHERE product_id = 1"
-    ).fetchone()[0] == 1
+    replay = sync(client, lease_b, [second_event])["acks"][0]
+    assert replay["duplicate"] is True
+    assert replay["receipt"] == ack["receipt"]
+
+    sales = db.execute(
+        "SELECT id, status, total_cents FROM sales WHERE store_id = ?", (STORE_ID,),
+    ).fetchall()
+    assert {tuple(row) for row in sales} == {
+        (first_sale, "paid_cash", 1800),
+        (second_sale, "paid_cash", 1800),
+    }
+    payments = db.execute(
+        "SELECT sale_id, amount_cents FROM payments WHERE source = 'offline_outbox'",
+    ).fetchall()
+    assert sorted(map(tuple, payments)) == sorted([(first_sale, 1800), (second_sale, 1800)])
 
 
 # ---------------------------------------------------------------------------
