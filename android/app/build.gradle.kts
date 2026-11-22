@@ -23,6 +23,11 @@ android {
         versionName = "1.2.3"
         // Servidor HTTPS estable de Render para la demo.
         buildConfigField("String", "DEMO_SERVER", "\"https://abarpay-api.onrender.com\"")
+        // Backend PG del dueño (en blanco: no apunta a la demo SQLite).
+        buildConfigField("String", "OWNER_API_BASE_URL", "\"\"")
+        buildConfigField("String", "AUTH0_DOMAIN", "\"\"")
+        buildConfigField("String", "AUTH0_CLIENT_ID", "\"\"")
+        buildConfigField("String", "AUTH0_AUDIENCE", "\"\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }

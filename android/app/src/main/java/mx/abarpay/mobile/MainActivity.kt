@@ -47,22 +47,34 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     /** Token de abarpay://empleado/<token> o https://…/invite/<token>. */
     private var deepLink by mutableStateOf<String?>(null)
+    private var showOwnerApproval by mutableStateOf(false)
+
+    private val ownerAuth: OwnerAuth by lazy {
+        OwnerOidcAuthAdapter(
+            OwnerOidcClient(
+                this,
+                OwnerOidcConfig(BuildConfig.AUTH0_DOMAIN, BuildConfig.AUTH0_CLIENT_ID, BuildConfig.AUTH0_AUDIENCE),
+            )
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         installSplashScreen()
         enableEdgeToEdge()
-        deepLink = extractInviteToken(intent?.dataString)
+        handleIncomingIntent(intent)
         setContent {
             var splashDone by remember { mutableStateOf(BuildConfig.DEBUG) }
             if (!splashDone) {
@@ -81,7 +93,16 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 Box(Modifier.fillMaxSize()) {
-                    AbarpayApp(state, model) { scanning = true }
+                    if (showOwnerApproval) {
+                        OwnerQrApprovalScreen(
+                            ownerAuth = ownerAuth,
+                            apiBaseUrl = BuildConfig.OWNER_API_BASE_URL,
+                            onApproved = { showOwnerApproval = false },
+                            onClose = { showOwnerApproval = false },
+                        )
+                    } else {
+                        AbarpayApp(state, model) { scanning = true }
+                    }
                     if (scanning) {
                         ContinuousScannerScreen(
                             onResult = { code ->
@@ -99,7 +120,22 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        extractInviteToken(intent.dataString)?.let { deepLink = it }
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        val data = intent?.data
+        if (data != null && data.scheme == BuildConfig.APPLICATION_ID && data.host == "oidc" && data.path == "/callback") {
+            lifecycleScope.launch {
+                runCatching { ownerAuth.completeSignIn(data) }
+            }
+            return
+        }
+        if (data != null && data.scheme == "abarpay" && data.host == "dueno") {
+            showOwnerApproval = true
+            return
+        }
+        extractInviteToken(intent?.dataString)?.let { deepLink = it }
     }
 }
 
