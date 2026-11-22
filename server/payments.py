@@ -35,22 +35,25 @@ def decrement_inventory(
     employee_id: int,
     *,
     now: float | None = None,
+    allow_oversell: bool = False,
 ) -> None:
-    """Decrement stock for a paid sale, rejecting a last-unit conflict.
+    """Decrement stock for a paid sale.
 
-    A limited product with insufficient stock is rejected with a
-    "stock_conflict" error when it has already entered sale circulation (it
-    has a prior 'sale' movement). That is the signature of a second till
-    selling the last piece: the first sale honors the unit (stock to exactly
-    zero) and the second is detected at apply time. A brand-new, never-sold
-    item keeps the demo's historical negative-stock allowance, so existing
-    fixtures that oversell a zero-stock catalog item keep working.
+    A limited product with insufficient stock either raises the pre-payment
+    stock_conflict (default, used by the online checkout before money changes
+    hands) or, when allow_oversell is set for an already-settled payment,
+    honors the sale anyway and records the shortage.
+
+    allow_oversell=True is reserved for payments that cannot be unwound: a
+    verified CoDi webhook/reconciliation and an offline cash sale whose cash
+    was already accepted. Those decrements take stock below zero and write an
+    inventory_movements row with reason='sale_oversell' so the shortage stays
+    auditable by sale and product instead of being corrected silently.
 
     The check and the decrement run inside the caller's BEGIN IMMEDIATE
-    transaction (see db.write_transaction), so two tills serialize atomically
-    and stock never goes negative from a sale of a traded product. Unlimited
-    products keep their historical behavior: a movement row is written, stock
-    is untouched.
+    transaction (see db.write_transaction), so two tills serialize atomically.
+    Unlimited products keep their historical behavior: a movement row is
+    written, stock is untouched.
     """
 
     from .outbox import SyncError  # deferred: outbox imports this module
@@ -67,16 +70,18 @@ def decrement_inventory(
         ).fetchone()
         if product is None:
             continue
-        if not product["unlimited_stock"] and int(product["stock_milli"]) < int(
-            item["qty_milli"]
-        ):
+        overselling = (
+            not product["unlimited_stock"]
+            and int(product["stock_milli"]) < int(item["qty_milli"])
+        )
+        if overselling and not allow_oversell:
             # A product that has already been sold and is now short is the
             # last-unit conflict: a second till selling beyond the last piece.
             # A brand-new, never-sold item keeps the demo's historical
             # negative-stock allowance (there is no prior sale to race against).
             sold_before = conn.execute(
                 "SELECT 1 FROM inventory_movements "
-                "WHERE product_id = ? AND reason = 'sale' LIMIT 1",
+                "WHERE product_id = ? AND reason IN ('sale', 'sale_oversell') LIMIT 1",
                 (item["product_id"],),
             ).fetchone()
             if sold_before is not None:
@@ -90,11 +95,12 @@ def decrement_inventory(
                 "WHERE id = ? AND unlimited_stock = 0",
                 (item["qty_milli"], item["product_id"]),
             )
+        reason = "sale_oversell" if overselling else "sale"
         conn.execute(
             """INSERT INTO inventory_movements
                (product_id, delta_milli, reason, sale_id, employee_id, created_at)
-               VALUES (?, ?, 'sale', ?, ?, ?)""",
-            (item["product_id"], -item["qty_milli"], sale_id, employee_id, now),
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (item["product_id"], -item["qty_milli"], reason, sale_id, employee_id, now),
         )
 
 
@@ -267,7 +273,7 @@ def apply_payment(
            WHERE id = ?""",
         (transaction_id, now, note, sale_id),
     )
-    decrement_inventory(conn, sale_id, sale["employee_id"], now=now)
+    decrement_inventory(conn, sale_id, sale["employee_id"], now=now, allow_oversell=True)
 
     return {
         "outcome": "applied",

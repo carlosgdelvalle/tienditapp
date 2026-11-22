@@ -300,7 +300,7 @@ def _apply_sale_created(
                 line_total,
             ),
         )
-    decrement_inventory(conn, sale_id, employee["id"], now=float(occurred_at))
+    decrement_inventory(conn, sale_id, employee["id"], now=float(occurred_at), allow_oversell=True)
     conn.execute(
         """INSERT INTO payments
            (tx_id, sale_id, amount_cents, method, source, applied, received_at)
