@@ -323,7 +323,7 @@ def _apply_sale_created(
     merged = _merge_items(_coerce_items(payload.get("items")))
     employee = _require_employee(conn, store_id, _int_field(payload, "employeeId"))
 
-    price_map = _price_map_for(conn, store_id, catalog_version)
+    price_map = catalog_unit_prices(conn, store_id, catalog_version)
     total_cents = 0
     lines: list[tuple[sqlite3.Row, int, int, int]] = []
     for product_id, qty_milli in merged.items():
@@ -480,8 +480,12 @@ def sale_id_from_event(event_id: str) -> str:
     return "sale_" + (slug or uuid.uuid4().hex[:20])
 
 
-def _price_map_for(
-    conn: sqlite3.Connection, store_id: str, catalog_version: Any
+def catalog_unit_prices(
+    conn: sqlite3.Connection,
+    store_id: str,
+    catalog_version: Any,
+    *,
+    current_at: float | None = None,
 ) -> dict[int, int] | None:
     """Canonical unit prices for the event's catalog version.
 
@@ -489,16 +493,17 @@ def _price_map_for(
     from the live catalog under the documented legacy policy. A non-legacy
     version must resolve to a persisted snapshot; otherwise the event is routed
     to review (SyncError) instead of being silently repriced.
+    Online checkout only honors an issued snapshot while it is current.
     """
 
     version = _catalog_version_int(catalog_version)
     if version is None or version in LEGACY_CATALOG_VERSIONS:
         return None
     header = conn.execute(
-        "SELECT 1 FROM catalog_snapshots WHERE store_id = ? AND catalog_version = ?",
+        "SELECT expires_at FROM catalog_snapshots WHERE store_id = ? AND catalog_version = ?",
         (store_id, version),
     ).fetchone()
-    if header is None:
+    if header is None or (current_at is not None and current_at > header["expires_at"]):
         raise SyncError(
             "catalog_version_unavailable",
             "No se puede verificar el precio emitido: vuelve a autorizar en línea",

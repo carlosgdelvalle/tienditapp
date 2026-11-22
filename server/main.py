@@ -40,7 +40,13 @@ from .db import (
 )
 from .parser import line_total_cents, normalize, parse_count, parse_expense, parse_text
 from .payments import apply_payment, restore_inventory, decrement_inventory
-from .outbox import SyncError, cash_intent_matches, sale_id_from_event
+from .outbox import (
+    SyncError,
+    cash_intent_matches,
+    catalog_unit_prices,
+    ensure_outbox_schema,
+    sale_id_from_event,
+)
 from .pey import PeyClient, PeyError, PeyTimeout, payload_cents, verify_webhook
 from .reports import build_today_report, fiado_outstanding_cents, today_expenses_cents
 from .serializers import (
@@ -247,6 +253,8 @@ class SaleIn(BaseModel):
     items: list[SaleItemIn] = Field(min_length=1)
     paymentMethod: Literal["cash", "pey", "fiado"]
     cashReceivedCents: int | None = None
+    expectedTotalCents: int | None = Field(default=None, ge=0)
+    catalogVersion: int | None = Field(default=None, ge=0, le=0xFFFFFFFF)
     customerId: int | None = None
     note: str | None = None
 
@@ -1861,6 +1869,8 @@ def _install_routes(app: FastAPI) -> None:
         now = _now()
         cash_received: int | None = None
         change_cents: int | None = None
+        if idempotent_cash and body.catalogVersion is not None:
+            ensure_outbox_schema(conn)
 
         try:
             with write_transaction(conn):
@@ -1869,7 +1879,10 @@ def _install_routes(app: FastAPI) -> None:
                         "SELECT * FROM sales WHERE id = ?", (sale_id,)
                     ).fetchone()
                     if existing is not None:
-                        if not cash_intent_matches(
+                        if (
+                            body.expectedTotalCents is not None
+                            and body.expectedTotalCents != existing["total_cents"]
+                        ) or not cash_intent_matches(
                             conn,
                             existing,
                             employee_id=body.employeeId,
@@ -1887,16 +1900,29 @@ def _install_routes(app: FastAPI) -> None:
                 for product_id in merged:
                     products.append(_require_product(conn, product_id))
 
+                issued_prices = None
+                if idempotent_cash and body.catalogVersion is not None:
+                    issued_prices = catalog_unit_prices(
+                        conn, STORE_ID, body.catalogVersion, current_at=now,
+                    )
                 total_cents = 0
                 lines: list[dict[str, Any]] = []
                 for product in products:
-                    qty_milli = merged[int(product["id"])]
-                    line_total = line_total_cents(int(product["price_cents"]), qty_milli)
+                    product_id = int(product["id"])
+                    qty_milli = merged[product_id]
+                    if issued_prices is not None and product_id not in issued_prices:
+                        raise HTTPException(
+                            status_code=422,
+                            detail="El producto no está en el catálogo autorizado. Actualiza para cobrar.",
+                        )
+                    unit_price = int(product["price_cents"]) if issued_prices is None else issued_prices[product_id]
+                    line_total = line_total_cents(unit_price, qty_milli)
                     total_cents += line_total
                     lines.append(
                         {
                             "product": product,
                             "qty_milli": qty_milli,
+                            "unit_price": unit_price,
                             "line_total": line_total,
                         }
                     )
@@ -1911,6 +1937,11 @@ def _install_routes(app: FastAPI) -> None:
                     customer = _require_customer(conn, body.customerId)
 
                 if body.paymentMethod == "cash":
+                    if body.expectedTotalCents is not None and body.expectedTotalCents != total_cents:
+                        raise HTTPException(
+                            status_code=422,
+                            detail="El total cambió. Actualiza el catálogo antes de cobrar.",
+                        )
                     cash_received = (
                         total_cents if body.cashReceivedCents is None else body.cashReceivedCents
                     )
@@ -1975,7 +2006,7 @@ def _install_routes(app: FastAPI) -> None:
                             product["name"],
                             product["unit"],
                             line["qty_milli"],
-                            product["price_cents"],
+                            line["unit_price"],
                             line["line_total"],
                         ),
                     )
@@ -2006,6 +2037,8 @@ def _install_routes(app: FastAPI) -> None:
                     )
 
         except SyncError as exc:
+            if exc.code == "catalog_version_unavailable":
+                raise HTTPException(status_code=422, detail=exc.detail) from exc
             if exc.code == "stock_conflict":
                 return JSONResponse(
                     status_code=409,

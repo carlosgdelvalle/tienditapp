@@ -118,7 +118,8 @@ def test_offline_cash_uses_issued_price_after_catalog_edit_and_lost_ack(client, 
     assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == 23000
 
 
-def test_checkout_commit_survives_lost_response_and_offline_replay(settings, fake_pey, db):
+@pytest.mark.parametrize("change_price", [False, True])
+def test_checkout_commit_survives_lost_response_and_offline_replay(settings, fake_pey, db, change_price):
     device_id = "lost-checkout-response"
     event_id = "01HXRETRY00000000000000001"
     checkout = {
@@ -134,8 +135,19 @@ def test_checkout_commit_survives_lost_response_and_offline_replay(settings, fak
         event = sale_event(device_id, 1, event_id, lease["issuedAt"])
         event["catalogVersion"] = issued["snapshot"]["catalogVersion"]
         event["payload"] = checkout
+        if change_price:
+            db.execute("UPDATE products SET price_cents = 1900 WHERE id = 1")
+            db.commit()
         # Model the loss boundary by discarding the response after the request commits.
-        assert client.post("/api/sales", json=checkout, headers={"Idempotency-Key": event_id}).status_code == 200
+        response = client.post(
+            "/api/sales",
+            json=checkout | {
+                "catalogVersion": event["catalogVersion"],
+                "expectedTotalCents": 1800,
+            },
+            headers={"Idempotency-Key": event_id},
+        )
+        assert response.status_code == 200, response.text
 
     original_sales = db.execute("SELECT id FROM sales WHERE payment_method = 'cash'").fetchall()
     assert len(original_sales) == 1
@@ -147,8 +159,29 @@ def test_checkout_commit_survives_lost_response_and_offline_replay(settings, fak
             ack = sync(restarted, lease, [event])["acks"][0]
             assert ack["receipt"]["saleId"] == sale_id
             assert ack["receipt"]["totalCents"] == 1800
+            assert ack["receipt"]["changeCents"] == 200
 
     assert db.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == 1
     assert db.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 1
     assert db.execute("SELECT COUNT(*) FROM inventory_movements WHERE product_id = 1").fetchone()[0] == 1
     assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == 23000
+
+
+def test_stale_displayed_cash_total_is_rejected_before_sale_or_payment(client, db):
+    db.execute("UPDATE products SET price_cents = 1900 WHERE id = 1")
+    db.commit()
+    response = client.post(
+        "/api/sales",
+        json={
+            "employeeId": 1,
+            "items": [{"productId": 1, "qtyMilli": 1000}],
+            "paymentMethod": "cash",
+            "cashReceivedCents": 2000,
+            "expectedTotalCents": 1800,
+        },
+        headers={"Idempotency-Key": "01HXPRICE00000000000000001"},
+    )
+    assert response.status_code == 422
+    assert db.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == 0
+    assert db.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
+    assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == 24000
