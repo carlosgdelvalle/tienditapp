@@ -37,11 +37,25 @@ Roles (SIMULADO identity, X-Platform-Role header):
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from pydantic import BaseModel
+
+from .platform_auth import (
+    COOKIE_NAME,
+    INVITE_TTL_SECONDS,
+    PlatformAuth,
+    PlatformAuthError,
+    ROLE_LABELS,
+    ROLES,
+    SESSION_TTL_SECONDS,
+    SUPER_ROLES,
+    Staff,
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -92,8 +106,9 @@ SECTIONS: list[dict[str, str]] = [
 
 SECTION_BY_ID = {section["id"]: section for section in SECTIONS}
 
-# SaaS staff may open every section; a functional role may open only its own.
-_SUPER_ROLES = {"staff"}
+# Owners and administrators may open every section; a functional role may open
+# only its own.
+_SUPER_ROLES = {"owner", "admin"}
 
 
 def _role_allows(role: str, section_role: str) -> bool:
@@ -317,73 +332,304 @@ def _envelope(section_id: str, empty: bool) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Request bodies
+# ---------------------------------------------------------------------------
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class SetupIn(BaseModel):
+    name: str = ""
+    email: str
+    password: str
+
+
+class PasswordIn(BaseModel):
+    currentPassword: str
+    newPassword: str
+
+
+class InviteIn(BaseModel):
+    email: str
+    name: str = ""
+    role: str
+
+
+class AcceptInviteIn(BaseModel):
+    name: str = ""
+    password: str
+
+
+class StaffPatchIn(BaseModel):
+    role: str | None = None
+    active: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# Cookie + session helpers
+# ---------------------------------------------------------------------------
+
+
+def _request_is_https(request: Request) -> bool:
+    forwarded = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    return request.url.scheme == "https" or forwarded == "https"
+
+
+def _set_session_cookie(
+    response: Response, request: Request, token: str
+) -> None:
+    response.set_cookie(
+        COOKIE_NAME,
+        token,
+        max_age=SESSION_TTL_SECONDS,
+        httponly=True,
+        secure=_request_is_https(request),
+        samesite="lax",
+        path="/",
+    )
+
+
+def _require_staff(
+    request: Request, store: PlatformAuth, roles: set[str] | None = None
+) -> Staff:
+    staff = store.session_staff(request.cookies.get(COOKIE_NAME))
+    if staff is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Inicia sesión con tu cuenta del equipo Abarpay.",
+        )
+    if roles is not None and staff.role not in roles:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "insufficient_access",
+                "message": "Tu cuenta no tiene permiso para esta sección.",
+                "requiredRole": sorted(roles),
+            },
+        )
+    return staff
+
+
+# ---------------------------------------------------------------------------
 # register(app)
 # ---------------------------------------------------------------------------
 
 
 def register(app: Any) -> None:
+    settings = getattr(app.state, "settings", None)
+    db_path = Path(
+        getattr(settings, "db_path", None) or Path("server") / "data" / "abarpay.db"
+    )
+    store = PlatformAuth(db_path)
+    store.ensure_schema()
+    store.bootstrap(os.environ)
+    app.state.platform_auth = store
+
     api = APIRouter(prefix="/api/platform")
 
+    def auth_error(error: PlatformAuthError) -> HTTPException:
+        return HTTPException(status_code=error.status_code, detail=str(error))
+
+    # -- authentication -------------------------------------------------
+    @api.get("/auth/me")
+    def auth_me(request: Request) -> JSONResponse:
+        staff = store.session_staff(request.cookies.get(COOKIE_NAME))
+        staff_count = store.count_staff()
+        return JSONResponse(
+            content={
+                "authenticated": staff is not None,
+                "configured": staff_count > 0,
+                "setupOpen": staff_count == 0
+                and os.environ.get("ABARPAY_PLATFORM_SETUP_OPEN", "").strip() == "1",
+                "staff": staff.payload() if staff else None,
+            }
+        )
+
+    @api.post("/auth/setup", status_code=201)
+    def auth_setup(body: SetupIn, request: Request) -> JSONResponse:
+        if os.environ.get("ABARPAY_PLATFORM_SETUP_OPEN", "").strip() != "1":
+            raise HTTPException(
+                status_code=403,
+                detail="El alta inicial está cerrada. Pide una invitación al propietario.",
+            )
+        try:
+            staff = store.create_owner(
+                email=body.email, name=body.name, password=body.password
+            )
+        except PlatformAuthError as error:
+            raise auth_error(error) from error
+        token = store.create_session(staff.id)
+        payload = JSONResponse(
+            status_code=201, content={"staff": staff.payload()}
+        )
+        _set_session_cookie(payload, request, token)
+        return payload
+
+    @api.post("/auth/login")
+    def auth_login(body: LoginIn, request: Request) -> JSONResponse:
+        client_ip = (request.client.host if request.client else "") or ""
+        try:
+            staff = store.authenticate(
+                body.email, body.password, client_ip=client_ip
+            )
+        except PlatformAuthError as error:
+            raise auth_error(error) from error
+        if staff is None:
+            raise HTTPException(
+                status_code=401, detail="Correo o contraseña incorrectos."
+            )
+        token = store.create_session(staff.id)
+        payload = JSONResponse(content={"staff": staff.payload()})
+        _set_session_cookie(payload, request, token)
+        return payload
+
+    @api.post("/auth/logout", status_code=204)
+    def auth_logout(request: Request) -> Response:
+        store.revoke_session(request.cookies.get(COOKIE_NAME))
+        response = Response(status_code=204, headers={"Cache-Control": "no-store"})
+        response.delete_cookie(
+            COOKIE_NAME, httponly=True, samesite="lax", path="/"
+        )
+        return response
+
+    @api.post("/auth/password")
+    def auth_password(body: PasswordIn, request: Request) -> JSONResponse:
+        staff = _require_staff(request, store)
+        token = request.cookies.get(COOKIE_NAME)
+        try:
+            store.change_password(
+                staff.id,
+                body.currentPassword,
+                body.newPassword,
+                keep_token=token,
+            )
+        except PlatformAuthError as error:
+            raise auth_error(error) from error
+        updated = store.get_staff(staff.id)
+        return JSONResponse(
+            content={"staff": updated.payload() if updated else staff.payload()}
+        )
+
+    # -- team -----------------------------------------------------------
+    @api.get("/team")
+    def team_list(request: Request) -> JSONResponse:
+        _require_staff(request, store, set(SUPER_ROLES))
+        return JSONResponse(
+            content={
+                "items": store.list_staff(),
+                "roles": [
+                    {"id": role, "label": ROLE_LABELS[role]} for role in ROLES
+                ],
+            }
+        )
+
+    @api.post("/team/invites", status_code=201)
+    def team_invite(body: InviteIn, request: Request) -> JSONResponse:
+        actor = _require_staff(request, store, set(SUPER_ROLES))
+        try:
+            token, expires = store.invite(
+                email=body.email, name=body.name, role=body.role, actor=actor
+            )
+        except PlatformAuthError as error:
+            raise auth_error(error) from error
+        return JSONResponse(
+            status_code=201,
+            content={
+                "inviteUrl": "/platform/invite/" + token,
+                "expiresAt": expires.isoformat(timespec="seconds"),
+            },
+        )
+
+    @api.get("/team/invites/{token}")
+    def team_invite_preview(token: str) -> JSONResponse:
+        try:
+            return JSONResponse(content=store.invite_preview(token))
+        except PlatformAuthError as error:
+            raise auth_error(error) from error
+
+    @api.post("/team/invites/{token}")
+    def team_invite_accept(
+        token: str, body: AcceptInviteIn, request: Request
+    ) -> JSONResponse:
+        try:
+            staff = store.accept_invite(
+                token, name=body.name, password=body.password
+            )
+        except PlatformAuthError as error:
+            raise auth_error(error) from error
+        session = store.create_session(staff.id)
+        payload = JSONResponse(content={"staff": staff.payload()})
+        _set_session_cookie(payload, request, session)
+        return payload
+
+    @api.patch("/team/{staff_id}")
+    def team_patch(
+        staff_id: str, body: StaffPatchIn, request: Request
+    ) -> JSONResponse:
+        actor = _require_staff(request, store, set(SUPER_ROLES))
+        try:
+            staff = store.patch_staff(
+                staff_id, actor=actor, role=body.role, active=body.active
+            )
+        except PlatformAuthError as error:
+            raise auth_error(error) from error
+        return JSONResponse(content={"staff": staff.payload()})
+
+    # -- catalog and sections -------------------------------------------
     @api.get("/meta")
     def platform_meta() -> JSONResponse:
         return JSONResponse(
-            content={
-                "simulado": True,
-                "sections": SECTIONS,
-                "roles": ["staff", "operations", "marketing", "finance", "analyst"],
-            }
+            content={"simulado": True, "sections": SECTIONS, "roles": list(ROLES)}
         )
 
     @api.get("/{section_id}")
     def platform_section(
-        section_id: str,
-        request: Request,
-        fixture: str = "data",
-        x_platform_role: str | None = Header(default=None, alias="X-Platform-Role"),
+        section_id: str, request: Request, fixture: str = "data"
     ) -> JSONResponse:
         if section_id not in SECTION_BY_ID:
             raise HTTPException(status_code=404, detail="Sección no encontrada")
         section = SECTION_BY_ID[section_id]
-
-        # Access separation is enforced on the server, never only in the UI.
-        if not x_platform_role:
-            raise HTTPException(
-                status_code=401,
-                detail="Falta rol de plataforma (header X-Platform-Role)",
-            )
-        if not _role_allows(x_platform_role.strip().lower(), section["role"]):
+        staff = _require_staff(request, store)
+        if not _role_allows(staff.role, section["role"]):
             raise HTTPException(
                 status_code=403,
                 detail={
                     "code": "insufficient_access",
-                    "message": "Acceso insuficiente para esta sección",
-                    "providedRole": x_platform_role,
+                    "message": "Tu cuenta no tiene permiso para esta sección.",
+                    "providedRole": staff.role,
                     "requiredRole": section["role"],
                 },
             )
-
         empty = fixture.strip().lower() == "empty"
         return JSONResponse(content=_envelope(section_id, empty))
 
+    # -- pages -----------------------------------------------------------
     @app.get("/platform", include_in_schema=False)
     def platform_page(request: Request) -> FileResponse:
-        static_dir = Path(
-            getattr(getattr(request.app.state, "settings", None), "static_dir", None)
-            or STATIC_DIR
-        )
-        page = static_dir / "platform.html"
-        if not page.exists():
-            raise HTTPException(
-                status_code=500, detail="Consola de plataforma no instalada"
-            )
-        return FileResponse(
-            page,
-            media_type="text/html",
-            headers={"Cache-Control": "no-store"},
-        )
+        return _serve_page(request)
 
     @app.get("/platform/", include_in_schema=False)
     def platform_page_slash() -> RedirectResponse:
         return RedirectResponse(url="/platform")
 
+    @app.get("/platform/invite/{token}", include_in_schema=False)
+    def platform_invite_page(token: str, request: Request) -> FileResponse:
+        return _serve_page(request)
+
     app.include_router(api)
+
+
+def _serve_page(request: Request) -> FileResponse:
+    static_dir = Path(
+        getattr(getattr(request.app.state, "settings", None), "static_dir", None)
+        or STATIC_DIR
+    )
+    page = static_dir / "platform.html"
+    if not page.exists():
+        raise HTTPException(status_code=500, detail="Consola de plataforma no instalada")
+    return FileResponse(
+        page, media_type="text/html", headers={"Cache-Control": "no-store"}
+    )

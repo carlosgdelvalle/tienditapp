@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Abarpay · Plataforma SaaS</title>
+  <title>Abarpay · Plataforma</title>
   <style>
     :root {
       --purple: #2a0065;
@@ -14,15 +14,14 @@
       --soft-amber: #fff0d9;
       --soft-green: #e4f4da;
       --green-app: #297a00;
-      --amber-app: #9a5600;
-      --muted-app: #666680;
+      --amber-app: #8a4b00;
+      --muted-app: #5c5c74;
       --line-soft: #f0eaf9;
       --red: #b3261e;
       --red-soft: #fbe4e2;
       --ink: var(--purple);
-      --paper: var(--lavender);
       --card: #ffffff;
-      --line: #e7ddf6;
+      --line: #ddd0ef;
       --radius-card: 18px;
       --radius-control: 12px;
       --shadow-card: 0 1px 2px rgba(42, 0, 101, 0.05), 0 10px 26px rgba(42, 0, 101, 0.06);
@@ -40,6 +39,7 @@
       -webkit-font-smoothing: antialiased;
     }
     button, select, input { font: inherit; }
+    [hidden] { display: none !important; }
 
     .shell { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
 
@@ -57,13 +57,49 @@
     }
     .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--amber-app); }
     .spacer { flex: 1; }
-    .role-box { display: flex; align-items: center; gap: 8px; }
-    .role-box label { font-size: 13px; color: var(--muted-app); }
-    .role-box select {
-      border: 1px solid var(--line); background: var(--card); color: var(--ink);
-      border-radius: var(--radius-control); padding: 8px 12px; min-width: 150px;
+    .account { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .account .who { font-size: 13.5px; color: var(--muted-app); }
+    .account .who strong { color: var(--ink); }
+    .link {
+      border: 0; background: transparent; color: var(--violet-deep);
+      font-weight: 700; cursor: pointer; text-decoration: underline;
+      padding: 8px; border-radius: 8px;
     }
-    .role-box select:focus { outline: 2px solid var(--violet); outline-offset: 1px; }
+    .link:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+
+    .auth-card {
+      max-width: 470px; margin: 6vh auto 0; background: var(--card);
+      border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+      padding: 28px;
+    }
+    .auth-card h2 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.01em; }
+    .auth-card .muted { color: var(--muted-app); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+    .auth-card a { color: var(--violet-deep); font-weight: 650; }
+    .auth-card form { display: grid; gap: 14px; }
+    .auth-card label { display: grid; gap: 6px; font-size: 13.5px; font-weight: 650; }
+    .auth-card input, .auth-card select {
+      min-height: 46px; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: var(--radius-control); background: #fff; color: var(--ink);
+      width: 100%;
+    }
+    .auth-card input:focus, .auth-card select:focus {
+      outline: 3px solid var(--violet); outline-offset: 1px; border-color: var(--violet);
+    }
+    .auth-card button[type="submit"] {
+      min-height: 48px; border: 0; border-radius: var(--radius-control);
+      background: var(--violet); color: #fff; font-weight: 750; font-size: 15px;
+      cursor: pointer;
+    }
+    .auth-card button[type="submit"]:hover { background: var(--violet-deep); }
+    .auth-card button[type="submit"]:disabled { opacity: 0.55; cursor: wait; }
+    .auth-card button:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+    .status { min-height: 20px; font-size: 13.5px; margin: 14px 0 0; }
+    .status.error { color: #8e251d; }
+    .status.ok { color: var(--green-app); }
+    .hint {
+      font-size: 13px; color: #6b4400; background: var(--soft-amber);
+      padding: 10px 12px; border-radius: 10px; line-height: 1.45;
+    }
 
     .tabs {
       display: flex; gap: 8px; flex-wrap: wrap;
@@ -77,6 +113,7 @@
     }
     .tab:hover { color: var(--ink); }
     .tab.active { color: var(--violet); border-bottom-color: var(--violet); }
+    .tab:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
 
     .controls { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
     .controls label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-app); cursor: pointer; }
@@ -91,7 +128,7 @@
     .state { display: grid; place-items: center; text-align: center; padding: 48px 16px; color: var(--muted-app); }
     .state .glyph { font-size: 34px; margin-bottom: 10px; }
     .state .msg { font-size: 15px; max-width: 460px; }
-    .state .hint { font-size: 13px; color: var(--muted-app); margin-top: 6px; opacity: 0.8; }
+    .state .hint { font-size: 13px; color: var(--muted-app); margin-top: 6px; opacity: 0.85; }
     .spinner {
       width: 28px; height: 28px; border: 3px solid var(--soft-violet);
       border-top-color: var(--violet); border-radius: 50%;
@@ -126,7 +163,50 @@
     .funnel-stage .bar { background: var(--violet); height: 100%; border-radius: 6px; min-width: 2px; }
     .funnel-stage .stage-value { width: 48px; flex: none; font-size: 12.5px; font-weight: 700; }
 
-    @media (max-width: 640px) {
+    .team-form {
+      display: grid; grid-template-columns: 1.4fr 1fr 1fr auto;
+      gap: 10px; align-items: end; margin-bottom: 20px;
+    }
+    .team-form label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 650; color: var(--muted-app); }
+    .team-form input, .team-form select {
+      min-height: 42px; padding: 8px 10px; border: 1px solid var(--line);
+      border-radius: 10px; background: #fff; color: var(--ink); width: 100%;
+    }
+    .team-form button {
+      min-height: 42px; padding: 8px 16px; border: 0; border-radius: 10px;
+      background: var(--violet); color: #fff; font-weight: 700; cursor: pointer;
+    }
+    .team-form button:disabled { opacity: 0.55; cursor: wait; }
+    .team-table select { min-height: 38px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+    .team-table button {
+      min-height: 38px; padding: 6px 12px; border: 1px solid var(--line);
+      background: #fff; border-radius: 9px; color: var(--ink); font-weight: 650; cursor: pointer;
+    }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--soft-green); color: var(--green-app); }
+    .pill.off { background: var(--red-soft); color: var(--red); }
+    .pill.pending { background: var(--soft-amber); color: var(--amber-app); }
+    .invite-box { background: var(--soft-violet); border-radius: 12px; padding: 14px; margin-bottom: 18px; overflow-wrap: anywhere; }
+    .invite-box input { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; margin-top: 8px; background: #fff; }
+    .invite-box .row { display: flex; gap: 8px; margin-top: 8px; }
+    .invite-box button {
+      min-height: 42px; padding: 8px 14px; border: 1px solid var(--violet);
+      background: #fff; color: var(--violet-deep); border-radius: 9px; font-weight: 700; cursor: pointer;
+    }
+    .expiry { font-size: 12.5px; color: var(--muted-app); margin-top: 6px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(42, 0, 101, 0.45); display: grid; place-items: center; padding: 20px; z-index: 20; }
+    .modal-card { background: #fff; border-radius: 18px; padding: 26px; max-width: 440px; width: 100%; box-shadow: 0 20px 60px rgba(42, 0, 101, 0.3); }
+    .modal-card h3 { margin: 0 0 8px; font-size: 20px; }
+    .modal-card p { color: var(--muted-app); font-size: 14px; margin: 0 0 16px; }
+    .modal-card form { display: grid; gap: 12px; }
+    .modal-card label { display: grid; gap: 5px; font-size: 13px; font-weight: 650; }
+    .modal-card input { min-height: 44px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; width: 100%; }
+    .modal-card .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+    .modal-card .primary { min-height: 44px; padding: 9px 18px; border: 0; border-radius: 10px; background: var(--violet); color: #fff; font-weight: 700; cursor: pointer; }
+    .modal-card .secondary { min-height: 44px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font-weight: 650; cursor: pointer; }
+
+    @media (max-width: 760px) {
+      .team-form { grid-template-columns: 1fr; }
       .topbar { flex-direction: column; align-items: flex-start; }
       .spacer { display: none; }
     }
@@ -140,28 +220,110 @@
         <span class="badge">SIMULADO</span>
       </div>
       <div class="spacer"></div>
-      <div class="role-box">
-        <label for="role">Rol (identidad simulada)</label>
-        <select id="role">
-          <option value="staff" selected>staff · todas las secciones</option>
-          <option value="operations">operations · Salud</option>
-          <option value="marketing">marketing · Crecimiento</option>
-          <option value="finance">finance · Ingresos</option>
-          <option value="analyst">analyst · Datos</option>
-        </select>
+      <div class="account" id="account" hidden>
+        <span class="who" id="who"></span>
+        <button type="button" class="link" id="logout">Cerrar sesión</button>
       </div>
     </div>
 
-    <div class="tabs" id="tabs"></div>
+    <section class="auth-card" id="login-view" hidden aria-labelledby="login-title">
+      <h2 id="login-title">Acceso del equipo Abarpay</h2>
+      <p class="muted">
+        Consola interna para operar la plataforma. Si eres dueño de una tienda,
+        entra a <a href="/console">la consola de tu tienda</a>.
+      </p>
+      <form id="login-form" novalidate>
+        <label for="login-email">Correo
+          <input id="login-email" type="email" autocomplete="username" required>
+        </label>
+        <label for="login-password">Contraseña
+          <input id="login-password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" id="login-submit">Entrar</button>
+      </form>
+      <p class="status" id="login-status" role="status" aria-live="polite"></p>
+      <p class="hint" id="login-hint" hidden></p>
+    </section>
 
-    <div class="controls">
-      <label>
-        <input type="checkbox" id="emptyToggle">
-        Mostrar estado vacío (SIMULADO)
-      </label>
+    <section class="auth-card" id="invite-view" hidden aria-labelledby="invite-title">
+      <h2 id="invite-title">Activa tu acceso</h2>
+      <p class="muted" id="invite-copy"></p>
+      <form id="invite-form" novalidate>
+        <label for="invite-name">Tu nombre
+          <input id="invite-name" autocomplete="name">
+        </label>
+        <label for="invite-password">Contraseña (mínimo 10 caracteres)
+          <input id="invite-password" type="password" autocomplete="new-password" required>
+        </label>
+        <label for="invite-password2">Repite la contraseña
+          <input id="invite-password2" type="password" autocomplete="new-password" required>
+        </label>
+        <button type="submit" id="invite-submit">Activar acceso</button>
+      </form>
+      <p class="status" id="invite-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="auth-card" id="setup-view" hidden aria-labelledby="setup-title">
+      <h2 id="setup-title">Crea la cuenta de propietario</h2>
+      <p class="muted">
+        Es la primera vez que se abre esta consola. Esta cuenta administra el
+        acceso del resto del equipo.
+      </p>
+      <form id="setup-form" novalidate>
+        <label for="setup-name">Tu nombre
+          <input id="setup-name" autocomplete="name" required>
+        </label>
+        <label for="setup-email">Correo
+          <input id="setup-email" type="email" autocomplete="username" required>
+        </label>
+        <label for="setup-password">Contraseña (mínimo 10 caracteres)
+          <input id="setup-password" type="password" autocomplete="new-password" required>
+        </label>
+        <label for="setup-password2">Repite la contraseña
+          <input id="setup-password2" type="password" autocomplete="new-password" required>
+        </label>
+        <button type="submit" id="setup-submit">Crear cuenta y entrar</button>
+      </form>
+      <p class="status" id="setup-status" role="status" aria-live="polite"></p>
+      <p class="muted" style="margin:14px 0 0; font-size:13px;">
+        Si ya existe una cuenta,
+        <button type="button" class="link" id="setup-to-login" style="padding:0;">inicia sesión</button>.
+      </p>
+    </section>
+
+    <div id="app-view" hidden>
+      <nav class="tabs" id="tabs" aria-label="Secciones de la plataforma"></nav>
+      <div class="controls">
+        <label>
+          <input type="checkbox" id="emptyToggle">
+          Mostrar estado vacío (SIMULADO)
+        </label>
+      </div>
+      <div class="panel" id="panel"></div>
     </div>
+  </div>
 
-    <div class="panel" id="panel"></div>
+  <div class="modal" id="password-modal" hidden role="dialog" aria-modal="true" aria-labelledby="password-title">
+    <div class="modal-card">
+      <h3 id="password-title">Cambia tu contraseña</h3>
+      <p id="password-copy">Tu cuenta se creó con una contraseña temporal. Define una propia para continuar.</p>
+      <form id="password-form" novalidate>
+        <label for="password-current">Contraseña actual
+          <input id="password-current" type="password" autocomplete="current-password" required>
+        </label>
+        <label for="password-new">Contraseña nueva (mínimo 10 caracteres)
+          <input id="password-new" type="password" autocomplete="new-password" required>
+        </label>
+        <label for="password-new2">Repite la contraseña nueva
+          <input id="password-new2" type="password" autocomplete="new-password" required>
+        </label>
+        <p class="status" id="password-status" role="status" aria-live="polite"></p>
+        <div class="actions">
+          <button type="button" class="secondary" id="password-later">Salir</button>
+          <button type="submit" class="primary">Guardar</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
@@ -171,64 +333,141 @@
       { id: "ingresos", title: "Ingresos", subtitle: "Ingreso SaaS y finanzas", role: "finance" },
       { id: "datos", title: "Datos", subtitle: "Comunidad, socios y analista", role: "analyst" }
     ];
-
-    var activeId = "salud";
-    var tabsEl = document.getElementById("tabs");
-    var panelEl = document.getElementById("panel");
-    var roleEl = document.getElementById("role");
-    var emptyToggle = document.getElementById("emptyToggle");
+    var TEAM = { id: "equipo", title: "Equipo", subtitle: "Acceso del equipo Abarpay", role: "owner" };
+    var SUPER_ROLES = ["owner", "admin"];
+    var state = { staff: null, activeId: "salud" };
 
     var mxnFmt = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
     var intFmt = new Intl.NumberFormat("es-MX");
 
-    function esc(s) {
-      return String(s).replace(/[&<>"]/g, function (c) {
+    function $(id) { return document.getElementById(id); }
+
+    function esc(value) {
+      return String(value).replace(/[&<>"]/g, function (c) {
         return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
       });
     }
 
+    async function api(path, options) {
+      var init = options || {};
+      var headers = { Accept: "application/json" };
+      if (init.body !== undefined) headers["Content-Type"] = "application/json";
+      var response = await fetch(path, {
+        method: init.method || "GET",
+        headers: headers,
+        credentials: "same-origin",
+        cache: "no-store",
+        body: init.body === undefined ? undefined : JSON.stringify(init.body)
+      });
+      if (response.status === 204) return null;
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        var detail = data && data.detail;
+        var message = typeof detail === "string" ? detail
+          : (detail && detail.message) || "No se pudo completar la operación.";
+        var error = new Error(message);
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    }
+
+    function setStatus(id, message, kind) {
+      var el = $(id);
+      el.textContent = message || "";
+      el.classList.toggle("error", kind === "error");
+      el.classList.toggle("ok", kind === "ok");
+    }
+
+    function showLogin(info) {
+      var options = info || {};
+      $("app-view").hidden = true;
+      $("invite-view").hidden = true;
+      $("account").hidden = true;
+      if (options.setupOpen) {
+        $("login-view").hidden = true;
+        $("setup-view").hidden = false;
+        $("setup-name").focus();
+        return;
+      }
+      $("setup-view").hidden = true;
+      $("login-view").hidden = false;
+      $("login-hint").hidden = options.configured !== false;
+      if (options.configured === false) {
+        $("login-hint").textContent =
+          "La consola todavía no tiene cuentas. Define ABARPAY_PLATFORM_ADMIN_EMAIL y " +
+          "ABARPAY_PLATFORM_ADMIN_PASSWORD en el entorno del servicio y vuelve a desplegar.";
+        $("login-submit").disabled = true;
+      } else {
+        $("login-submit").disabled = false;
+      }
+      $("login-email").focus();
+    }
+
+    function enterApp(staff) {
+      state.staff = staff;
+      $("login-view").hidden = true;
+      $("setup-view").hidden = true;
+      $("invite-view").hidden = true;
+      $("app-view").hidden = false;
+      $("account").hidden = false;
+      $("who").innerHTML = "Sesión de <strong>" + esc(staff.name) + "</strong> · " + esc(staff.roleLabel);
+      if (!visibleSections().some(function (s) { return s.id === state.activeId; })) {
+        state.activeId = visibleSections()[0].id;
+      }
+      buildTabs();
+      render();
+      if (staff.mustChangePassword) openPasswordModal(true);
+    }
+
+    function visibleSections() {
+      if (!state.staff) return [];
+      var sections = SECTIONS.filter(function (section) {
+        return SUPER_ROLES.indexOf(state.staff.role) >= 0 || section.role === state.staff.role;
+      });
+      if (SUPER_ROLES.indexOf(state.staff.role) >= 0) sections = sections.concat([TEAM]);
+      return sections;
+    }
+
     function buildTabs() {
+      var tabsEl = $("tabs");
       tabsEl.innerHTML = "";
-      SECTIONS.forEach(function (s) {
-        var b = document.createElement("button");
-        b.className = "tab" + (s.id === activeId ? " active" : "");
-        b.textContent = s.title;
-        b.setAttribute("aria-label", s.subtitle);
-        b.addEventListener("click", function () {
-          activeId = s.id;
+      visibleSections().forEach(function (section) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "tab" + (section.id === state.activeId ? " active" : "");
+        button.textContent = section.title;
+        button.title = section.subtitle;
+        button.addEventListener("click", function () {
+          state.activeId = section.id;
           buildTabs();
           render();
         });
-        tabsEl.appendChild(b);
+        tabsEl.appendChild(button);
       });
+      var showEmpty = state.activeId !== "equipo";
+      $("emptyToggle").closest(".controls").hidden = !showEmpty;
     }
 
     function showLoading() {
-      panelEl.innerHTML =
-        '<div class="state"><div class="spinner"></div>' +
-        '<div class="msg">Cargando…</div></div>';
+      $("panel").innerHTML =
+        '<div class="state"><div class="spinner"></div><div class="msg">Cargando…</div></div>';
     }
 
-    function showInsufficientAccess(message) {
-      panelEl.innerHTML =
-        '<div class="state"><div class="glyph">🔒</div>' +
+    function showMessage(glyph, message, hint) {
+      $("panel").innerHTML =
+        '<div class="state"><div class="glyph">' + glyph + '</div>' +
         '<div class="msg">' + esc(message) + '</div>' +
-        '<div class="hint">Cambia el rol para ver esta sección.</div></div>';
-    }
-
-    function showEmpty(message) {
-      panelEl.innerHTML =
-        '<div class="state"><div class="glyph">📭</div>' +
-        '<div class="msg">' + esc(message) + '</div></div>';
+        (hint ? '<div class="hint">' + esc(hint) + '</div>' : '') + '</div>';
     }
 
     function fmtValue(block) {
-      var v = block.value;
-      if (v === null || v === undefined) return "Sin datos suficientes";
-      if (block.kind === "moneyCents") return mxnFmt.format(v / 100);
-      if (block.kind === "count") return intFmt.format(v);
-      if (block.kind === "percent") return v + "%";
-      return String(v);
+      var value = block.value;
+      if (value === null || value === undefined) return "Sin datos suficientes";
+      if (block.kind === "moneyCents") return mxnFmt.format(value / 100);
+      if (block.kind === "count") return intFmt.format(value);
+      if (block.kind === "percent") return value + "%";
+      return String(value);
     }
 
     function renderMetric(block) {
@@ -240,7 +479,7 @@
 
     function renderTable(block) {
       var html = '<div class="table-wrap"><table><thead><tr>';
-      block.columns.forEach(function (c) { html += '<th>' + esc(c) + '</th>'; });
+      block.columns.forEach(function (column) { html += '<th>' + esc(column) + '</th>'; });
       html += '</tr></thead><tbody>';
       block.rows.forEach(function (row) {
         html += '<tr>';
@@ -265,12 +504,12 @@
       block.campaigns.forEach(function (campaign) {
         html += '<div class="funnel-campaign"><div class="name">Campaña ' + esc(campaign.name) + '</div>';
         var max = 1;
-        campaign.stages.forEach(function (st) { if (st.value > max) max = st.value; });
-        campaign.stages.forEach(function (st) {
-          var pct = Math.max(2, Math.round((st.value / max) * 100));
-          html += '<div class="funnel-stage"><div class="stage-label">' + esc(st.label) + '</div>' +
+        campaign.stages.forEach(function (stage) { if (stage.value > max) max = stage.value; });
+        campaign.stages.forEach(function (stage) {
+          var pct = Math.max(2, Math.round((stage.value / max) * 100));
+          html += '<div class="funnel-stage"><div class="stage-label">' + esc(stage.label) + '</div>' +
             '<div class="bar-track"><div class="bar" style="width:' + pct + '%"></div></div>' +
-            '<div class="stage-value">' + intFmt.format(st.value) + '</div></div>';
+            '<div class="stage-value">' + intFmt.format(stage.value) + '</div></div>';
         });
         html += '</div>';
       });
@@ -292,7 +531,6 @@
         '<div class="meta-line"><span>Rol mínimo: ' + esc(data.role) + '</span>' +
         '<span>Último cálculo: ' + (data.lastCalcAt ? esc(data.lastCalcAt) : "Sin cálculo (SIMULADO)") + '</span>' +
         (data.delayed ? '<span>Datos con retraso</span>' : '') + '</div></div>';
-
       if (data.empty) {
         html += '<div class="state"><div class="glyph">📭</div><div class="msg">' +
           esc(data.emptyMessage) + '</div></div>';
@@ -300,51 +538,316 @@
         var metricHtml = "";
         var restHtml = "";
         data.blocks.forEach(function (block) {
-          if (block.type === "metric") { metricHtml += renderMetric(block); }
-          else { restHtml += renderBlock(block); }
+          if (block.type === "metric") metricHtml += renderMetric(block);
+          else restHtml += renderBlock(block);
         });
         if (metricHtml) html += '<div class="grid">' + metricHtml + '</div>';
         html += restHtml;
       }
-      panelEl.innerHTML = html;
+      $("panel").innerHTML = html;
+    }
+
+    async function renderSection() {
+      var section = SECTIONS.find(function (s) { return s.id === state.activeId; });
+      if (!section) return;
+      showLoading();
+      var url = "/api/platform/" + section.id;
+      if ($("emptyToggle").checked) url += "?fixture=empty";
+      try {
+        renderData(await api(url));
+      } catch (error) {
+        if (error.status === 401) {
+          showLogin({ configured: true });
+          setStatus("login-status", "Tu sesión terminó. Vuelve a entrar.", "error");
+        } else if (error.status === 403) {
+          showMessage("🔒", error.message, "Pide acceso al propietario de la cuenta.");
+        } else {
+          showMessage("⚠️", "No se pudo cargar la sección.", "Revisa tu conexión e intenta de nuevo.");
+        }
+      }
+    }
+
+    function roleOptions(selected, actorRole) {
+      var roles = [
+        ["operations", "Operaciones"],
+        ["marketing", "Crecimiento"],
+        ["finance", "Ingresos"],
+        ["analyst", "Datos"]
+      ];
+      if (actorRole === "owner") {
+        roles.push(["admin", "Administrador"]);
+        roles.push(["owner", "Propietario"]);
+      }
+      return roles.map(function (pair) {
+        return '<option value="' + pair[0] + '"' + (pair[0] === selected ? " selected" : "") + ">" +
+          esc(pair[1]) + "</option>";
+      }).join("");
+    }
+
+    async function renderTeam() {
+      showLoading();
+      try {
+        var data = await api("/api/platform/team");
+        var rows = data.items.map(function (person) {
+          var status = person.pendingInvite
+            ? '<span class="pill pending">Invitación pendiente</span>'
+            : person.active
+              ? '<span class="pill">Activo</span>'
+              : '<span class="pill off">Sin acceso</span>';
+          var isSelf = state.staff && person.id === state.staff.id;
+          var controls = "";
+          if (!isSelf) {
+            controls = '<select data-role="1" data-id="' + esc(person.id) + '" aria-label="Rol de ' +
+              esc(person.name) + '">' + roleOptions(person.role, state.staff.role) + "</select> " +
+              '<button type="button" data-toggle="' + (person.active ? "0" : "1") + '" data-id="' +
+              esc(person.id) + '">' + (person.active ? "Quitar acceso" : "Dar acceso") + "</button>";
+          }
+          return "<tr><td><strong>" + esc(person.name) + "</strong><br><span class='muted'>" +
+            esc(person.email) + "</span></td><td>" + esc(person.roleLabel) + "</td><td>" +
+            status + "</td><td>" + controls + "</td></tr>";
+        }).join("");
+        var html = '<div class="panel-head"><h2>Equipo Abarpay</h2>' +
+          '<p class="sub">Quién puede entrar a esta consola y qué sección ve.</p></div>' +
+          '<form class="team-form" id="team-invite-form">' +
+          '<label>Correo<input id="invite-email" type="email" autocomplete="off" required></label>' +
+          '<label>Nombre<input id="invite-person-name" autocomplete="off" required></label>' +
+          '<label>Rol<select id="invite-role">' + roleOptions("operations", state.staff.role) + '</select></label>' +
+          '<button type="submit" id="invite-submit">Invitar</button></form>' +
+          '<div id="invite-result"></div>' +
+          '<div class="table-wrap"><table class="team-table"><thead><tr>' +
+          '<th>Persona</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' +
+          (rows || '<tr><td colspan="4">Todavía no hay cuentas.</td></tr>') +
+          '</tbody></table></div>' +
+          '<p class="status" id="team-status" role="status" aria-live="polite"></p>';
+        $("panel").innerHTML = html;
+        $("team-invite-form").addEventListener("submit", sendInvite);
+      } catch (error) {
+        if (error.status === 401) {
+          showLogin({ configured: true });
+        } else {
+          showMessage("⚠️", error.message || "No se pudo cargar el equipo.");
+        }
+      }
+    }
+
+    async function sendInvite(event) {
+      event.preventDefault();
+      var button = $("invite-submit");
+      button.disabled = true;
+      setStatus("team-status", "Creando invitación…");
+      try {
+        var result = await api("/api/platform/team/invites", {
+          method: "POST",
+          body: {
+            email: $("invite-email").value,
+            name: $("invite-person-name").value,
+            role: $("invite-role").value
+          }
+        });
+        var link = location.origin + result.inviteUrl;
+        $("invite-result").innerHTML =
+          '<div class="invite-box"><strong>Comparte este enlace con la persona.</strong>' +
+          "<div>Se muestra una sola vez. Vence: " +
+          esc(new Date(result.expiresAt).toLocaleString("es-MX")) + "</div>" +
+          '<input id="invite-link" readonly value="' + esc(link) + '">' +
+          '<div class="row"><button type="button" id="copy-invite">Copiar enlace</button></div></div>';
+        $("copy-invite").addEventListener("click", async function () {
+          try {
+            await navigator.clipboard.writeText(link);
+            setStatus("team-status", "Enlace copiado.", "ok");
+          } catch (_) {
+            $("invite-link").select();
+            setStatus("team-status", "Selecciona y copia el enlace manualmente.", "error");
+          }
+        });
+        setStatus("team-status", "Invitación creada.", "ok");
+        $("invite-email").value = "";
+        $("invite-person-name").value = "";
+      } catch (error) {
+        setStatus("team-status", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function patchStaff(staffId, body) {
+      setStatus("team-status", "Guardando…");
+      try {
+        await api("/api/platform/team/" + encodeURIComponent(staffId), { method: "PATCH", body: body });
+        setStatus("team-status", "Cambio guardado.", "ok");
+        renderTeam();
+      } catch (error) {
+        setStatus("team-status", error.message, "error");
+      }
     }
 
     function render() {
-      showLoading();
-      var section = SECTIONS.find(function (s) { return s.id === activeId; });
-      if (!section) return;
-      var url = "/api/platform/" + section.id;
-      if (emptyToggle.checked) url += "?fixture=empty";
-      fetch(url, { headers: { "X-Platform-Role": roleEl.value } })
-        .then(function (resp) {
-          return resp.json().catch(function () { return {}; }).then(function (body) {
-            return { ok: resp.ok, status: resp.status, body: body };
-          });
-        })
-        .then(function (r) {
-          if (r.status === 401) {
-            showInsufficientAccess(r.body && r.body.detail ? r.body.detail : "Falta rol de plataforma.");
-          } else if (r.status === 403) {
-            var msg = "Acceso insuficiente para esta sección.";
-            if (r.body && r.body.detail && r.body.detail.message) msg = r.body.detail.message;
-            showInsufficientAccess(msg);
-          } else if (!r.ok) {
-            showEmpty("No se pudo cargar la sección (error " + r.status + ").");
-          } else if (r.body.empty) {
-            showEmpty(r.body.emptyMessage || "Sin datos.");
-          } else {
-            renderData(r.body);
-          }
-        })
-        .catch(function () {
-          showEmpty("No se pudo conectar con la plataforma.");
-        });
+      if (state.activeId === "equipo") renderTeam();
+      else renderSection();
     }
 
-    roleEl.addEventListener("change", render);
-    emptyToggle.addEventListener("change", render);
-    buildTabs();
-    render();
+    function openPasswordModal(forced) {
+      $("password-modal").hidden = false;
+      $("password-later").hidden = !forced;
+      $("password-current").focus();
+    }
+
+    function closePasswordModal() {
+      $("password-modal").hidden = true;
+      $("password-form").reset();
+      setStatus("password-status", "");
+    }
+
+    $("setup-to-login").addEventListener("click", function () {
+      showLogin({ configured: true });
+    });
+
+    $("setup-form").addEventListener("submit", async function (event) {
+      event.preventDefault();
+      if ($("setup-password").value !== $("setup-password2").value) {
+        setStatus("setup-status", "Las contraseñas no coinciden.", "error");
+        return;
+      }
+      var button = $("setup-submit");
+      button.disabled = true;
+      setStatus("setup-status", "Creando la cuenta…");
+      try {
+        var result = await api("/api/platform/auth/setup", {
+          method: "POST",
+          body: {
+            name: $("setup-name").value,
+            email: $("setup-email").value,
+            password: $("setup-password").value
+          }
+        });
+        enterApp(result.staff);
+      } catch (error) {
+        setStatus("setup-status", error.message, "error");
+        button.disabled = false;
+      }
+    });
+
+    $("login-form").addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var button = $("login-submit");
+      button.disabled = true;
+      setStatus("login-status", "Entrando…");
+      try {
+        var result = await api("/api/platform/auth/login", {
+          method: "POST",
+          body: { email: $("login-email").value, password: $("login-password").value }
+        });
+        $("login-password").value = "";
+        setStatus("login-status", "");
+        enterApp(result.staff);
+      } catch (error) {
+        setStatus("login-status", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    $("logout").addEventListener("click", async function () {
+      try { await api("/api/platform/auth/logout", { method: "POST" }); } catch (_) {}
+      state.staff = null;
+      location.assign("/platform");
+    });
+
+    $("password-form").addEventListener("submit", async function (event) {
+      event.preventDefault();
+      if ($("password-new").value !== $("password-new2").value) {
+        setStatus("password-status", "Las contraseñas nuevas no coinciden.", "error");
+        return;
+      }
+      setStatus("password-status", "Guardando…");
+      try {
+        var result = await api("/api/platform/auth/password", {
+          method: "POST",
+          body: {
+            currentPassword: $("password-current").value,
+            newPassword: $("password-new").value
+          }
+        });
+        state.staff = result.staff;
+        closePasswordModal();
+        $("who").innerHTML = "Sesión de <strong>" + esc(state.staff.name) + "</strong> · " +
+          esc(state.staff.roleLabel);
+        setStatus("team-status", "Contraseña actualizada.", "ok");
+      } catch (error) {
+        setStatus("password-status", error.message, "error");
+      }
+    });
+
+    $("password-later").addEventListener("click", async function () {
+      try { await api("/api/platform/auth/logout", { method: "POST" }); } catch (_) {}
+      location.assign("/platform");
+    });
+
+    $("emptyToggle").addEventListener("change", render);
+
+    $("panel").addEventListener("change", function (event) {
+      var target = event.target;
+      if (target.matches("select[data-role]")) {
+        patchStaff(target.dataset.id, { role: target.value });
+      }
+    });
+    $("panel").addEventListener("click", function (event) {
+      var target = event.target;
+      if (target.matches("button[data-toggle]")) {
+        patchStaff(target.dataset.id, { active: target.dataset.toggle === "1" });
+      }
+    });
+
+    async function showInvite(token) {
+      $("login-view").hidden = true;
+      $("app-view").hidden = true;
+      $("invite-view").hidden = false;
+      try {
+        var preview = await api("/api/platform/team/invites/" + encodeURIComponent(token));
+        $("invite-copy").textContent =
+          "Invitación para " + preview.email + " como " + preview.roleLabel + ".";
+        $("invite-name").value = preview.name;
+      } catch (error) {
+        $("invite-copy").textContent = error.message;
+        $("invite-submit").disabled = true;
+      }
+      $("invite-form").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        if ($("invite-password").value !== $("invite-password2").value) {
+          setStatus("invite-status", "Las contraseñas no coinciden.", "error");
+          return;
+        }
+        var button = $("invite-submit");
+        button.disabled = true;
+        setStatus("invite-status", "Activando…");
+        try {
+          var result = await api("/api/platform/team/invites/" + encodeURIComponent(token), {
+            method: "POST",
+            body: { name: $("invite-name").value, password: $("invite-password").value }
+          });
+          history.replaceState({}, "", "/platform");
+          enterApp(result.staff);
+        } catch (error) {
+          setStatus("invite-status", error.message, "error");
+          button.disabled = false;
+        }
+      });
+    }
+
+    (async function init() {
+      if (location.pathname.indexOf("/platform/invite/") === 0) {
+        await showInvite(location.pathname.split("/").pop());
+        return;
+      }
+      try {
+        var me = await api("/api/platform/auth/me");
+        if (me.authenticated) enterApp(me.staff);
+        else showLogin(me);
+      } catch (_) {
+        showLogin({ configured: true });
+        setStatus("login-status", "No se pudo conectar con la plataforma.", "error");
+      }
+    })();
   </script>
 </body>
 </html>

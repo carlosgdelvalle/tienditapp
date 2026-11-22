@@ -14,6 +14,8 @@
   header a { color: #085239; font-size: 1.35rem; font-weight: 750; text-decoration: none; }
   .header-inner, .store-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
   .store-heading h1 { margin: 0; overflow-wrap: anywhere; }
+  .store-picker { display: flex; align-items: center; gap: .5rem; font-weight: 650; }
+  .store-picker select { min-height: 2.85rem; padding: .45rem .6rem; border: 1px solid #758681; }
   .skip-content { position: absolute; inset-block-start: .5rem; inset-inline-start: .5rem; z-index: 2; padding: .55rem .8rem; background: white; transform: translateY(-160%); }
   .skip-content:focus { transform: none; }
   h1, h2 { line-height: 1.2; margin: 0 0 .8rem; }
@@ -85,6 +87,10 @@
   <div id="owner" hidden>
     <div class="store-heading">
       <h1 id="store-name" tabindex="-1"></h1>
+      <label class="store-picker" id="store-picker" hidden>
+        <span>Tienda</span>
+        <select id="store-select" aria-label="Cambiar de tienda"></select>
+      </label>
       <button type="button" id="logout" class="secondary">Cerrar sesión</button>
     </div>
     <p class="status empty-space" id="session-status" role="status"></p>
@@ -362,6 +368,7 @@
     auth = null;
     sessionStorage.removeItem(authKey);
     $('owner').hidden = true;
+    $('store-picker').hidden = true;
     catalog = [];
     $('history-items').replaceChildren();
     $('catalog-items').replaceChildren();
@@ -425,6 +432,7 @@
       auth = { tenantId: session.tenant.id, csrf: session.csrfToken };
       sessionStorage.setItem(authKey, JSON.stringify(auth));
       await showStore(session.tenant);
+      await loadMemberships();
     } catch (_) {
       if (attempt === qrAttempt) restartChallenge('No se pudo completar el acceso. Genera otro código para entrar.');
     }
@@ -448,6 +456,48 @@
     status('sale-status', '');
     restorePendingSale();
     showView();
+  }
+
+  async function loadMemberships() {
+    if (!auth?.csrf) return;
+    let items = [];
+    try {
+      const data = await api('/api/me/memberships');
+      items = (data.items || []).filter(item => item.active !== false);
+    } catch (_) {
+      $('store-picker').hidden = true;
+      return;
+    }
+    if (items.length < 2) {
+      $('store-picker').hidden = true;
+      return;
+    }
+    const select = $('store-select');
+    select.replaceChildren(...items.map(item => new Option(
+      item.storeName || item.tenantName,
+      item.tenantId,
+      false,
+      item.tenantId === auth.tenantId,
+    )));
+    $('store-picker').hidden = false;
+    select.onchange = async () => {
+      const tenantId = select.value;
+      select.disabled = true;
+      status('session-status', 'Cambiando de tienda…');
+      try {
+        const session = await api('/api/session/store', {method: 'POST', body: {tenantId}});
+        auth = {tenantId: session.tenant.id, csrf: session.csrfToken};
+        sessionStorage.setItem(authKey, JSON.stringify(auth));
+        await showStore(session.tenant);
+        await loadMemberships();
+        status('session-status', '');
+      } catch (_) {
+        status('session-status', 'No se pudo cambiar de tienda.', true);
+        await loadMemberships();
+      } finally {
+        select.disabled = false;
+      }
+    };
   }
 
   function restorePendingSale() {
@@ -828,7 +878,7 @@
 
   if (auth?.csrf) {
     status('login-status', 'Revisando tu sesión…');
-    api('/api/tenant').then(showStore).then(() => status('login-status', '')).catch(() => {
+    api('/api/tenant').then(showStore).then(loadMemberships).then(() => status('login-status', '')).catch(() => {
       auth = null;
       sessionStorage.removeItem(authKey);
       status('login-status', 'Vuelve a entrar para abrir tu tienda.');

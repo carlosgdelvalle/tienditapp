@@ -27,6 +27,8 @@ Replace the simulated access (`X-Employee-Id` and console PIN) with verified Aba
 - Discovery at `/.well-known/openid-configuration` and keys at `/discovery/v2.0/keys`.
 - `oid` plus `tid` form `external_sub` with `idp='entra'`.
 
+Current pilot (2026-11-22): `/platform` uses first-party staff accounts stored in `platform_staff`, with scrypt password hashes, opaque sessions and server-side role checks. An owner can invite the rest of the team with a single-use link and choose one of five roles. Entra remains the target for MFA and centralized offboarding.
+
 Boundary rule: signing in to the Entra staff realm never grants a business membership. SaaS staff operate the SaaS console, not the stores, and any exceptional support operation uses auditable internal permissions with temporary scope. An operator who is also a merchant takes on that role with their independent Abarpay merchant account.
 
 ## Staff access token validation

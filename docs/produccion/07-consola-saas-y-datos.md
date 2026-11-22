@@ -1,6 +1,6 @@
 # Platform console, measurement, and data pilot
 
-**Users:** Carlos and the Abarpay team. Merchants sign in to their store console by scanning a QR code. SaaS staff use a dedicated route and OIDC audience with Entra MFA. The operational objective is to decide which store needs help, which campaign works, which charges Finance must reconcile, and what information provides value to a supply chain without revealing its participants.
+**Users:** Carlos and the Abarpay team. Merchants sign in to their store console by scanning a QR code. SaaS staff sign in at `/platform` with first-party accounts: scrypt password hashes, opaque server-side sessions and a role stored on the account. Entra MFA is the planned hardening once the team directory exists. The operational objective is to decide which store needs help, which campaign works, which charges Finance must reconcile, and what information provides value to a supply chain without revealing its participants.
 
 ## Views the team must implement
 
