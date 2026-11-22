@@ -225,7 +225,12 @@ def _qr_svg(data: str) -> str | None:
     except ImportError:
         return None
     try:
-        return segno.make_qr(data).svg_inline()
+        svg = segno.make_qr(data).svg_inline(scale=6)
+        # svg_inline() omits the XML namespace; a Blob served as image/svg+xml
+        # requires a valid standalone SVG document.
+        if "xmlns=" not in svg[:80]:
+            svg = svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ', 1)
+        return svg
     except Exception:
         return None
 
