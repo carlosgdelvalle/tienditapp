@@ -12,6 +12,10 @@
   header { background: white; border-bottom: 1px solid var(--line); }
   .container { max-width: 62rem; margin-inline: auto; padding: 1.25rem clamp(1rem, 4vw, 2.5rem); }
   header a { color: #085239; font-size: 1.35rem; font-weight: 750; text-decoration: none; }
+  .header-inner, .store-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+  .store-heading h1 { margin: 0; overflow-wrap: anywhere; }
+  .skip-content { position: absolute; inset-block-start: .5rem; inset-inline-start: .5rem; z-index: 2; padding: .55rem .8rem; background: white; transform: translateY(-160%); }
+  .skip-content:focus { transform: none; }
   h1, h2 { line-height: 1.2; margin: 0 0 .8rem; }
   section, article { background: white; border: 1px solid var(--line); border-radius: .9rem; padding: clamp(1rem, 3vw, 2rem); }
   .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1rem; }
@@ -26,13 +30,17 @@
   img { max-width: 100%; height: auto; }
   .secondary { background: white; color: #085239; }
   .muted { color: var(--soft); }
-  .status { margin: 0; min-height: 1.55em; overflow-wrap: anywhere; }
+  .status { margin: 0; overflow-wrap: anywhere; }
+  .status:not(:empty) { padding: .6rem .75rem; background: #edf5f0; border-radius: .45rem; }
+  .status.error:not(:empty) { background: #fff1ee; }
   .error { color: #8e251d; }
   .receipt { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: 1rem; overflow-wrap: anywhere; }
   .code { display: block; width: fit-content; padding: .25rem .65rem; border-radius: .35rem; background: #edf5f0; font-size: 1.5rem; letter-spacing: .13em; }
   .store-nav { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
-  .store-nav a { padding: .55rem .9rem; border-radius: .55rem; color: #085239; font-weight: 700; }
+  .store-nav a { display: flex; align-items: center; justify-content: center; min-height: 2.9rem; padding: .55rem .85rem; border: 1px solid var(--line); border-radius: .55rem; background: #fff; color: #085239; font-weight: 700; text-align: center; text-decoration: none; }
   .store-nav a[aria-current="page"] { background: #0b6e4f; color: white; text-decoration: none; }
+  .store-nav a:hover:not([aria-current]) { background: #edf5f0; text-decoration: underline; }
+  .empty-space:not(:empty) { margin-block: .75rem; }
   .stack { display: grid; gap: 1rem; }
   .row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
   .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .75rem; }
@@ -41,24 +49,32 @@
   .records { list-style: none; margin: 0; padding: 0; }
   .records li { padding: .8rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
   .record-title { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; column-gap: 1rem; }
-  .records small, .records code { display: block; color: var(--soft); }
+  .records small, .records code { display: block; font-size: .94rem; color: var(--soft); }
   .catalog-list { max-width: 100%; }
   .choice { display: flex; gap: .6rem; align-items: center; min-height: 2.65rem; }
   .choice input { width: 1.2rem; height: 1.2rem; min-height: 0; accent-color: var(--brand); }
-  @media (max-width: 32rem) {
-    .store-nav a { padding-inline: .65rem; }
+  @media (max-width: 40rem) {
+    .store-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
+    .store-nav a { padding-inline: .45rem; }
     .record-title { row-gap: .2rem; }
   }
 </style>
 </head>
 <body>
-<header><div class="container"><a href="/console#/inicio">Abarpay</a></div></header>
-<main class="container">
+<header><div class="container header-inner"><button type="button" class="secondary skip-content" id="skip-content">Saltar al contenido</button><a href="/console#/inicio">Abarpay</a></div></header>
+<main class="container" id="main-content" tabindex="-1">
   <section id="login" aria-labelledby="login-title">
     <h1 id="login-title">Entrar a mi tienda</h1>
-    <p>Abre Abarpay en tu teléfono. Escanea el QR, compara el código y aprueba este acceso.</p>
-    <button type="button" id="start-qr">Mostrar código QR</button>
-    <p class="status" id="login-status" role="status"></p>
+    <ol>
+      <li>En la app Abarpay, abre <strong>Consola</strong>.</li>
+      <li>Toca <strong>Escanear código QR</strong> y apunta a esta pantalla.</li>
+      <li>Compara los códigos y aprueba el acceso en tu celular.</li>
+    </ol>
+    <div class="row">
+      <button type="button" id="start-qr">Mostrar código QR</button>
+      <button type="button" class="secondary" id="cancel-qr" hidden>Cancelar acceso</button>
+    </div>
+    <p class="status empty-space" id="login-status" role="status"></p>
     <div id="challenge" hidden>
       <img id="owner-qr" width="224" height="224" alt="Código QR para abrir tu tienda con la app Abarpay" hidden>
       <p>Código para comprobar el acceso en tu teléfono</p>
@@ -67,7 +83,11 @@
   </section>
 
   <div id="owner" hidden>
-    <h1 id="store-name" tabindex="-1"></h1>
+    <div class="store-heading">
+      <h1 id="store-name" tabindex="-1"></h1>
+      <button type="button" id="logout" class="secondary">Cerrar sesión</button>
+    </div>
+    <p class="status empty-space" id="session-status" role="status"></p>
     <nav class="store-nav" aria-label="Mi tienda">
       <a href="#/inicio" data-view="inicio">Inicio</a>
       <a href="#/catalogo" data-view="catalogo">Catálogo</a>
@@ -84,7 +104,7 @@
         <p class="muted" id="overview-date" hidden></p>
         <dl class="metrics" id="overview-metrics" hidden>
           <div><dt>Ventas en efectivo hoy</dt><dd id="overview-sales"></dd></div>
-          <div><dt>Importe de hoy</dt><dd id="overview-amount"></dd></div>
+          <div><dt>Efectivo cobrado hoy</dt><dd id="overview-amount"></dd></div>
           <div><dt>Productos en catálogo</dt><dd id="overview-products"></dd></div>
         </dl>
         <button type="button" class="secondary" id="refresh-overview">Actualizar resumen</button>
@@ -97,6 +117,7 @@
           <label>Cantidad <input id="sale-quantity" value="1" required inputmode="decimal"></label>
           <p class="status" id="sale-total" role="status"></p>
           <label>Efectivo recibido en pesos <input id="sale-cash" required inputmode="decimal" placeholder="20.00"></label>
+          <p class="status" id="sale-change" role="status"></p>
           <button id="record-sale">Registrar venta</button>
           <p class="status" id="sale-status" role="status"></p>
         </form>
@@ -224,6 +245,7 @@
         <p id="team-status" class="status" role="status"></p>
         <ul id="team-items" class="records" aria-label="Personas vinculadas"></ul>
         <h3>Invitar al equipo</h3>
+        <p class="muted">Marca las tareas que podrá hacer esta persona. Podrás cambiar sus permisos después.</p>
         <form id="team-invite-form">
           <label>Número de celular (+52)
             <input id="team-invite-phone" type="tel" inputmode="tel" required maxlength="18" autocomplete="off">
@@ -258,7 +280,7 @@
     </div>
   </div>
 </main>
-<script src="/console/operations.js"></script>
+<script src="/console/operations.js?v=2"></script>
 <script>
 (() => {
   'use strict';
@@ -272,6 +294,7 @@
   let catalog = [];
   let pollTimer;
   let qrUrl;
+  let qrAttempt = 0;
   let editingProduct = null;
   let storeZone = 'America/Mexico_City';
   let catalogRequest = 0;
@@ -307,7 +330,8 @@
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
     });
-    const data = await response.json();
+    if (response.status === 204) return null;
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(typeof data.detail === 'string' ? data.detail : 'Revisa los datos e intenta de nuevo.');
       error.status = response.status;
@@ -317,22 +341,24 @@
   }
 
   function clearChallenge() {
+    qrAttempt += 1;
     clearTimeout(pollTimer);
     if (qrUrl) URL.revokeObjectURL(qrUrl);
     qrUrl = undefined;
     $('owner-qr').hidden = true;
     $('owner-qr').removeAttribute('src');
     $('challenge').hidden = true;
+    $('cancel-qr').hidden = true;
   }
 
   function restartChallenge(message) {
     clearChallenge();
     status('login-status', message);
     $('start-qr').disabled = false;
-    $('start-qr').textContent = 'Generar otro código';
+    $('start-qr').textContent = 'Mostrar código QR';
   }
 
-  function askToSignInAgain() {
+  function askToSignInAgain(message = 'Tu sesión terminó. Vuelve a entrar para abrir la tienda.') {
     auth = null;
     sessionStorage.removeItem(authKey);
     $('owner').hidden = true;
@@ -342,19 +368,26 @@
     $('overview-metrics').hidden = true;
     $('overview-date').hidden = true;
     $('sale-receipt').hidden = true;
+    $('sale-form').reset();
+    $('sale-product').replaceChildren(new Option('Selecciona un producto', ''));
+    $('product-search').value = '';
+    for (const id of ['sale-total', 'sale-change', 'sale-status', 'session-status']) status(id, '');
     resetProductForm();
     operations.reset();
     $('login').hidden = false;
-    restartChallenge('Tu sesión terminó. Vuelve a entrar para abrir la tienda.');
+    restartChallenge(message);
     $('start-qr').focus();
   }
 
   async function startChallenge() {
     clearChallenge();
+    const attempt = qrAttempt;
     $('start-qr').disabled = true;
+    $('cancel-qr').hidden = false;
     status('login-status', 'Generando el código…');
     try {
       const challenge = await api('/api/auth/challenge', {method: 'POST', body: {intent: 'browser_login'}});
+      if (attempt !== qrAttempt) return;
       if (typeof challenge.qrSvg !== 'string') throw new Error('No se pudo mostrar el código QR.');
       qrUrl = URL.createObjectURL(new Blob([challenge.qrSvg], {type: 'image/svg+xml'}));
       $('owner-qr').src = qrUrl;
@@ -362,13 +395,14 @@
       $('matching-code').textContent = challenge.code;
       $('challenge').hidden = false;
       status('login-status', 'Esperando tu aprobación en el teléfono…');
-      pollTimer = setTimeout(() => poll(challenge), 750);
+      pollTimer = setTimeout(() => poll(challenge, attempt), 750);
     } catch (_) {
-      restartChallenge('No se pudo mostrar el código. Revisa tu conexión e intenta de nuevo.');
+      if (attempt === qrAttempt) restartChallenge('No se pudo mostrar el código. Revisa tu conexión e intenta de nuevo.');
     }
   }
 
-  async function poll(challenge) {
+  async function poll(challenge, attempt) {
+    if (attempt !== qrAttempt) return;
     const path = '/api/auth/challenge/' + encodeURIComponent(challenge.challengeId);
     if (Date.now() >= challenge.expiresAt * 1000) {
       restartChallenge('El código venció. Genera otro para entrar.');
@@ -376,20 +410,23 @@
     }
     try {
       const current = await api(path);
+      if (attempt !== qrAttempt) return;
       if (current.status === 'pending') {
-        pollTimer = setTimeout(() => poll(challenge), 750);
+        pollTimer = setTimeout(() => poll(challenge, attempt), 750);
         return;
       }
       if (current.status !== 'approved') {
         restartChallenge(current.status === 'denied' ? 'Se rechazó el acceso.' : 'Genera otro código para entrar.');
         return;
       }
+      $('cancel-qr').hidden = true;
+      status('login-status', 'Abriendo tu tienda…');
       const session = await api(path + '/exchange', {method: 'POST'});
       auth = { tenantId: session.tenant.id, csrf: session.csrfToken };
       sessionStorage.setItem(authKey, JSON.stringify(auth));
       await showStore(session.tenant);
     } catch (_) {
-      restartChallenge('No se pudo completar el acceso. Genera otro código para entrar.');
+      if (attempt === qrAttempt) restartChallenge('No se pudo completar el acceso. Genera otro código para entrar.');
     }
   }
 
@@ -399,7 +436,7 @@
     $('login').hidden = true;
     $('owner').hidden = false;
     $('store-name').textContent = tenant.name;
-    $('store-name').focus();
+    status('session-status', '');
     try {
       new Intl.DateTimeFormat('es-MX', {timeZone: tenant.timezone});
       storeZone = tenant.timezone || storeZone;
@@ -439,6 +476,9 @@
       if (active) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     }
+    const title = $('view-' + current).querySelector('h2');
+    title.tabIndex = -1;
+    title.focus();
     if (current === 'inicio') {
       loadOverview();
       loadCatalog({forSale: true});
@@ -510,6 +550,7 @@
     for (const product of catalog) {
       if (q && ![product.name, ...(product.aliases || [])].some(value => value.toLocaleLowerCase('es-MX').includes(q))) continue;
       const row = document.createElement('li');
+      row.dataset.productId = product.id;
       const title = document.createElement('div');
       title.className = 'record-title';
       const name = document.createElement('strong');
@@ -628,6 +669,10 @@
     const total = savedAmount ?? (product && qty > 0 && Number.isSafeInteger(qty * product.priceCents)
       ? Math.round(qty * product.priceCents / 1000) : null);
     status('sale-total', total === null ? '' : 'Total ' + money(total));
+    const received = scaledInput('sale-cash', 2);
+    const difference = total !== null && received !== null ? received - total : null;
+    status('sale-change', difference === null ? '' : difference < 0
+      ? 'Faltan ' + money(-difference) : 'Cambio ' + money(difference), difference !== null && difference < 0);
     return total;
   }
 
@@ -640,6 +685,27 @@
   }
 
   $('start-qr').addEventListener('click', startChallenge);
+  $('cancel-qr').addEventListener('click', () => {
+    restartChallenge('Se canceló el acceso. Puedes mostrar otro código cuando quieras.');
+    $('start-qr').focus();
+  });
+  $('skip-content').addEventListener('click', () => {
+    const target = $('owner').hidden ? $('login-title') : $('view-' + viewFromHash()).querySelector('h2');
+    target.tabIndex = -1;
+    target.focus();
+  });
+  $('logout').addEventListener('click', async () => {
+    $('logout').disabled = true;
+    status('session-status', 'Cerrando sesión…');
+    try {
+      await api('/api/session/logout', {method: 'POST'});
+      askToSignInAgain('Cerraste sesión. Puedes volver a entrar con tu celular.');
+    } catch (error) {
+      requestError('session-status', error, 'No se pudo cerrar la sesión. Revisa tu conexión e intenta de nuevo.');
+    } finally {
+      $('logout').disabled = false;
+    }
+  });
   window.addEventListener('hashchange', showView);
   $('refresh-overview').addEventListener('click', () => { loadOverview(); loadCatalog({forSale: true}); });
   $('refresh-catalog').addEventListener('click', () => loadCatalog());
@@ -647,12 +713,18 @@
   $('previous-sales').addEventListener('click', () => loadHistory(Math.max(0, historyOffset - historyLimit)));
   $('next-sales').addEventListener('click', () => loadHistory(historyOffset + historyLimit));
   $('product-search').addEventListener('input', renderCatalog);
-  $('cancel-product-edit').addEventListener('click', resetProductForm);
+  $('cancel-product-edit').addEventListener('click', () => {
+    const previous = editingProduct;
+    resetProductForm();
+    ($('catalog-items').querySelector('[data-product-id="' + previous + '"] button') || $('product-search')).focus();
+  });
   $('sale-product').addEventListener('change', showTotal);
   $('sale-quantity').addEventListener('input', showTotal);
+  $('sale-cash').addEventListener('input', showTotal);
 
   $('product-form').addEventListener('submit', async event => {
     event.preventDefault();
+    const identity = auth;
     const productId = editingProduct;
     const name = $('product-name').value.trim();
     const unit = $('product-unit').value.trim();
@@ -672,6 +744,7 @@
       const product = await api(productId ? '/api/catalog/' + encodeURIComponent(productId) : '/api/catalog', {
         method: productId ? 'PATCH' : 'POST', body,
       });
+      if (auth !== identity) return;
       catalog = [...catalog.filter(item => item.id !== product.id), product]
         .sort((a, b) => a.name.localeCompare(b.name, 'es-MX'));
       resetProductForm();
@@ -681,6 +754,7 @@
       showTotal();
       status('product-status', productId ? 'Cambios guardados.' : 'Producto guardado.');
     } catch (error) {
+      if (auth !== identity) return;
       if (error.status === 401 || error.status === 403) {
         askToSignInAgain();
         return;
@@ -694,6 +768,8 @@
 
   $('sale-form').addEventListener('submit', async event => {
     event.preventDefault();
+    const identity = auth;
+    const storageKey = pendingKey();
     let pending = pendingSale();
     if (!pending) {
       const qtyMilli = scaledInput('sale-quantity', 3);
@@ -707,7 +783,7 @@
         key: crypto.randomUUID(),
         body: { items: [{ productId: $('sale-product').value, qtyMilli }], cashReceivedCents, expectedTotalCents: total },
       };
-      try { sessionStorage.setItem(pendingKey(), JSON.stringify(pending)); }
+      try { sessionStorage.setItem(storageKey, JSON.stringify(pending)); }
       catch (_) {
         status('sale-status', 'El navegador no pudo guardar el intento. Revisa la configuración antes de cobrar.', true);
         return;
@@ -719,22 +795,27 @@
     status('sale-status', 'Confirmando la venta…');
     try {
       const receipt = await api('/api/sales', {method: 'POST', key: pending.key, body: pending.body});
+      sessionStorage.removeItem(storageKey);
+      if (auth !== identity) return;
       const folio = document.createElement('code');
       folio.textContent = receipt.saleId;
       $('sale-receipt').replaceChildren('Venta registrada. Total ' + money(receipt.totalCents) +
         '. Cambio ' + money(receipt.changeCents) + '. Folio ', folio);
       $('sale-receipt').hidden = false;
-      sessionStorage.removeItem(pendingKey());
+      $('sale-receipt').tabIndex = -1;
+      if (viewFromHash() === 'inicio') $('sale-receipt').focus();
       $('sale-cash').value = '';
       retryState(false);
+      showTotal();
       status('sale-status', '');
       loadCatalog({forSale: true});
       loadOverview();
     } catch (error) {
+      if (auth !== identity) return;
       if (error.status === 401 || error.status === 403) {
         askToSignInAgain();
       } else if ([400, 404, 409, 422].includes(error.status)) {
-        sessionStorage.removeItem(pendingKey());
+        sessionStorage.removeItem(storageKey);
         retryState(false);
         status('sale-status', error.message, true);
       } else {

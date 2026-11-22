@@ -1,0 +1,6 @@
+# 2026-11-22 11:53 · Consola QR · Ergonomía
+
+- **Qué cambió** El acceso por QR indica qué tocar en el teléfono y deja cancelar el código. Cada sección lleva el teclado al título, las acciones caben en pantallas estrechas y los editores devuelven el foco al cancelar. Caja muestra cuánto falta o cuánto devolver antes de registrar la venta. Inventario guía al dueño si otra persona cambió la existencia. Cerrar sesión revoca el acceso del navegador.
+- **Evidencia** Con una copia PostgreSQL y datos ficticios se revisaron las siete secciones. A 390 px se comprobó que la página no desborda y que la venta muestra el cambio y aparece en Historial. Se probaron teclado y cancelación de editores, detalle de Fiado, registro de Gastos, salida y cancelación del QR. Una prueba verifica que cerrar sesión exige CSRF e invalida la sesión anterior.
+- **Samsung** Se revisaron Inicio y Caja con texto normal y el comprobante con texto al 200 %. El importe y el cambio siguieron visibles. Queda pendiente simplificar la entrada a caja, acercar el total a la lista de productos y conservar el carrito sin guardar cuando Android interrumpe el proceso.
+- **Publicación** La consola QR queda en QA. Carlos eligió publicar las mejoras de la consola demo SQLite por separado.

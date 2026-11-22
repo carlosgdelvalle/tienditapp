@@ -447,6 +447,21 @@ def get_tenant(
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
 
+@router.post("/session/logout", status_code=204)
+def logout(
+    ctx: SessionContext = Depends(require_owner),
+    service: IdentityService = Depends(_service),
+    config: AuthConfig = Depends(_config),
+) -> Response:
+    service.end_session(ctx.session.token)
+    response = Response(status_code=204, headers={"Cache-Control": "no-store"})
+    response.delete_cookie(
+        SESSION_COOKIE_NAME, httponly=True, secure=config.secure_cookies,
+        samesite=config.cookie_samesite, path="/",
+    )
+    return response
+
+
 @router.get("/tenant/members")
 def list_members(
     ctx: SessionContext = Depends(require_owner),

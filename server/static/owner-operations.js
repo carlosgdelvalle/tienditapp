@@ -8,6 +8,8 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
   let adjustment;
   let customer;
   let teamMember;
+  let adjustmentTrigger;
+  let teamTrigger;
 
   function asQuantity(milli, unit) {
     const label = unit === 'pieza' && milli !== 1000 ? 'piezas' : unit;
@@ -95,6 +97,13 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
       if ([400, 404, 409, 422].includes(error.status)) {
         sessionStorage.removeItem(storageKey);
         status(statusId, error.message, true);
+        if (section === 'inventory' && error.status === 409) {
+          adjustment = null;
+          await loadInventory();
+          status('inventory-status', 'La existencia cambió. Selecciona el producto y vuelve a confirmar el conteo.', true);
+          $('inventory-status').tabIndex = -1;
+          $('inventory-status').focus();
+        }
       } else requestError(statusId, error, pendingLabel);
     } finally {
       writes.delete(section);
@@ -119,13 +128,14 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
     return loadSection('inventory', '/api/owner/inventory', data => {
       $('inventory-items').replaceChildren(...data.items.map(item => {
         const stock = item.unlimitedStock ? 'Existencia ilimitada' : asQuantity(item.stockMilli, item.unit);
-        const button = item.unlimitedStock ? null : actionButton('Ajustar', 'Ajustar ' + item.name, () => {
+        const button = item.unlimitedStock ? null : actionButton('Ajustar', 'Ajustar ' + item.name, event => {
           if (pending('inventory')) {
             syncAdjustment();
             $('retry-inventory').focus();
             return;
           }
           adjustment = item;
+          adjustmentTrigger = event.currentTarget;
           $('adjust-label').textContent = item.name + ' · Actual: ' + stock;
           $('adjust-stock').value = String(item.stockMilli / 1000);
           $('adjust-reason').value = '';
@@ -178,7 +188,11 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
       body: {stockMilli, expectedStockMilli: adjustment.stockMilli, reason},
     });
   });
-  $('cancel-adjust').addEventListener('click', () => { adjustment = null; syncAdjustment(); });
+  $('cancel-adjust').addEventListener('click', () => {
+    adjustment = null;
+    syncAdjustment();
+    (adjustmentTrigger?.isConnected ? adjustmentTrigger : $('refresh-inventory')).focus();
+  });
   $('retry-inventory').addEventListener('click', () => saveAdjustment());
   $('refresh-inventory').addEventListener('click', loadInventory);
 
@@ -243,6 +257,8 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
     $('fiado-customer').textContent = item.name;
     $('fiado-balance').textContent = '';
     syncFiadoForm();
+    $('fiado-customer').tabIndex = -1;
+    $('fiado-customer').focus();
     loadCustomer();
   }
 
@@ -362,9 +378,10 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
             .filter(Boolean);
           details.push(permissions.length ? permissions.join(', ') : 'Sin permisos de operación');
         }
-        const edit = item.role === 'owner' ? null : actionButton('Editar permisos', 'Editar permisos de ' + name, () => {
+        const edit = item.role === 'owner' ? null : actionButton('Editar permisos', 'Editar permisos de ' + name, event => {
           if (pending('team')) { syncTeam(); $('retry-team').focus(); return; }
           teamMember = item;
+          teamTrigger = event.currentTarget;
           $('team-member').textContent = name;
           status('team-edit-status', '');
           for (const [field, key] of Object.entries(teamFields)) $(field).checked = item[key];
@@ -390,7 +407,11 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
     saveTeam({url: '/api/tenant/members/' + teamMember.userId, method: 'PATCH', label: memberName(teamMember), body});
   });
   $('retry-team').addEventListener('click', () => saveTeam());
-  $('cancel-team').addEventListener('click', () => { teamMember = null; syncTeam(); });
+  $('cancel-team').addEventListener('click', () => {
+    teamMember = null;
+    syncTeam();
+    (teamTrigger?.isConnected ? teamTrigger : $('refresh-team')).focus();
+  });
   $('refresh-team').addEventListener('click', loadTeam);
 
   function clearInviteLink() {

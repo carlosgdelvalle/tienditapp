@@ -974,6 +974,9 @@ class IdentityService:
             return None
         return session
 
+    def end_session(self, token: str) -> None:
+        self._store.revoke_session(token)
+
     # -- invites -----------------------------------------------------------
     def create_invite(
         self,

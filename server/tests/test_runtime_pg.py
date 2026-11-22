@@ -32,7 +32,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from fastapi.testclient import TestClient
 
 from server.auth import AuthConfig, Issuer, StaticJwksProvider, TokenValidator
-from server.identity import CHALLENGE_COOKIE_NAME, SESSION_HEADER_NAME
+from server.identity import CHALLENGE_COOKIE_NAME, SESSION_COOKIE_NAME, SESSION_HEADER_NAME
 from server.db_pg import set_tenant_context
 from server.runtime import create_production_app
 
@@ -836,6 +836,15 @@ def test_owner_phone_enrollment_and_qr_without_oidc(migrated_dsn, pg_cluster):
         assert other.get("/api/sales/" + sale["saleId"]).status_code == 404
         assert other.patch(product_url, headers={"X-CSRF-Token": other_session.json()["csrfToken"]},
                            json=changed).status_code == 404
+
+        session_token = client.cookies.get(SESSION_COOKIE_NAME)
+        assert session_token
+        assert client.post("/api/session/logout").status_code == 403
+        assert client.get("/api/tenant").status_code == 200
+        assert client.post("/api/session/logout", headers=csrf).status_code == 204
+        assert client.cookies.get(SESSION_COOKIE_NAME) is None
+        assert client.get("/api/tenant", headers={SESSION_HEADER_NAME: session_token}).status_code == 401
+        assert other.get("/api/tenant").status_code == 200
 
 
 def test_owner_inventory_fiado_expenses_and_team_are_tenant_scoped(migrated_dsn, pg_cluster):

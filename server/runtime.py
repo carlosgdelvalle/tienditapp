@@ -183,12 +183,16 @@ def owner_console():
     page = SERVER_ROOT / "static" / "owner-console.html"
     if not page.exists():
         return JSONResponse(status_code=404, content={"detail": "Consola no disponible"})
-    return FileResponse(page, media_type="text/html")
+    return FileResponse(page, media_type="text/html", headers={"Cache-Control": "no-cache"})
 
 
 @console_router.get("/console/operations.js", include_in_schema=False)
 def owner_console_operations():
-    return FileResponse(SERVER_ROOT / "static" / "owner-operations.js", media_type="text/javascript")
+    return FileResponse(
+        SERVER_ROOT / "static" / "owner-operations.js",
+        media_type="text/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @invite_router.get("/invite/{token}", include_in_schema=False)
