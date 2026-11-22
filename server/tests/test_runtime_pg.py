@@ -22,6 +22,7 @@ import subprocess
 import time
 import urllib.parse
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import jwt
@@ -744,3 +745,87 @@ def test_owner_phone_enrollment_and_qr_without_oidc(migrated_dsn, pg_cluster):
         cookie = cookie_value(created, CHALLENGE_COOKIE_NAME)
         client.cookies.set(CHALLENGE_COOKIE_NAME, cookie)
         assert client.post(exchange_path).status_code == 409
+
+        csrf = {"X-CSRF-Token": exchanged.json()["csrfToken"]}
+        product = client.post("/api/catalog", headers=csrf, json={
+            "name": "Arroz SIMULADO", "unit": "pieza", "priceCents": 1950, "stockMilli": 1000,
+        }).json()
+        mobile_path = f"/api/owner/pos/{tenant['id']}"
+        assert client.get(mobile_path + "/catalog", headers=auth).json()["items"][0]["id"] == product["id"]
+        assert client.get(mobile_path + "/catalog").status_code == 401
+
+        request = {
+            "items": [{"productId": product["id"], "qtyMilli": 1000}],
+            "cashReceivedCents": 2000, "expectedTotalCents": 1950,
+        }
+        key_header = {**auth, "Idempotency-Key": str(uuid.uuid4())}
+        assert client.post(mobile_path + "/sales", headers=auth, json=request).status_code == 422
+        assert client.post(
+            mobile_path + "/sales", headers=key_header,
+            json={**request, "expectedTotalCents": 1800},
+        ).status_code == 409
+
+        def send_sale():
+            return client.post(mobile_path + "/sales", headers=key_header, json=request)
+
+        # A duplicate can arrive while the original still holds the last unit.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first, duplicate = list(pool.map(lambda _: send_sale(), range(2)))
+        assert first.status_code == duplicate.status_code == 200
+        assert first.json() == duplicate.json()
+        sale = first.json()
+        assert sale["totalCents"] == 1950 and sale["changeCents"] == 50
+
+        product_url = "/api/catalog/" + product["id"]
+        changed = {"name": "Arroz editado", "unit": "bolsa", "priceCents": 2100}
+        assert client.patch(product_url, json=changed).status_code == 403
+        updated = client.patch(product_url, headers=csrf, json=changed)
+        assert updated.status_code == 200 and updated.json()["priceCents"] == 2100
+        assert updated.json()["stockMilli"] == 0
+        assert send_sale().json() == sale
+        assert client.post(
+            mobile_path + "/sales", headers=key_header,
+            json={**request, "cashReceivedCents": 2300},
+        ).status_code == 409
+        history = client.get("/api/sales").json()["items"]
+        assert [(item["saleId"], item["totalCents"]) for item in history] == [(sale["saleId"], 1950)]
+        overview = client.get("/api/owner/overview").json()
+        assert (overview["cashSaleCount"], overview["cashSalesCents"]) == (1, 1950)
+        with psycopg.connect(pg_cluster["superuser_dsn"]) as conn:
+            assert conn.execute("SELECT count(*) FROM payments WHERE sale_id = %s", (sale["saleId"],)).fetchone() == (1,)
+            assert conn.execute(
+                "SELECT count(*) FROM inventory_movements WHERE sale_id = %s", (sale["saleId"],),
+            ).fetchone() == (1,)
+
+        second = other.post(prefix + "phone/start", json={
+            "phone": "5512345678", "deviceId": other_device, "publicKey": other_pub,
+        })
+        assert second.status_code == 200
+        enrollment = second.json()["challengeId"]
+        second_phone = other.post(prefix + "phone/verify", json={
+            "challengeId": enrollment, "code": inbox[-1][1],
+            "signature": sign_device(other_key, f"abarpay-owner-enroll:{enrollment}"),
+        })
+        assert second_phone.status_code == 200
+        other_auth = {"Authorization": "Bearer " + second_phone.json()["accessToken"]}
+        other_signup = other.post("/api/signup", json={
+            "name": "Dueño B", "storeName": "Tienda B",
+        }, headers=other_auth)
+        assert other_signup.status_code == 200
+        other_tenant = other_signup.json()["tenant"]["id"]
+        assert other.get(mobile_path + "/catalog", headers=other_auth).status_code == 403
+        second_qr = parse_qr(other.post("/api/auth/challenge", json={"intent": "browser_login"}).json()["qr"])
+        second_path = "/api/auth/challenge/" + second_qr["id"]
+        second_payload = NL.join([
+            second_qr["id"], second_qr["nonce"], str(second_qr["exp"]), second_qr["intent"], other_tenant,
+        ])
+        assert other.post(second_path + "/approve", headers=other_auth, json={
+            "deviceId": other_device, "tenantId": other_tenant, "code": second_qr["code"],
+            "deviceSignature": sign_device(other_key, second_payload),
+        }).status_code == 200
+        other_session = other.post(second_path + "/exchange")
+        assert other_session.status_code == 200
+        assert other.get("/api/sales").json()["items"] == []
+        assert other.get("/api/sales/" + sale["saleId"]).status_code == 404
+        assert other.patch(product_url, headers={"X-CSRF-Token": other_session.json()["csrfToken"]},
+                           json=changed).status_code == 404

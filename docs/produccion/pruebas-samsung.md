@@ -31,6 +31,14 @@ The phone launcher calls the app **Abarpay QA** and its package is `mx.abarpay.m
 
 Label the SMS and store fixtures **SIMULADO** in the test record. Record physical camera approval and real carrier delivery separately. Repeat the message check with an authorized Mexican SIM and an approved transport before the pilot. See the [LabsMobile setup and simulated SMS notes](labsmobile-sms.md).
 
+## Connected cash and the QR console
+
+Use the same isolated PostgreSQL backend for the QR console and **Caja** in Abarpay QA. Open **Catálogo** in the browser, add a fixture item, then edit its name and price. Check that Caja loads the edited product and that editing leaves the stock unchanged.
+
+Record one cash sale in **Caja → Entrar a mi tienda**. To test loss of a response, wrap the QA server so the first successful mobile checkout response becomes an error after the database commit. Restart the Android app and select **Consultar venta pendiente**. Compare the full folio and total with **Historial de ventas** and verify one sale, payment, and stock movement for that folio in PostgreSQL. Check **Inicio** for the current business day's count and amount. In a separate browser, use a second verified owner with a different store. The sale must be absent from their history and return HTTP 404 when requested directly.
+
+The connected owner checkout and the SQLite offline POS fixture use separate routes. Run the following offline checks against the SQLite fixture.
+
 ## Offline cash on the physical phone
 
 Open the POS fixture at `http://127.0.0.1:8010` in the QA app and confirm the seeded catalog and offline authorization load while connected. Use a fresh cash cart with synthetic products. Cut and restore only the POS transport:

@@ -37,7 +37,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun OwnerQrApprovalScreen(ownerAuth: OwnerAuth, apiBaseUrl: String, onClose: () -> Unit) {
+fun OwnerQrApprovalScreen(
+    ownerAuth: OwnerAuth,
+    apiBaseUrl: String,
+    onClose: () -> Unit,
+    startInCash: Boolean = false,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var step by rememberSaveable { mutableStateOf("ready") }
@@ -67,7 +72,11 @@ fun OwnerQrApprovalScreen(ownerAuth: OwnerAuth, apiBaseUrl: String, onClose: () 
             return
         }
         stores = withContext(Dispatchers.IO) { OwnerQrApi(apiBaseUrl, token).ownerStores() }
-        step = if (stores.isEmpty()) "signup" else "scanReady"
+        step = when {
+            stores.isEmpty() -> "signup"
+            startInCash -> "cash"
+            else -> "scanReady"
+        }
     }
 
     fun runAction(message: String, action: suspend () -> Unit) {
@@ -116,11 +125,19 @@ fun OwnerQrApprovalScreen(ownerAuth: OwnerAuth, apiBaseUrl: String, onClose: () 
 
     // An activity recreation can restore the confirmation but not the cached membership.
     LaunchedEffect(step) {
-        if (step == "confirm" && stores.isEmpty()) {
+        if (step in setOf("confirm", "cash") && stores.isEmpty()) {
             runAction("Cargando tu tienda…") {
                 val api = ownerApi()
                 stores = withContext(Dispatchers.IO) { api.ownerStores() }
             }
+        }
+    }
+
+    if (step == "cash") {
+        val selected = stores.singleOrNull() ?: stores.find { it.tenantId == selectedId }
+        if (selected != null) {
+            OwnerCashScreen(ownerAuth, apiBaseUrl, selected, onClose)
+            return
         }
     }
 
@@ -253,6 +270,17 @@ fun OwnerQrApprovalScreen(ownerAuth: OwnerAuth, apiBaseUrl: String, onClose: () 
             "done" -> {
                 Text("Acceso aprobado", style = MaterialTheme.typography.headlineSmall)
                 Text("Continúa en tu computadora.")
+            }
+            "cash" -> {
+                Text("Elige la tienda donde vas a cobrar.", style = MaterialTheme.typography.headlineSmall)
+                stores.forEach { store ->
+                    Button(onClick = { selectedId = store.tenantId }) { Text(store.name) }
+                }
+                if (stores.isEmpty() && idle) {
+                    OutlinedButton(onClick = { runAction("Cargando tu tienda…") { openStore() } }) {
+                        Text("Volver a cargar")
+                    }
+                }
             }
             else -> {
                 Text("Entra a tu tienda", style = MaterialTheme.typography.headlineSmall)

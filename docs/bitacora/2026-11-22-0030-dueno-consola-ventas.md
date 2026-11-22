@@ -1,0 +1,7 @@
+# 2026-11-22 · Dueño · Consola y ventas desde Android
+
+- **Cambio:** Inicio muestra las ventas en efectivo de hoy. Catálogo permite agregar productos y editar nombre, unidad y precio. Historial muestra las ventas de la tienda con su importe y folio. La opción Caja de Android usa el catálogo y el registro de ventas del mismo negocio en PostgreSQL.
+- **Evidencia física:** Samsung SM-A165M, Chrome y PostgreSQL 16 en el laboratorio. Se interrumpió la respuesta tras el commit, se cambió el precio de catálogo de MXN 19.50 a MXN 21.00 y se reinició la app. Al consultar la venta pendiente, se recuperaron el mismo folio, los MXN 19.50 y el cambio de MXN 0.50. El historial mostró una fila. PostgreSQL registró un pago y un movimiento para ese folio.
+- **Aislamiento:** una segunda tienda abrió una sesión QR independiente. Su historial quedó vacío y el acceso directo al folio devolvió HTTP 404. Las pruebas PostgreSQL incluyen reintentos simultáneos, CSRF y edición de un producto ajeno.
+- **Verificación:** 328 pruebas del servidor, 16 de la app de referencia y 175 de Android aprobadas. `assembleRelease` pasó. Chrome, con Playwright, verificó escritorio y 390 px, estado de carga con respuesta lenta, foco al editar y ausencia de desbordamiento horizontal. [Pruebas en Samsung](../produccion/pruebas-samsung.md)
+- **Alcance:** caja conectada en efectivo. Las pruebas se hicieron con datos SIMULADOS y sin dinero real.

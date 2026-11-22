@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
     /** Token de abarpay://empleado/<token> o https://…/invite/<token>. */
     private var deepLink by mutableStateOf<String?>(null)
     private var showOwnerApproval by mutableStateOf(false)
+    private var openOwnerCash by mutableStateOf(false)
     private val ownerAuth: OwnerAuth by lazy {
         OwnerPhoneAuth(applicationContext, BuildConfig.OWNER_API_BASE_URL)
     }
@@ -70,6 +71,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         enableEdgeToEdge()
         showOwnerApproval = savedInstanceState?.getBoolean("ownerApproval") == true
+        openOwnerCash = savedInstanceState?.getBoolean("ownerCash") == true
         handleIncomingIntent(intent)
         setContent {
             var splashDone by remember { mutableStateOf(BuildConfig.DEBUG) }
@@ -89,14 +91,19 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 Box(Modifier.fillMaxSize()) {
-                    if (showOwnerApproval) {
+                    if (showOwnerApproval || openOwnerCash) {
                         OwnerQrApprovalScreen(
                             ownerAuth = ownerAuth,
                             apiBaseUrl = BuildConfig.OWNER_API_BASE_URL,
-                            onClose = { showOwnerApproval = false },
+                            onClose = { showOwnerApproval = false; openOwnerCash = false },
+                            startInCash = openOwnerCash,
                         )
                     } else {
-                        AbarpayApp(state, model, scan = { scanning = true }, openOwner = { showOwnerApproval = true }, ownerConfigured = ownerConfigured)
+                        AbarpayApp(
+                            state, model, scan = { scanning = true },
+                            openOwner = if (ownerConfigured) ({ showOwnerApproval = true }) else null,
+                            openCash = if (ownerConfigured) ({ openOwnerCash = true }) else null,
+                        )
                     }
                     if (scanning) {
                         ContinuousScannerScreen(
@@ -120,6 +127,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("ownerApproval", showOwnerApproval)
+        outState.putBoolean("ownerCash", openOwnerCash)
         super.onSaveInstanceState(outState)
     }
 
@@ -130,6 +138,7 @@ class MainActivity : ComponentActivity() {
         val data = intent?.data
         if (data != null && data.scheme == "abarpay" && data.host == "dueno") {
             if (ownerConfigured) {
+                openOwnerCash = false
                 showOwnerApproval = true
             }
             return
@@ -139,7 +148,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOwner: () -> Unit, ownerConfigured: Boolean) {
+private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOwner: (() -> Unit)?, openCash: (() -> Unit)?) {
     var settings by rememberSaveable { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current
 
@@ -199,7 +208,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         ) {
             Column(Modifier.fillMaxSize().imePadding()) {
-                CompactHeader(onOwner = if (ownerConfigured) openOwner else null)
+                CompactHeader(onOwner = openOwner, onCash = openCash)
                 if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Notice(
                     when {
@@ -236,7 +245,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
 
 /** Encabezado compacto: solo el logo pequeño dentro del contenido, sin nombre ni URL. */
 @Composable
-private fun CompactHeader(onOwner: (() -> Unit)?) {
+private fun CompactHeader(onOwner: (() -> Unit)?, onCash: (() -> Unit)?) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -249,6 +258,11 @@ private fun CompactHeader(onOwner: (() -> Unit)?) {
             )
         }
         Spacer(Modifier.weight(1f))
+        if (onCash != null) {
+            TextButton(onClick = onCash, modifier = Modifier.testTag("owner-cash-entry")) {
+                Text("Caja")
+            }
+        }
         if (onOwner != null) {
             TextButton(onClick = onOwner, modifier = Modifier.testTag("owner-entry")) {
                 Text("Consola", fontSize = 12.sp)

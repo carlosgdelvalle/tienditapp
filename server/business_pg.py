@@ -11,18 +11,22 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from psycopg.rows import dict_row
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from .auth_routes import SessionContext, require_owner, require_session
+from .auth_routes import IdentityContext, SessionContext, require_identity, require_owner, require_session
 from .db_pg import set_tenant_context
+from .identity import IdentityService
+from .owner_phone import MobileIdentity
 from .parser import line_total_cents
 
 router = APIRouter(prefix="/api")
+PG_INT_MAX = 2_147_483_647
 
 
 # ---------------------------------------------------------------------------
@@ -43,6 +47,12 @@ class ProductIn(BaseModel):
     imageUrl: str | None = None
 
 
+class ProductEditIn(BaseModel):
+    name: str = Field(max_length=120)
+    unit: str = Field(max_length=30)
+    priceCents: int = Field(ge=0, le=PG_INT_MAX)
+
+
 class BarcodeLinkIn(BaseModel):
     productId: str
     code: str
@@ -57,6 +67,7 @@ class SaleIn(BaseModel):
     items: list[SaleItemIn]
     cashReceivedCents: int | None = None
     note: str | None = None
+    expectedTotalCents: int | None = Field(default=None, ge=0, le=PG_INT_MAX)
 
 
 # ---------------------------------------------------------------------------
@@ -105,19 +116,25 @@ def _product_dict(row: dict) -> dict[str, Any]:
     }
 
 
-def _sale_dict(sale: dict, items: list[dict]) -> dict[str, Any]:
+def _sale_summary(sale: dict) -> dict[str, Any]:
     return {
-        "id": str(sale["id"]),
         "saleId": str(sale["id"]),
-        "storeId": str(sale["store_id"]),
-        "employeeId": str(sale["employee_id"]),
         "createdAt": _epoch(sale["created_at"]),
         "status": sale["status"],
         "paymentMethod": sale["payment_method"],
         "totalCents": sale["total_cents"],
-        "chargedCents": sale["charged_cents"],
         "cashReceivedCents": sale["cash_received_cents"],
         "changeCents": sale["change_cents"],
+    }
+
+
+def _sale_dict(sale: dict, items: list[dict]) -> dict[str, Any]:
+    return {
+        **_sale_summary(sale),
+        "id": str(sale["id"]),
+        "storeId": str(sale["store_id"]),
+        "employeeId": str(sale["employee_id"]),
+        "chargedCents": sale["charged_cents"],
         "customerId": None,
         "customer": None,
         "qrId": sale["pey_qr_id"],
@@ -222,6 +239,56 @@ class PostgresBusinessStore:
             ]
         return {"items": items, "total": len(items)}
 
+    def update_product(self, tenant_id: str, product_id: uuid.UUID, body: ProductEditIn) -> dict[str, Any]:
+        with self._pool.connection() as conn:
+            set_tenant_context(conn, tenant_id=tenant_id, user_id="")
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """UPDATE products SET name = %s, unit = %s, price_cents = %s
+                       WHERE id = %s
+                       RETURNING *""",
+                    (body.name.strip(), body.unit.strip(), body.priceCents, product_id),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    raise HTTPException(404, "Producto no encontrado")
+                return _product_dict(row)
+
+    def overview(self, tenant_id: str) -> dict[str, Any]:
+        with self._pool.connection() as conn:
+            set_tenant_context(conn, tenant_id=tenant_id, user_id="")
+            tz_name = conn.execute("SELECT timezone FROM tenants WHERE id = %s", (tenant_id,)).fetchone()[0]
+            try:
+                local_zone = ZoneInfo(tz_name)
+            except (ValueError, ZoneInfoNotFoundError):
+                local_zone = ZoneInfo("America/Mexico_City")
+            today = datetime.now(local_zone).date()
+            beginning = datetime.combine(today, time.min, local_zone)
+            end = datetime.combine(today + timedelta(days=1), time.min, local_zone)
+            count, amount = conn.execute(
+                """SELECT count(*), coalesce(sum(total_cents), 0) FROM sales
+                   WHERE status = 'paid_cash' AND created_at >= %s AND created_at < %s""",
+                (beginning, end),
+            ).fetchone()
+            catalog_count = conn.execute("SELECT count(*) FROM products").fetchone()[0]
+        return {
+            "date": today.isoformat(), "timezone": local_zone.key, "cashSaleCount": count,
+            "cashSalesCents": amount, "productCount": catalog_count,
+        }
+
+    def list_sales(self, tenant_id: str, limit: int, offset: int) -> dict[str, Any]:
+        with self._pool.connection() as conn:
+            set_tenant_context(conn, tenant_id=tenant_id, user_id="")
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """SELECT id, created_at, status, payment_method, total_cents,
+                              cash_received_cents, change_cents FROM sales
+                       ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s""",
+                    (limit + 1, offset),
+                )
+                rows = cur.fetchall()
+        return {"items": [_sale_summary(row) for row in rows[:limit]], "hasMore": len(rows) > limit}
+
     def link_barcode(self, *, tenant_id: str, code: str, product_id: str) -> dict[str, Any]:
         with self._pool.connection() as conn:
             set_tenant_context(conn, tenant_id=tenant_id, user_id="")
@@ -264,11 +331,11 @@ class PostgresBusinessStore:
 
     def _verify_replay(
         self,
-        cur,
         existing: dict[str, Any],
         user_id: str,
         items: list[dict[str, Any]],
         cash_received_cents: int | None,
+        expected_total_cents: int | None,
     ) -> None:
         """Reject a reused Idempotency-Key whose normalized inputs changed."""
 
@@ -286,19 +353,11 @@ class PostgresBusinessStore:
             raise HTTPException(
                 status_code=409, detail="Idempotency-Key reutilizada con un carrito distinto"
             )
-        total_cents = 0
-        for item in items:
-            cur.execute(
-                "SELECT price_cents FROM products WHERE id = %s::uuid",
-                (item["product_id"],),
-            )
-            row = cur.fetchone()
-            if row is None:
-                raise HTTPException(status_code=404, detail="Producto no encontrado")
-            total_cents += line_total_cents(int(row["price_cents"]), item["qty_milli"])
+        total_cents = existing["totalCents"]
         received = total_cents if cash_received_cents is None else cash_received_cents
-        change = received - total_cents
-        if existing["cashReceivedCents"] != received or existing["changeCents"] != change:
+        if existing["cashReceivedCents"] != received or (
+            expected_total_cents is not None and expected_total_cents != total_cents
+        ):
             raise HTTPException(
                 status_code=409, detail="Idempotency-Key reutilizada con un importe distinto"
             )
@@ -318,6 +377,7 @@ class PostgresBusinessStore:
         cash_received_cents: int | None,
         note: str | None,
         idempotency_key: str | None = None,
+        expected_total_cents: int | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
         sale_id = (
@@ -328,11 +388,14 @@ class PostgresBusinessStore:
         with self._pool.connection() as conn:
             set_tenant_context(conn, tenant_id=tenant_id, user_id=user_id)
             with conn.cursor(row_factory=dict_row) as cur:
+                if idempotency_key:
+                    # Serialize attempts at the same sale before looking at stock.
+                    cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (sale_id,))
                 # Idempotent replay: a committed id returns its receipt before
                 # any product lock or stock validation.
                 existing = self._fetch_sale(cur, sale_id)
                 if existing is not None:
-                    self._verify_replay(cur, existing, user_id, items, cash_received_cents)
+                    self._verify_replay(existing, user_id, items, cash_received_cents, expected_total_cents)
                     conn.rollback()
                     return existing
 
@@ -374,7 +437,11 @@ class PostgresBusinessStore:
                     total_cents += line_total
                     lines.append({"product": product, "qty_milli": item["qty_milli"], "line_total": line_total})
 
+                if expected_total_cents is not None and expected_total_cents != total_cents:
+                    raise HTTPException(409, "El precio cambió. Actualiza el catálogo antes de cobrar.")
                 received = total_cents if cash_received_cents is None else cash_received_cents
+                if total_cents > PG_INT_MAX or received > PG_INT_MAX:
+                    raise HTTPException(400, "El importe excede el límite de la venta")
                 if received < total_cents:
                     raise HTTPException(status_code=400, detail="El efectivo recibido no cubre el total")
                 change = received - total_cents
@@ -394,8 +461,10 @@ class PostgresBusinessStore:
                 )
                 if cur.fetchone() is None:
                     winner = self._fetch_sale(cur, sale_id)
-                    conn.rollback()
-                    return winner if winner is not None else {}
+                    if winner is None:
+                        raise HTTPException(409, "No se pudo reservar el folio de la venta")
+                    self._verify_replay(winner, user_id, items, cash_received_cents, expected_total_cents)
+                    return winner
 
                 for line in lines:
                     product = line["product"]
@@ -464,11 +533,11 @@ def create_catalog_item(
     unit = body.unit.strip()
     if not unit:
         raise HTTPException(status_code=400, detail="La unidad es obligatoria")
-    if body.priceCents < 0:
-        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
+    if not 0 <= body.priceCents <= PG_INT_MAX:
+        raise HTTPException(status_code=400, detail="El precio está fuera del rango permitido")
     stock = 0 if body.stockMilli is None else int(body.stockMilli)
-    if stock < 0:
-        raise HTTPException(status_code=400, detail="El stock no puede ser negativo")
+    if not 0 <= stock <= PG_INT_MAX:
+        raise HTTPException(status_code=400, detail="La existencia está fuera del rango permitido")
     kind = (body.kind or "").strip() or "producto"
     unlimited = body.unlimitedStock if body.unlimitedStock is not None else kind != "producto"
     return store.add_product(
@@ -487,6 +556,27 @@ def create_catalog_item(
     )
 
 
+@router.patch("/catalog/{product_id}")
+def update_catalog_item(
+    product_id: uuid.UUID,
+    body: ProductEditIn,
+    ctx: SessionContext = Depends(require_owner),
+    store: PostgresBusinessStore = Depends(_store),
+):
+    if not body.name.strip() or not body.unit.strip():
+        raise HTTPException(400, "Escribe el nombre y la unidad del producto.")
+    return store.update_product(ctx.tenant_id, product_id, body)
+
+
+@router.get("/owner/overview")
+def owner_overview(
+    ctx: SessionContext = Depends(require_owner),
+    store: PostgresBusinessStore = Depends(_store),
+):
+    return store.overview(ctx.tenant_id)
+
+
+
 @router.post("/barcode/link")
 def barcode_link(
     body: BarcodeLinkIn,
@@ -499,18 +589,23 @@ def barcode_link(
     return store.link_barcode(tenant_id=ctx.tenant_id, code=code, product_id=body.productId)
 
 
-@router.post("/sales")
-def create_sale(
+def _record_cash_sale(
     body: SaleIn,
-    ctx: SessionContext = Depends(require_owner),
-    store: PostgresBusinessStore = Depends(_store),
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    store: PostgresBusinessStore,
+    tenant_id: str,
+    user_id: str,
+    idempotency_key: str | None,
 ):
     merged: dict[str, int] = {}
     for item in body.items:
-        if item.qtyMilli <= 0:
-            raise HTTPException(status_code=400, detail="qtyMilli debe ser mayor que cero")
-        merged[item.productId] = merged.get(item.productId, 0) + item.qtyMilli
+        try:
+            product_id = str(uuid.UUID(item.productId))
+        except ValueError:
+            raise HTTPException(400, "Identificador de producto inválido") from None
+        quantity = merged.get(product_id, 0) + item.qtyMilli
+        if not 0 < item.qtyMilli <= quantity <= PG_INT_MAX:
+            raise HTTPException(400, "Cantidad de producto fuera del rango permitido")
+        merged[product_id] = quantity
     if not merged:
         raise HTTPException(status_code=400, detail="La venta no tiene productos")
     if idempotency_key:
@@ -520,25 +615,82 @@ def create_sale(
             raise HTTPException(status_code=400, detail="Idempotency-Key no es un UUID válido")
     items = [{"product_id": pid, "qty_milli": qty} for pid, qty in merged.items()]
     return store.create_cash_sale(
-        tenant_id=ctx.tenant_id,
-        user_id=ctx.user_id,
+        tenant_id=tenant_id,
+        user_id=user_id,
         items=items,
         cash_received_cents=body.cashReceivedCents,
         note=body.note,
         idempotency_key=idempotency_key,
+        expected_total_cents=body.expectedTotalCents,
     )
+
+
+@router.post("/sales")
+def create_sale(
+    body: SaleIn,
+    ctx: SessionContext = Depends(require_owner),
+    store: PostgresBusinessStore = Depends(_store),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    return _record_cash_sale(body, store, ctx.tenant_id, ctx.user_id, idempotency_key)
+
+
+@router.get("/sales")
+def sale_history(
+    ctx: SessionContext = Depends(require_owner),
+    store: PostgresBusinessStore = Depends(_store),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    return store.list_sales(ctx.tenant_id, limit, offset)
 
 
 @router.get("/sales/{sale_id}")
 def get_sale(
-    sale_id: str,
+    sale_id: uuid.UUID,
     ctx: SessionContext = Depends(require_session),
     store: PostgresBusinessStore = Depends(_store),
 ):
-    sale = store.get_sale(tenant_id=ctx.tenant_id, sale_id=sale_id)
+    sale = store.get_sale(tenant_id=ctx.tenant_id, sale_id=str(sale_id))
     if sale is None:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     return sale
+
+
+def _require_mobile_cash_owner(
+    tenant_id: uuid.UUID,
+    request: Request,
+    ctx: IdentityContext = Depends(require_identity),
+) -> IdentityContext:
+    if not isinstance(ctx.token, MobileIdentity):
+        raise HTTPException(403, "Entra desde tu celular vinculado.")
+    service: IdentityService = request.app.state.identity_service
+    membership = service.select_tenant(ctx.user.id, str(tenant_id))
+    if membership.role != "owner" or not membership.can_sell:
+        raise HTTPException(403, "No tienes permiso para cobrar en esta tienda.")
+    return ctx
+
+
+@router.get("/owner/pos/{tenant_id}/catalog")
+def mobile_cash_catalog(
+    tenant_id: uuid.UUID,
+    ctx: IdentityContext = Depends(_require_mobile_cash_owner),
+    store: PostgresBusinessStore = Depends(_store),
+):
+    return store.list_products(tenant_id=str(tenant_id))
+
+
+@router.post("/owner/pos/{tenant_id}/sales")
+def record_mobile_cash_sale(
+    tenant_id: uuid.UUID,
+    body: SaleIn,
+    ctx: IdentityContext = Depends(_require_mobile_cash_owner),
+    store: PostgresBusinessStore = Depends(_store),
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1),
+):
+    if body.expectedTotalCents is None or body.cashReceivedCents is None:
+        raise HTTPException(400, "Confirma el total y el efectivo recibido.")
+    return _record_cash_sale(body, store, str(tenant_id), ctx.user.id, idempotency_key)
 
 
 # ---------------------------------------------------------------------------

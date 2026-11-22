@@ -30,10 +30,27 @@
   .error { color: #8e251d; }
   .receipt { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: 1rem; overflow-wrap: anywhere; }
   .code { display: block; width: fit-content; padding: .25rem .65rem; border-radius: .35rem; background: #edf5f0; font-size: 1.5rem; letter-spacing: .13em; }
+  .store-nav { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+  .store-nav a { padding: .55rem .9rem; border-radius: .55rem; color: #085239; font-weight: 700; }
+  .store-nav a[aria-current="page"] { background: #0b6e4f; color: white; text-decoration: none; }
+  .stack { display: grid; gap: 1rem; }
+  .row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .75rem; }
+  .metrics div { padding: .8rem; background: #edf5f0; border-radius: .55rem; }
+  .metrics dd { margin: 0; font-size: 1.6rem; font-weight: 750; }
+  .records { list-style: none; margin: 0; padding: 0; }
+  .records li { padding: .8rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  .record-title { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; column-gap: 1rem; }
+  .records small, .records code { display: block; color: var(--soft); }
+  .catalog-list { max-width: 100%; }
+  @media (max-width: 32rem) {
+    .store-nav a { padding-inline: .65rem; }
+    .record-title { row-gap: .2rem; }
+  }
 </style>
 </head>
 <body>
-<header><div class="container"><a href="/">Abarpay</a></div></header>
+<header><div class="container"><a href="/console#/inicio">Abarpay</a></div></header>
 <main class="container">
   <section id="login" aria-labelledby="login-title">
     <h1 id="login-title">Entrar a mi tienda</h1>
@@ -49,17 +66,23 @@
 
   <div id="owner" hidden>
     <h1 id="store-name" tabindex="-1"></h1>
-    <div class="columns">
-      <article aria-labelledby="product-title">
-        <h2 id="product-title">Agregar un producto</h2>
-        <form id="product-form">
-          <label>Nombre <input id="product-name" required maxlength="120" autocomplete="off"></label>
-          <label>Precio en pesos <input id="product-price" required inputmode="decimal" placeholder="18.00"></label>
-          <label>Existencia inicial <input id="product-stock" required inputmode="decimal" placeholder="1"></label>
-          <button id="save-product">Guardar producto</button>
-          <p class="status" id="product-status" role="status"></p>
-        </form>
-      </article>
+    <nav class="store-nav" aria-label="Mi tienda">
+      <a href="#/inicio" data-view="inicio">Inicio</a>
+      <a href="#/catalogo" data-view="catalogo">Catálogo</a>
+      <a href="#/ventas" data-view="ventas">Historial de ventas</a>
+    </nav>
+    <div id="view-inicio" class="stack" hidden>
+      <section aria-labelledby="home-title">
+        <h2 id="home-title">Inicio</h2>
+        <p class="status" id="overview-status" role="status"></p>
+        <p class="muted" id="overview-date" hidden></p>
+        <dl class="metrics" id="overview-metrics" hidden>
+          <div><dt>Ventas en efectivo hoy</dt><dd id="overview-sales"></dd></div>
+          <div><dt>Importe de hoy</dt><dd id="overview-amount"></dd></div>
+          <div><dt>Productos en catálogo</dt><dd id="overview-products"></dd></div>
+        </dl>
+        <button type="button" class="secondary" id="refresh-overview">Actualizar resumen</button>
+      </section>
 
       <article aria-labelledby="sale-title">
         <h2 id="sale-title">Venta en efectivo</h2>
@@ -74,6 +97,39 @@
         <div class="receipt" id="sale-receipt" aria-live="polite" hidden></div>
       </article>
     </div>
+    <div id="view-catalogo" class="columns" hidden>
+      <section aria-labelledby="catalog-title" class="catalog-list stack">
+        <h2 id="catalog-title">Catálogo</h2>
+        <label>Buscar producto <input id="product-search" type="search" autocomplete="off"></label>
+        <p class="status" id="catalog-status" role="status"></p>
+        <ul class="records" id="catalog-items" aria-label="Productos"></ul>
+        <button type="button" class="secondary" id="refresh-catalog">Actualizar catálogo</button>
+      </section>
+      <section aria-labelledby="product-title">
+        <h2 id="product-title">Agregar un producto</h2>
+        <form id="product-form">
+          <label>Nombre <input id="product-name" required maxlength="120" autocomplete="off"></label>
+          <label>Unidad <input id="product-unit" required maxlength="30" value="pieza" autocomplete="off"></label>
+          <label>Precio en pesos <input id="product-price" required inputmode="decimal" placeholder="18.00"></label>
+          <label id="initial-stock">Existencia inicial <input id="product-stock" required inputmode="decimal" value="0"></label>
+          <div class="row">
+            <button id="save-product">Guardar producto</button>
+            <button id="cancel-product-edit" type="button" class="secondary" hidden>Cancelar edición</button>
+          </div>
+          <p class="status" id="product-status" role="status"></p>
+        </form>
+      </section>
+    </div>
+    <section id="view-ventas" aria-labelledby="history-title" class="stack" hidden>
+      <h2 id="history-title">Historial de ventas</h2>
+      <div class="row"><button type="button" class="secondary" id="refresh-history">Actualizar historial</button></div>
+      <p class="status" id="history-status" role="status"></p>
+      <ol class="records" id="history-items" aria-label="Ventas de la tienda"></ol>
+      <div class="row">
+        <button type="button" class="secondary" id="previous-sales" hidden>Anteriores</button>
+        <button type="button" class="secondary" id="next-sales" hidden>Siguientes</button>
+      </div>
+    </section>
   </div>
 </main>
 <script>
@@ -89,6 +145,14 @@
   let catalog = [];
   let pollTimer;
   let qrUrl;
+  let editingProduct = null;
+  let storeZone = 'America/Mexico_City';
+  let catalogRequest = 0;
+  let historyRequest = 0;
+  let overviewRequest = 0;
+  let historyOffset = 0;
+  const historyLimit = 20;
+  const views = [...document.querySelectorAll('[data-view]')];
 
   function readStorage(key) {
     try { return JSON.parse(sessionStorage.getItem(key)); }
@@ -139,6 +203,13 @@
     auth = null;
     sessionStorage.removeItem(authKey);
     $('owner').hidden = true;
+    catalog = [];
+    $('history-items').replaceChildren();
+    $('catalog-items').replaceChildren();
+    $('overview-metrics').hidden = true;
+    $('overview-date').hidden = true;
+    $('sale-receipt').hidden = true;
+    resetProductForm();
     $('login').hidden = false;
     restartChallenge('Tu sesión terminó. Vuelve a entrar para abrir la tienda.');
     $('start-qr').focus();
@@ -190,14 +261,25 @@
 
   async function showStore(tenant) {
     if (!auth?.csrf || tenant.id !== auth.tenantId) return;
-    const data = await api('/api/catalog');
-    catalog = data.items;
     clearChallenge();
     $('login').hidden = true;
     $('owner').hidden = false;
     $('store-name').textContent = tenant.name;
     $('store-name').focus();
-    showProducts();
+    try {
+      new Intl.DateTimeFormat('es-MX', {timeZone: tenant.timezone});
+      storeZone = tenant.timezone || storeZone;
+    } catch (_) {
+      storeZone = 'America/Mexico_City';
+    }
+    $('sale-form').reset();
+    retryState(false);
+    status('sale-status', '');
+    restorePendingSale();
+    showView();
+  }
+
+  function restorePendingSale() {
     const pending = pendingSale();
     if (pending) {
       $('sale-product').value = pending.body.items[0].productId;
@@ -206,6 +288,180 @@
       showTotal();
       retryState(true);
       status('sale-status', 'Hay una venta por confirmar. Revisa el resultado antes de cobrar de nuevo.');
+    }
+  }
+
+  function viewFromHash() {
+    const id = location.hash.slice(2);
+    return views.some(link => link.dataset.view === id) ? id : 'inicio';
+  }
+
+  function showView() {
+    if (!auth || $('owner').hidden) return;
+    const current = viewFromHash();
+    for (const link of views) {
+      const active = current === link.dataset.view;
+      $('view-' + link.dataset.view).hidden = !active;
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    }
+    if (current === 'inicio') {
+      loadOverview();
+      loadCatalog({forSale: true});
+    } else if (current === 'catalogo') loadCatalog();
+    else loadHistory(0);
+  }
+
+  function requestError(id, error, fallback) {
+    if (error.status === 401) askToSignInAgain();
+    else status(id, error.status ? error.message : fallback, true);
+  }
+
+  async function loadOverview() {
+    const activeSession = auth;
+    const request = ++overviewRequest;
+    $('refresh-overview').disabled = true;
+    status('overview-status', 'Cargando el resumen…');
+    try {
+      const summary = await api('/api/owner/overview');
+      if (auth !== activeSession || request !== overviewRequest) return;
+      storeZone = summary.timezone;
+      $('overview-sales').textContent = summary.cashSaleCount;
+      $('overview-amount').textContent = money(summary.cashSalesCents);
+      $('overview-products').textContent = summary.productCount;
+      const reportDay = new Intl.DateTimeFormat('es-MX', {dateStyle: 'long', timeZone: 'UTC'});
+      $('overview-date').textContent = reportDay.format(new Date(summary.date + 'T12:00:00Z'));
+      $('overview-metrics').hidden = false;
+      $('overview-date').hidden = false;
+      status('overview-status', '');
+    } catch (error) {
+      if (auth === activeSession && request === overviewRequest) {
+        requestError('overview-status', error, 'No se pudo actualizar el resumen. Intenta de nuevo.');
+      }
+    } finally {
+      if (request === overviewRequest) $('refresh-overview').disabled = false;
+    }
+  }
+
+  async function loadCatalog({forSale = false} = {}) {
+    const activeSession = auth;
+    const request = ++catalogRequest;
+    const statusId = forSale ? 'sale-status' : 'catalog-status';
+    $('refresh-catalog').disabled = true;
+    status(statusId, 'Cargando el catálogo…');
+    try {
+      const data = await api('/api/catalog');
+      if (auth !== activeSession || request !== catalogRequest) return;
+      catalog = data.items;
+      showProducts();
+      renderCatalog();
+      if (forSale) {
+        status(statusId, catalog.length ? '' : 'Agrega un producto en Catálogo para cobrar.');
+        restorePendingSale();
+      }
+    } catch (error) {
+      if (auth === activeSession && request === catalogRequest) {
+        requestError(statusId, error, 'No se pudo cargar el catálogo. Intenta de nuevo.');
+      }
+    } finally {
+      if (request === catalogRequest) $('refresh-catalog').disabled = false;
+    }
+  }
+
+  function renderCatalog() {
+    const list = $('catalog-items');
+    list.replaceChildren();
+    const q = $('product-search').value.trim().toLocaleLowerCase('es-MX');
+    for (const product of catalog) {
+      if (q && ![product.name, ...(product.aliases || [])].some(value => value.toLocaleLowerCase('es-MX').includes(q))) continue;
+      const row = document.createElement('li');
+      const title = document.createElement('div');
+      title.className = 'record-title';
+      const name = document.createElement('strong');
+      name.textContent = product.name;
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'secondary';
+      edit.textContent = 'Editar';
+      edit.setAttribute('aria-label', 'Editar ' + product.name);
+      edit.addEventListener('click', () => editProduct(product));
+      title.append(name, edit);
+      const detail = document.createElement('small');
+      detail.textContent = money(product.priceCents) + ' / ' + product.unit + ' · ' +
+        (product.unlimitedStock ? 'Existencia ilimitada' : quantity.format(product.stockMilli / 1000) + ' disponibles');
+      row.append(title, detail);
+      list.append(row);
+    }
+    status('catalog-status', list.children.length ? '' :
+      (q ? 'No encontramos productos con esa búsqueda.' : 'Todavía no hay productos.'));
+  }
+
+  function resetProductForm() {
+    editingProduct = null;
+    $('product-form').reset();
+    $('product-title').textContent = 'Agregar un producto';
+    $('initial-stock').hidden = false;
+    $('product-stock').required = true;
+    $('cancel-product-edit').hidden = true;
+    status('product-status', '');
+  }
+
+  function editProduct(product) {
+    if ($('save-product').disabled) return;
+    editingProduct = product.id;
+    $('product-title').textContent = 'Editar producto';
+    $('product-name').value = product.name;
+    $('product-unit').value = product.unit;
+    $('product-price').value = (product.priceCents / 100).toFixed(2);
+    $('initial-stock').hidden = true;
+    $('product-stock').required = false;
+    $('cancel-product-edit').hidden = false;
+    status('product-status', '');
+    $('product-name').focus();
+  }
+
+  async function loadHistory(offset) {
+    const activeSession = auth;
+    const request = ++historyRequest;
+    const buttons = ['refresh-history', 'previous-sales', 'next-sales'];
+    for (const id of buttons) $(id).disabled = true;
+    status('history-status', 'Cargando las ventas…');
+    try {
+      const history = await api('/api/sales?limit=' + historyLimit + '&offset=' + offset);
+      if (auth !== activeSession || request !== historyRequest) return;
+      const date = new Intl.DateTimeFormat('es-MX', {dateStyle: 'medium', timeStyle: 'short', timeZone: storeZone});
+      const rows = history.items.map(sale => {
+        const row = document.createElement('li');
+        row.dataset.saleId = sale.saleId;
+        const title = document.createElement('div');
+        title.className = 'record-title';
+        const amount = document.createElement('strong');
+        amount.textContent = money(sale.totalCents);
+        const timestamp = document.createElement('time');
+        const created = new Date(sale.createdAt * 1000);
+        timestamp.dateTime = created.toISOString();
+        timestamp.textContent = date.format(created);
+        title.append(amount, timestamp);
+        const label = document.createElement('small');
+        const method = {cash: 'Efectivo', pey: 'CoDi', fiado: 'Fiado'}[sale.paymentMethod] || 'Venta';
+        const state = {paid_cash: 'Pagada', paid_pey: 'Pagada', paid: 'Pagada', pending: 'Pendiente'}[sale.status];
+        label.textContent = state ? method + ' · ' + state : method;
+        const folio = document.createElement('code');
+        folio.textContent = sale.saleId;
+        row.append(title, label, 'Folio ', folio);
+        return row;
+      });
+      $('history-items').replaceChildren(...rows);
+      historyOffset = offset;
+      $('previous-sales').hidden = offset === 0;
+      $('next-sales').hidden = !history.hasMore;
+      status('history-status', rows.length ? '' : 'Todavía no hay ventas.');
+    } catch (error) {
+      if (auth === activeSession && request === historyRequest) {
+        requestError('history-status', error, 'No se pudo actualizar el historial. Intenta de nuevo.');
+      }
+    } finally {
+      if (request === historyRequest) for (const id of buttons) $(id).disabled = false;
     }
   }
 
@@ -231,10 +487,11 @@
   }
 
   function showTotal() {
+    const savedAmount = auth ? pendingSale()?.body.expectedTotalCents : undefined;
     const product = catalog.find(item => item.id === $('sale-product').value);
     const qty = scaledInput('sale-quantity', 3);
-    const total = product && qty > 0 && Number.isSafeInteger(qty * product.priceCents)
-      ? Math.round(qty * product.priceCents / 1000) : null;
+    const total = savedAmount ?? (product && qty > 0 && Number.isSafeInteger(qty * product.priceCents)
+      ? Math.round(qty * product.priceCents / 1000) : null);
     status('sale-total', total === null ? '' : 'Total ' + money(total));
     return total;
   }
@@ -248,30 +505,46 @@
   }
 
   $('start-qr').addEventListener('click', startChallenge);
+  window.addEventListener('hashchange', showView);
+  $('refresh-overview').addEventListener('click', () => { loadOverview(); loadCatalog({forSale: true}); });
+  $('refresh-catalog').addEventListener('click', () => loadCatalog());
+  $('refresh-history').addEventListener('click', () => loadHistory(0));
+  $('previous-sales').addEventListener('click', () => loadHistory(Math.max(0, historyOffset - historyLimit)));
+  $('next-sales').addEventListener('click', () => loadHistory(historyOffset + historyLimit));
+  $('product-search').addEventListener('input', renderCatalog);
+  $('cancel-product-edit').addEventListener('click', resetProductForm);
   $('sale-product').addEventListener('change', showTotal);
   $('sale-quantity').addEventListener('input', showTotal);
 
   $('product-form').addEventListener('submit', async event => {
     event.preventDefault();
+    const productId = editingProduct;
     const name = $('product-name').value.trim();
+    const unit = $('product-unit').value.trim();
     const priceCents = scaledInput('product-price', 2);
     const stockMilli = scaledInput('product-stock', 3);
-    if (!name || priceCents === null || priceCents <= 0 || stockMilli === null) {
-      status('product-status', 'Escribe el nombre, un precio mayor a cero y la existencia.', true);
+    if (!name || !unit || priceCents === null || priceCents > 2147483647 ||
+      (!productId && (stockMilli === null || stockMilli > 2147483647))) {
+      status('product-status', 'Revisa el nombre, la unidad, el precio y la existencia inicial.', true);
       return;
     }
     $('save-product').disabled = true;
+    $('cancel-product-edit').disabled = true;
     status('product-status', 'Guardando el producto…');
     try {
-      const product = await api('/api/catalog', {
-        method: 'POST', body: { name, unit: 'pieza', priceCents, stockMilli },
+      const body = { name, unit, priceCents };
+      if (!productId) body.stockMilli = stockMilli;
+      const product = await api(productId ? '/api/catalog/' + encodeURIComponent(productId) : '/api/catalog', {
+        method: productId ? 'PATCH' : 'POST', body,
       });
-      catalog.push(product);
-      event.target.reset();
+      catalog = [...catalog.filter(item => item.id !== product.id), product]
+        .sort((a, b) => a.name.localeCompare(b.name, 'es-MX'));
+      resetProductForm();
       showProducts();
-      if (stockMilli > 0) $('sale-product').value = product.id;
+      renderCatalog();
+      if (!pendingSale() && product.stockMilli > 0) $('sale-product').value = product.id;
       showTotal();
-      status('product-status', 'Producto guardado.');
+      status('product-status', productId ? 'Cambios guardados.' : 'Producto guardado.');
     } catch (error) {
       if (error.status === 401 || error.status === 403) {
         askToSignInAgain();
@@ -280,6 +553,7 @@
       status('product-status', error.status ? error.message : 'No se pudo confirmar el guardado. Revisa tu conexión.', true);
     } finally {
       $('save-product').disabled = false;
+      $('cancel-product-edit').disabled = false;
     }
   });
 
@@ -296,7 +570,7 @@
       }
       pending = {
         key: crypto.randomUUID(),
-        body: { items: [{ productId: $('sale-product').value, qtyMilli }], cashReceivedCents },
+        body: { items: [{ productId: $('sale-product').value, qtyMilli }], cashReceivedCents, expectedTotalCents: total },
       };
       try { sessionStorage.setItem(pendingKey(), JSON.stringify(pending)); }
       catch (_) {
@@ -319,11 +593,8 @@
       $('sale-cash').value = '';
       retryState(false);
       status('sale-status', '');
-      const updated = await api('/api/catalog').catch(() => null);
-      if (updated) {
-        catalog = updated.items;
-        showProducts();
-      }
+      loadCatalog({forSale: true});
+      loadOverview();
     } catch (error) {
       if (error.status === 401 || error.status === 403) {
         askToSignInAgain();
