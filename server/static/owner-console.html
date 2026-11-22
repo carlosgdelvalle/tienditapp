@@ -135,6 +135,15 @@
     $('start-qr').textContent = 'Generar otro código';
   }
 
+  function askToSignInAgain() {
+    auth = null;
+    sessionStorage.removeItem(authKey);
+    $('owner').hidden = true;
+    $('login').hidden = false;
+    restartChallenge('Tu sesión terminó. Vuelve a entrar para abrir la tienda.');
+    $('start-qr').focus();
+  }
+
   async function startChallenge() {
     clearChallenge();
     $('start-qr').disabled = true;
@@ -264,6 +273,10 @@
       showTotal();
       status('product-status', 'Producto guardado.');
     } catch (error) {
+      if (error.status === 401 || error.status === 403) {
+        askToSignInAgain();
+        return;
+      }
       status('product-status', error.status ? error.message : 'No se pudo confirmar el guardado. Revisa tu conexión.', true);
     } finally {
       $('save-product').disabled = false;
@@ -312,7 +325,9 @@
         showProducts();
       }
     } catch (error) {
-      if ([400, 404, 409, 422].includes(error.status)) {
+      if (error.status === 401 || error.status === 403) {
+        askToSignInAgain();
+      } else if ([400, 404, 409, 422].includes(error.status)) {
         sessionStorage.removeItem(pendingKey());
         retryState(false);
         status('sale-status', error.message, true);
