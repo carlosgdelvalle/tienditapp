@@ -29,12 +29,25 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="abarpay" android:host="empleado" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="abarpay" android:host="dueno" />
+            </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="abarpay-api.onrender.com" android:pathPrefix="/invite/" />
             </intent-filter>
-        </activity>
+                <!-- Retorno OIDC del dueño. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${applicationId}" android:host="oidc" android:path="/callback" />
+            </intent-filter>
+    </activity>
     </application>
 </manifest>

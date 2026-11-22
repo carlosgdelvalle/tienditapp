@@ -212,6 +212,29 @@ def _set_challenge_cookie(
     )
 
 
+def _qr_svg(data: str) -> str | None:
+    """Render the challenge QR as an inline SVG for the browser console.
+
+    Uses the optional segno dependency so the owner page never needs a JS QR
+    library. Returns None when segno is unavailable; production installs it via
+    server/requirements.txt.
+    """
+
+    try:
+        import segno
+    except ImportError:
+        return None
+    try:
+        svg = segno.make_qr(data).svg_inline(scale=6)
+        # svg_inline() omits the XML namespace; a Blob served as image/svg+xml
+        # requires a valid standalone SVG document.
+        if "xmlns=" not in svg[:80]:
+            svg = svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ', 1)
+        return svg
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
@@ -259,6 +282,7 @@ def create_challenge(
         "challengeId": challenge.id,
         "code": challenge.code,
         "qr": qr,
+        "qrSvg": _qr_svg(qr),
         "expiresAt": challenge.expires_at,
     }
 

@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi tienda · Abarpay</title>
+<style>
+  :root { color-scheme: light; --ink: #16202b; --soft: #465463; --brand: #0b6e4f; --line: #bdc9c5; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 1rem/1.55 system-ui, sans-serif; background: #f3f7f5; color: var(--ink); }
+  header { background: white; border-bottom: 1px solid var(--line); }
+  .container { max-width: 62rem; margin-inline: auto; padding: 1.25rem clamp(1rem, 4vw, 2.5rem); }
+  header a { color: #085239; font-size: 1.35rem; font-weight: 750; text-decoration: none; }
+  h1, h2 { line-height: 1.2; margin: 0 0 .8rem; }
+  section, article { background: white; border: 1px solid var(--line); border-radius: .9rem; padding: clamp(1rem, 3vw, 2rem); }
+  .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1rem; }
+  form { display: grid; gap: .85rem; align-items: start; }
+  label { display: grid; gap: .25rem; font-weight: 650; min-width: 0; }
+  input, select, button { font: inherit; min-height: 2.85rem; border-radius: .55rem; }
+  input, select { width: 100%; padding: .55rem .7rem; border: 1px solid #758681; background: white; color: var(--ink); }
+  button { justify-self: start; border: 1px solid var(--brand); padding: .55rem 1rem; background: var(--brand); color: white; font-weight: 700; cursor: pointer; }
+  button:disabled { cursor: wait; background: #40594e; border-color: #40594e; }
+  :focus-visible { outline: 3px solid #285fba; outline-offset: 3px; }
+  code { overflow-wrap: anywhere; }
+  img { max-width: 100%; height: auto; }
+  .secondary { background: white; color: #085239; }
+  .muted { color: var(--soft); }
+  .status { margin: 0; min-height: 1.55em; overflow-wrap: anywhere; }
+  .error { color: #8e251d; }
+  .receipt { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: 1rem; overflow-wrap: anywhere; }
+  .code { display: block; width: fit-content; padding: .25rem .65rem; border-radius: .35rem; background: #edf5f0; font-size: 1.5rem; letter-spacing: .13em; }
+</style>
+</head>
+<body>
+<header><div class="container"><a href="/">Abarpay</a></div></header>
+<main class="container">
+  <section id="login" aria-labelledby="login-title">
+    <h1 id="login-title">Entrar a mi tienda</h1>
+    <p>Abre Abarpay en tu teléfono. Escanea el QR, compara el código y aprueba este acceso.</p>
+    <button type="button" id="start-qr">Mostrar código QR</button>
+    <p class="status" id="login-status" role="status"></p>
+    <div id="challenge" hidden>
+      <img id="owner-qr" width="224" height="224" alt="Código QR para abrir tu tienda con la app Abarpay" hidden>
+      <p>Código para comprobar el acceso en tu teléfono</p>
+      <output class="code" id="matching-code"></output>
+    </div>
+  </section>
+
+  <div id="owner" hidden>
+    <h1 id="store-name" tabindex="-1"></h1>
+    <div class="columns">
+      <article aria-labelledby="product-title">
+        <h2 id="product-title">Agregar un producto</h2>
+        <form id="product-form">
+          <label>Nombre <input id="product-name" required maxlength="120" autocomplete="off"></label>
+          <label>Precio en pesos <input id="product-price" required inputmode="decimal" placeholder="18.00"></label>
+          <label>Existencia inicial <input id="product-stock" required inputmode="decimal" placeholder="1"></label>
+          <button id="save-product">Guardar producto</button>
+          <p class="status" id="product-status" role="status"></p>
+        </form>
+      </article>
+
+      <article aria-labelledby="sale-title">
+        <h2 id="sale-title">Venta en efectivo</h2>
+        <form id="sale-form">
+          <label>Producto <select id="sale-product" required><option value="">Selecciona un producto</option></select></label>
+          <label>Cantidad <input id="sale-quantity" value="1" required inputmode="decimal"></label>
+          <p class="status" id="sale-total" role="status"></p>
+          <label>Efectivo recibido en pesos <input id="sale-cash" required inputmode="decimal" placeholder="20.00"></label>
+          <button id="record-sale">Registrar venta</button>
+          <p class="status" id="sale-status" role="status"></p>
+        </form>
+        <div class="receipt" id="sale-receipt" aria-live="polite" hidden></div>
+      </article>
+    </div>
+  </div>
+</main>
+<script>
+(() => {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const price = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+  const quantity = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 3 });
+  const money = cents => price.format(cents / 100);
+  const authKey = 'abarpay.owner.browser';
+  let auth = readStorage(authKey);
+  let catalog = [];
+  let pollTimer;
+  let qrUrl;
+
+  function readStorage(key) {
+    try { return JSON.parse(sessionStorage.getItem(key)); }
+    catch (_) { return null; }
+  }
+
+  function status(id, message, failed = false) {
+    $(id).textContent = message;
+    $(id).classList.toggle('error', failed);
+  }
+
+  async function api(path, { method = 'GET', body, key } = {}) {
+    const headers = { Accept: 'application/json' };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (auth?.csrf) headers['X-CSRF-Token'] = auth.csrf;
+    if (key) headers['Idempotency-Key'] = key;
+    const response = await fetch(path, {
+      method, headers, credentials: 'same-origin', cache: 'no-store',
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      const error = new Error(typeof data.detail === 'string' ? data.detail : 'Revisa los datos e intenta de nuevo.');
+      error.status = response.status;
+      throw error;
+    }
+    return data;
+  }
+
+  function clearChallenge() {
+    clearTimeout(pollTimer);
+    if (qrUrl) URL.revokeObjectURL(qrUrl);
+    qrUrl = undefined;
+    $('owner-qr').hidden = true;
+    $('owner-qr').removeAttribute('src');
+    $('challenge').hidden = true;
+  }
+
+  function restartChallenge(message) {
+    clearChallenge();
+    status('login-status', message);
+    $('start-qr').disabled = false;
+    $('start-qr').textContent = 'Generar otro código';
+  }
+
+  function askToSignInAgain() {
+    auth = null;
+    sessionStorage.removeItem(authKey);
+    $('owner').hidden = true;
+    $('login').hidden = false;
+    restartChallenge('Tu sesión terminó. Vuelve a entrar para abrir la tienda.');
+    $('start-qr').focus();
+  }
+
+  async function startChallenge() {
+    clearChallenge();
+    $('start-qr').disabled = true;
+    status('login-status', 'Generando el código…');
+    try {
+      const challenge = await api('/api/auth/challenge', {method: 'POST', body: {intent: 'browser_login'}});
+      if (typeof challenge.qrSvg !== 'string') throw new Error('No se pudo mostrar el código QR.');
+      qrUrl = URL.createObjectURL(new Blob([challenge.qrSvg], {type: 'image/svg+xml'}));
+      $('owner-qr').src = qrUrl;
+      $('owner-qr').hidden = false;
+      $('matching-code').textContent = challenge.code;
+      $('challenge').hidden = false;
+      status('login-status', 'Esperando tu aprobación en el teléfono…');
+      pollTimer = setTimeout(() => poll(challenge), 750);
+    } catch (_) {
+      restartChallenge('No se pudo mostrar el código. Revisa tu conexión e intenta de nuevo.');
+    }
+  }
+
+  async function poll(challenge) {
+    const path = '/api/auth/challenge/' + encodeURIComponent(challenge.challengeId);
+    if (Date.now() >= challenge.expiresAt * 1000) {
+      restartChallenge('El código venció. Genera otro para entrar.');
+      return;
+    }
+    try {
+      const current = await api(path);
+      if (current.status === 'pending') {
+        pollTimer = setTimeout(() => poll(challenge), 750);
+        return;
+      }
+      if (current.status !== 'approved') {
+        restartChallenge(current.status === 'denied' ? 'Se rechazó el acceso.' : 'Genera otro código para entrar.');
+        return;
+      }
+      const session = await api(path + '/exchange', {method: 'POST'});
+      auth = { tenantId: session.tenant.id, csrf: session.csrfToken };
+      sessionStorage.setItem(authKey, JSON.stringify(auth));
+      await showStore(session.tenant);
+    } catch (_) {
+      restartChallenge('No se pudo completar el acceso. Genera otro código para entrar.');
+    }
+  }
+
+  async function showStore(tenant) {
+    if (!auth?.csrf || tenant.id !== auth.tenantId) return;
+    const data = await api('/api/catalog');
+    catalog = data.items;
+    clearChallenge();
+    $('login').hidden = true;
+    $('owner').hidden = false;
+    $('store-name').textContent = tenant.name;
+    $('store-name').focus();
+    showProducts();
+    const pending = pendingSale();
+    if (pending) {
+      $('sale-product').value = pending.body.items[0].productId;
+      $('sale-quantity').value = String(pending.body.items[0].qtyMilli / 1000);
+      $('sale-cash').value = String(pending.body.cashReceivedCents / 100);
+      showTotal();
+      retryState(true);
+      status('sale-status', 'Hay una venta por confirmar. Revisa el resultado antes de cobrar de nuevo.');
+    }
+  }
+
+  function showProducts() {
+    const control = $('sale-product');
+    const before = control.value;
+    control.replaceChildren(new Option('Selecciona un producto', ''));
+    for (const product of catalog) {
+      const available = product.unlimitedStock || product.stockMilli > 0;
+      const stock = product.unlimitedStock ? '' : ' · ' + quantity.format(product.stockMilli / 1000) + ' disponibles';
+      const option = new Option(product.name + ' · ' + money(product.priceCents) + stock, product.id);
+      option.disabled = !available;
+      control.append(option);
+    }
+    control.value = before && catalog.some(product => product.id === before) ? before : '';
+    showTotal();
+  }
+
+  function scaledInput(id, digits) {
+    const pattern = new RegExp('^(\\d{1,7})(?:[.,](\\d{1,' + digits + '}))?$');
+    const match = pattern.exec($(id).value.trim());
+    return match ? Number(match[1] + (match[2] || '').padEnd(digits, '0')) : null;
+  }
+
+  function showTotal() {
+    const product = catalog.find(item => item.id === $('sale-product').value);
+    const qty = scaledInput('sale-quantity', 3);
+    const total = product && qty > 0 && Number.isSafeInteger(qty * product.priceCents)
+      ? Math.round(qty * product.priceCents / 1000) : null;
+    status('sale-total', total === null ? '' : 'Total ' + money(total));
+    return total;
+  }
+
+  function pendingKey() { return 'abarpay.owner.sale.' + auth.tenantId; }
+  function pendingSale() { return readStorage(pendingKey()); }
+
+  function retryState(hasPending) {
+    for (const id of ['sale-product', 'sale-quantity', 'sale-cash']) $(id).disabled = hasPending;
+    $('record-sale').textContent = hasPending ? 'Confirmar venta pendiente' : 'Registrar venta';
+  }
+
+  $('start-qr').addEventListener('click', startChallenge);
+  $('sale-product').addEventListener('change', showTotal);
+  $('sale-quantity').addEventListener('input', showTotal);
+
+  $('product-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const name = $('product-name').value.trim();
+    const priceCents = scaledInput('product-price', 2);
+    const stockMilli = scaledInput('product-stock', 3);
+    if (!name || priceCents === null || priceCents <= 0 || stockMilli === null) {
+      status('product-status', 'Escribe el nombre, un precio mayor a cero y la existencia.', true);
+      return;
+    }
+    $('save-product').disabled = true;
+    status('product-status', 'Guardando el producto…');
+    try {
+      const product = await api('/api/catalog', {
+        method: 'POST', body: { name, unit: 'pieza', priceCents, stockMilli },
+      });
+      catalog.push(product);
+      event.target.reset();
+      showProducts();
+      if (stockMilli > 0) $('sale-product').value = product.id;
+      showTotal();
+      status('product-status', 'Producto guardado.');
+    } catch (error) {
+      if (error.status === 401 || error.status === 403) {
+        askToSignInAgain();
+        return;
+      }
+      status('product-status', error.status ? error.message : 'No se pudo confirmar el guardado. Revisa tu conexión.', true);
+    } finally {
+      $('save-product').disabled = false;
+    }
+  });
+
+  $('sale-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    let pending = pendingSale();
+    if (!pending) {
+      const qtyMilli = scaledInput('sale-quantity', 3);
+      const cashReceivedCents = scaledInput('sale-cash', 2);
+      const total = showTotal();
+      if (!$('sale-product').value || !qtyMilli || cashReceivedCents === null || total === null || cashReceivedCents < total) {
+        status('sale-status', 'Elige un producto, revisa la cantidad y escribe el efectivo recibido.', true);
+        return;
+      }
+      pending = {
+        key: crypto.randomUUID(),
+        body: { items: [{ productId: $('sale-product').value, qtyMilli }], cashReceivedCents },
+      };
+      try { sessionStorage.setItem(pendingKey(), JSON.stringify(pending)); }
+      catch (_) {
+        status('sale-status', 'El navegador no pudo guardar el intento. Revisa la configuración antes de cobrar.', true);
+        return;
+      }
+    }
+    $('record-sale').disabled = true;
+    $('sale-receipt').hidden = true;
+    retryState(true);
+    status('sale-status', 'Confirmando la venta…');
+    try {
+      const receipt = await api('/api/sales', {method: 'POST', key: pending.key, body: pending.body});
+      const folio = document.createElement('code');
+      folio.textContent = receipt.saleId;
+      $('sale-receipt').replaceChildren('Venta registrada. Total ' + money(receipt.totalCents) +
+        '. Cambio ' + money(receipt.changeCents) + '. Folio ', folio);
+      $('sale-receipt').hidden = false;
+      sessionStorage.removeItem(pendingKey());
+      $('sale-cash').value = '';
+      retryState(false);
+      status('sale-status', '');
+      const updated = await api('/api/catalog').catch(() => null);
+      if (updated) {
+        catalog = updated.items;
+        showProducts();
+      }
+    } catch (error) {
+      if (error.status === 401 || error.status === 403) {
+        askToSignInAgain();
+      } else if ([400, 404, 409, 422].includes(error.status)) {
+        sessionStorage.removeItem(pendingKey());
+        retryState(false);
+        status('sale-status', error.message, true);
+      } else {
+        status('sale-status', 'Venta por confirmar. Revisa el resultado antes de cobrar de nuevo.', true);
+      }
+    } finally {
+      $('record-sale').disabled = false;
+    }
+  });
+
+  if (auth?.csrf) {
+    status('login-status', 'Revisando tu sesión…');
+    api('/api/tenant').then(showStore).then(() => status('login-status', '')).catch(() => {
+      auth = null;
+      sessionStorage.removeItem(authKey);
+      status('login-status', 'Vuelve a entrar para abrir tu tienda.');
+    });
+  }
+})();
+</script>
+</body>
+</html>

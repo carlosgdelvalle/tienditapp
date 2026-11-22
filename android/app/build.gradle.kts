@@ -12,6 +12,13 @@ if (keystoreFile.exists()) {
     keystoreFile.inputStream().use { keystoreProps.load(it) }
 }
 
+// Valores públicos configurables por Gradle (-PCLAVE=valor) o entorno (CLAVE).
+// Nombres exactos: OWNER_API_BASE_URL, AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_AUDIENCE.
+// Callback OIDC (Native): {applicationId}://oidc/callback (manifest y OwnerOidcClient).
+// En blanco por defecto: la demo SQLite y las pruebas usan solo endpoints de fixture.
+fun gradleConfig(name: String, default: String = "") : String =
+    (project.findProperty(name) as String?) ?: System.getenv(name) ?: default
+
 android {
     namespace = "mx.abarpay.mobile"
     compileSdk = 35
@@ -23,6 +30,11 @@ android {
         versionName = "1.2.3"
         // Servidor HTTPS estable de Render para la demo.
         buildConfigField("String", "DEMO_SERVER", "\"https://abarpay-api.onrender.com\"")
+        // Backend PG del dueño (en blanco: no apunta a la demo SQLite).
+        buildConfigField("String", "OWNER_API_BASE_URL", "\"" + gradleConfig("OWNER_API_BASE_URL") + "\"")
+        buildConfigField("String", "AUTH0_DOMAIN", "\"" + gradleConfig("AUTH0_DOMAIN") + "\"")
+        buildConfigField("String", "AUTH0_CLIENT_ID", "\"" + gradleConfig("AUTH0_CLIENT_ID") + "\"")
+        buildConfigField("String", "AUTH0_AUDIENCE", "\"" + gradleConfig("AUTH0_AUDIENCE") + "\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
