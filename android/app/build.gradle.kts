@@ -19,6 +19,8 @@ if (keystoreFile.exists()) {
 fun gradleConfig(name: String, default: String = "") : String =
     (project.findProperty(name) as String?) ?: System.getenv(name) ?: default
 
+val deviceTest = providers.gradleProperty("ABARPAY_DEVICE_TEST").orNull == "true"
+
 android {
     namespace = "mx.abarpay.mobile"
     compileSdk = 35
@@ -28,6 +30,7 @@ android {
         targetSdk = 35
         versionCode = 15
         versionName = "1.2.3"
+        manifestPlaceholders["abarpayLabel"] = "Abarpay"
         // Servidor HTTPS estable de Render para la demo.
         buildConfigField("String", "DEMO_SERVER", "\"https://abarpay-api.onrender.com\"")
         // Backend PG del dueño (en blanco: no apunta a la demo SQLite).
@@ -54,7 +57,10 @@ android {
         }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".dev" }
+        debug {
+            applicationIdSuffix = if (deviceTest) ".qa" else ".dev"
+            if (deviceTest) manifestPlaceholders["abarpayLabel"] = "Abarpay QA"
+        }
         release {
             isMinifyEnabled = false
             if (keystoreFile.exists()) signingConfig = signingConfigs.getByName("release")
