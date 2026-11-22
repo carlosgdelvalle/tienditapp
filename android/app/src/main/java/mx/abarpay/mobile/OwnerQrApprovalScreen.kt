@@ -1,5 +1,6 @@
 package mx.abarpay.mobile
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,22 +25,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
 
 /**
  * Pantalla del dueño para aprobar el ingreso por QR a la consola (J-11).
- * El token se resuelve con [OwnerAuth] (OIDC real) o [OwnerAuthSeam] en pruebas.
- * Si el dueño no tiene tienda se muestra el alta; al escanear se muestra el
- * código de verificación y la tienda real de la membresía, y solo un
- * "Aprobar acceso" explícito firma y aprueba el reto. Cancelar deja el reto
- * sin aprobar. Toda llamada de red corre en Dispatchers.IO.
+ * El primer "Entrar" lanza el navegador con OwnerAuth.beginSignIn() si no hay
+ * token; cuando el retorno OIDC incrementa [authRevision] se retoman las
+ * membresías y se sigue al alta o al escáner. Si el navegador vuelve sin
+ * retorno se limpia el estado para reintentar. Toda llamada de red corre en
+ * Dispatchers.IO.
  */
 @Composable
 fun OwnerQrApprovalScreen(
     ownerAuth: OwnerAuth,
     apiBaseUrl: String,
+    authRevision: Int,
+    authError: String?,
     onApproved: (String) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -53,6 +61,46 @@ fun OwnerQrApprovalScreen(
     var pendingCode by remember { mutableStateOf("") }
     var pendingStore by remember { mutableStateOf("") }
     var pendingRaw by remember { mutableStateOf("") }
+    var waitingOidc by remember { mutableStateOf(false) }
+    var oidcRevisionAtClick by remember { mutableStateOf(0) }
+
+    suspend fun proceed() {
+        busy = true
+        runCatching {
+            val token = resolveOwnerToken(ownerAuth)
+            val api = OwnerQrApi(apiBaseUrl, token)
+            val tenants = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                api.ownerTenantIds()
+            }
+            if (tenants.isEmpty()) step = "signup" else step = "scanning"
+        }.onFailure { error = it.message ?: "No se pudo iniciar sesión" }
+        busy = false
+    }
+
+    LaunchedEffect(authRevision) {
+        if (authRevision > 0) {
+            waitingOidc = false
+            if (authError != null) {
+                error = authError
+                busy = false
+            } else {
+                proceed()
+            }
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && waitingOidc && authRevision == oidcRevisionAtClick) {
+                waitingOidc = false
+                busy = false
+                error = "No se completó el inicio de sesión. Intenta de nuevo."
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     if (step == "scanning") {
         ContinuousScannerScreen(
@@ -178,17 +226,20 @@ fun OwnerQrApprovalScreen(
                 }
                 Button(
                     onClick = {
-                        scope.launch {
+                        if (OwnerAuthSeam.tokenProvider != null || ownerAuth.accessToken() != null) {
+                            scope.launch { proceed() }
+                        } else {
                             busy = true
+                            oidcRevisionAtClick = authRevision
+                            waitingOidc = true
                             runCatching {
-                                val token = resolveOwnerToken(ownerAuth)
-                                val api = OwnerQrApi(apiBaseUrl, token)
-                                val tenants = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    api.ownerTenantIds()
-                                }
-                                if (tenants.isEmpty()) step = "signup" else step = "scanning"
-                            }.onFailure { error = it.message ?: "No se pudo iniciar sesión" }
-                            busy = false
+                                val intent = ownerAuth.beginSignIn().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(intent)
+                            }.onFailure {
+                                waitingOidc = false
+                                busy = false
+                                error = it.message ?: "No se pudo abrir el inicio de sesión"
+                            }
                         }
                     },
                     enabled = !busy && apiBaseUrl.isNotBlank(),

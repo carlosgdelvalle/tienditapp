@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +31,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +62,8 @@ class MainActivity : ComponentActivity() {
     /** Token de abarpay://empleado/<token> o https://…/invite/<token>. */
     private var deepLink by mutableStateOf<String?>(null)
     private var showOwnerApproval by mutableStateOf(false)
+    private var authRevision by mutableStateOf(0)
+    private var authError by mutableStateOf<String?>(null)
 
     private val ownerAuth: OwnerAuth by lazy {
         OwnerOidcAuthAdapter(
@@ -97,11 +101,13 @@ class MainActivity : ComponentActivity() {
                         OwnerQrApprovalScreen(
                             ownerAuth = ownerAuth,
                             apiBaseUrl = BuildConfig.OWNER_API_BASE_URL,
+                            authRevision = authRevision,
+                            authError = authError,
                             onApproved = { showOwnerApproval = false },
                             onClose = { showOwnerApproval = false },
                         )
                     } else {
-                        AbarpayApp(state, model) { scanning = true }
+                        AbarpayApp(state, model, scan = { scanning = true }, openOwner = { showOwnerApproval = true }, ownerConfigured = ownerConfigured)
                     }
                     if (scanning) {
                         ContinuousScannerScreen(
@@ -123,16 +129,34 @@ class MainActivity : ComponentActivity() {
         handleIncomingIntent(intent)
     }
 
+    private val ownerConfigured: Boolean
+        get() = BuildConfig.OWNER_API_BASE_URL.isNotBlank() &&
+            BuildConfig.AUTH0_DOMAIN.isNotBlank() &&
+            BuildConfig.AUTH0_CLIENT_ID.isNotBlank() &&
+            BuildConfig.AUTH0_AUDIENCE.isNotBlank()
+
     private fun handleIncomingIntent(intent: Intent?) {
         val data = intent?.data
         if (data != null && data.scheme == BuildConfig.APPLICATION_ID && data.host == "oidc" && data.path == "/callback") {
             lifecycleScope.launch {
                 runCatching { ownerAuth.completeSignIn(data) }
+                    .onSuccess {
+                        authError = null
+                        authRevision += 1
+                        showOwnerApproval = true
+                    }
+                    .onFailure {
+                        authError = it.message
+                        authRevision += 1
+                        showOwnerApproval = true
+                    }
             }
             return
         }
         if (data != null && data.scheme == "abarpay" && data.host == "dueno") {
-            showOwnerApproval = true
+            if (ownerConfigured) {
+                showOwnerApproval = true
+            }
             return
         }
         extractInviteToken(intent?.dataString)?.let { deepLink = it }
@@ -140,7 +164,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
+private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOwner: () -> Unit, ownerConfigured: Boolean) {
     var settings by rememberSaveable { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current
 
@@ -200,7 +224,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         ) {
             Column(Modifier.fillMaxSize().imePadding()) {
-                CompactHeader()
+                CompactHeader(onOwner = if (ownerConfigured) openOwner else null)
                 if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Notice(
                     when {
@@ -237,7 +261,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit) {
 
 /** Encabezado compacto: solo el logo pequeño dentro del contenido, sin nombre ni URL. */
 @Composable
-private fun CompactHeader() {
+private fun CompactHeader(onOwner: (() -> Unit)?) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -248,6 +272,12 @@ private fun CompactHeader() {
                 "Abarpay",
                 Modifier.padding(horizontal = 8.dp, vertical = 5.dp).width(58.dp).height(19.dp),
             )
+        }
+        Spacer(Modifier.weight(1f))
+        if (onOwner != null) {
+            TextButton(onClick = onOwner, modifier = Modifier.testTag("owner-entry")) {
+                Text("Consola", fontSize = 12.sp)
+            }
         }
     }
 }
