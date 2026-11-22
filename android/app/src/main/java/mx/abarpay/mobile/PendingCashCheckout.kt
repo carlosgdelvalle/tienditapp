@@ -82,6 +82,10 @@ internal fun recoverPendingCashCheckout(
     if (pending.server != currentServer) return null
     coordinator.attach(pending.storeId)
     val saleId = saleIdFromEventId(pending.eventId)
+    // Sin una versión compatible no se genera un evento divergente: se resuelve por recibo.
+    if (pending.catalogVersion == 0L) {
+        return saleId
+    }
     // El evento ya fue reconocido por el servidor: solo falta recuperar el recibo.
     if (coordinator.outbox().isAckedByEventId(pending.eventId)) {
         return saleId

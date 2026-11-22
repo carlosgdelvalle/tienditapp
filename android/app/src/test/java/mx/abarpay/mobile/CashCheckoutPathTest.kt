@@ -30,6 +30,7 @@ class CashCheckoutPathTest {
         val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
         val keys = object : KeyProvider { override fun getOrCreate() = key }
         val posted = AtomicReference<String>()
+        val postedBody = AtomicReference<String>()
         val synced = AtomicReference<String>()
         MockWebServer().use { server ->
             server.dispatcher = object : Dispatcher() {
@@ -51,6 +52,7 @@ class CashCheckoutPathTest {
                         }
                         "/api/sales" -> {
                             posted.set(request.getHeader("Idempotency-Key"))
+                            postedBody.set(request.body.readUtf8())
                             response.setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
                         }
                         "/api/sync/events" -> {
@@ -75,6 +77,9 @@ class CashCheckoutPathTest {
             idleUntil { !first.ui.value.busy && posted.get() != null && first.ui.value.sale != null }
             assertEquals(posted.get(), firstCoordinator.outbox().pending().single().eventId)
             assertEquals(saleIdFromEventId(posted.get()), first.ui.value.sale?.id)
+            val body = JSONObject(postedBody.get())
+            assertEquals(1800L, body.getLong("expectedTotalCents"))
+            assertEquals(42L, body.getLong("catalogVersion"))
             firstCoordinator.close()
 
             val restoredCoordinator = SaleCoordinator(app, keys)

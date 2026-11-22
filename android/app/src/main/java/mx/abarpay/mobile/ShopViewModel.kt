@@ -770,10 +770,8 @@ class ShopViewModel @JvmOverloads constructor(
             val employee = checkNotNull(snapshot.employee) { "Elige quién cobra" }
             val estimate = runCatching { cartEstimate(snapshot.cart, snapshot.bootstrap?.products.orEmpty()) }.getOrDefault(0)
             val cashEventId = if (method == PAYMENT_CASH && !snapshot.simulated) newUlid() else null
+            val cashVersion = if (method == PAYMENT_CASH) cashQuote(snapshot, estimate) else null
             if (cashEventId != null) {
-                // Guarda la clave y la intención ANTES de despachar, junto con la
-                // marca de «creando», en una única escritura verificada.
-                val (issuedTotal, catalogVersion) = offlinePricing(snapshot, estimate)
                 check(
                     writePendingCashCheckout(
                         prefs,
@@ -783,9 +781,9 @@ class ShopViewModel @JvmOverloads constructor(
                             storeId = snapshot.bootstrap?.store?.id.orEmpty(),
                             server = snapshot.server,
                             cart = snapshot.cart,
-                            totalCents = issuedTotal,
+                            totalCents = estimate,
                             cashReceivedCents = cashReceivedCents,
-                            catalogVersion = catalogVersion,
+                            catalogVersion = cashVersion ?: 0L,
                         )
                     )
                 ) { "No se pudo proteger el intento. No se envió el cobro." }
@@ -797,7 +795,11 @@ class ShopViewModel @JvmOverloads constructor(
             state.update { it.copy(uncertain = true, message = null) }
             var committed: Sale? = null
             try {
-                val created = repo.create(employee.id, snapshot.cart, method, cashReceivedCents, customerId, cashEventId)
+                val created = repo.create(
+                    employee.id, snapshot.cart, method, cashReceivedCents, customerId, cashEventId,
+                    expectedTotalCents = if (method == PAYMENT_CASH) estimate else null,
+                    catalogVersion = cashVersion,
+                )
                 val sale = if (created.totalCents > 0) created else created.copy(
                     totalCents = estimate,
                     chargedCents = if (created.chargedCents > 0) created.chargedCents else estimate,
@@ -824,7 +826,7 @@ class ShopViewModel @JvmOverloads constructor(
                 // Servidor inalcanzable (no hubo respuesta HTTP): una venta en
                 // efectivo se finaliza en el teléfono y se sincroniza al reconectar.
                 if (method == PAYMENT_CASH && !snapshot.simulated && e is java.io.IOException) {
-                    finalizeOfflineCashSale(snapshot, employee, estimate, cashReceivedCents, cashEventId)
+                    finalizeOfflineCashSale(snapshot, employee, estimate, cashReceivedCents, cashEventId, cashVersion)
                     return@work
                 }
                 throw e
@@ -845,7 +847,7 @@ class ShopViewModel @JvmOverloads constructor(
         }
     }
 
-    private fun finalizeOfflineCashSale(snapshot: ShopState, employee: Employee, totalCents: Long, cashReceivedCents: Long?, eventId: String?) {
+    private fun finalizeOfflineCashSale(snapshot: ShopState, employee: Employee, totalCents: Long, cashReceivedCents: Long?, eventId: String?, catalogVersion: Long?) {
         val storeId = snapshot.bootstrap?.store?.id.orEmpty()
         check(storeId.isNotBlank()) { "Actualiza el catálogo antes de vender sin conexión" }
         coordinator.attach(storeId)
@@ -854,13 +856,18 @@ class ShopViewModel @JvmOverloads constructor(
             // y la venta puede existir; se recupera al renovar el arrendamiento.
             error(reason)
         }
+        // Sin una versión compatible no se genera un recibo divergente: se conserva
+        // la intención y se resuelve por recibo al reconectar.
+        if (catalogVersion == null) {
+            state.update { it.copy(uncertain = true) }
+            error("Actualiza el catálogo antes de cobrar sin conexión.")
+        }
         snapshot.bootstrap?.products?.let { coordinator.seedLocalStock(it) }
-        val (effectiveTotal, catalogVersion) = offlinePricing(snapshot, totalCents)
-        val received = cashReceivedCents ?: effectiveTotal
+        val received = cashReceivedCents ?: totalCents
         val result = coordinator.finalizeOfflineCashSale(
             employeeId = employee.id,
             cart = snapshot.cart,
-            totalCents = effectiveTotal,
+            totalCents = totalCents,
             cashReceivedCents = received,
             catalogVersion = catalogVersion,
             eventId = eventId,
@@ -1100,16 +1107,17 @@ class ShopViewModel @JvmOverloads constructor(
         runCatching { loadSummary() }
     }
 
-    private fun offlinePricing(snapshot: ShopState, fallbackTotal: Long): Pair<Long, Long> {
+    private fun cashQuote(snapshot: ShopState, displayedTotal: Long): Long? {
+        // Devuelve la versión de la instantánea solo si cubre el carrito y reproduce
+        // el total mostrado; null significa que no hay base para confirmar el recibo
+        // sin conexión sin riesgo de una cita divergente.
         val priceSnapshot = coordinator.snapshot()
-        val issuedTotal = priceSnapshot?.items?.let { items ->
-            val byId = items.associateBy { it.productId }
-            if (snapshot.cart.all { byId.containsKey(it.productId) }) {
-                snapshot.cart.sumOf { line -> lineTotalCents(byId.getValue(line.productId).priceCents, line.qtyMilli) }
-            } else null
-        } ?: 0L
-        val effectiveTotal = if (issuedTotal > 0) issuedTotal else fallbackTotal
-        return effectiveTotal to (priceSnapshot?.catalogVersion ?: 0L)
+        val byId = priceSnapshot?.items?.associateBy { it.productId } ?: return null
+        if (!snapshot.cart.all { byId.containsKey(it.productId) }) return null
+        val snapshotTotal = snapshot.cart.sumOf { line ->
+            lineTotalCents(byId.getValue(line.productId).priceCents, line.qtyMilli)
+        }
+        return if (snapshotTotal == displayedTotal) priceSnapshot.catalogVersion else null
     }
 
     private suspend fun resolveRecoveredSale() {

@@ -72,6 +72,8 @@ interface ShopRepository {
         cashReceivedCents: Long? = null,
         customerId: Int? = null,
         idempotencyKey: String? = null,
+        expectedTotalCents: Long? = null,
+        catalogVersion: Long? = null,
     ): Sale
     suspend fun status(saleId: String): Sale
     suspend fun cancel(saleId: String): Sale
@@ -395,6 +397,8 @@ internal fun saleRequest(
     paymentMethod: String,
     cashReceivedCents: Long?,
     customerId: Int?,
+    expectedTotalCents: Long? = null,
+    catalogVersion: Long? = null,
 ) = JSONObject()
     .put("employeeId", employeeId)
     .put("items", saleItemsJson(cart))
@@ -402,6 +406,8 @@ internal fun saleRequest(
     .apply {
         if (cashReceivedCents != null) put("cashReceivedCents", cashReceivedCents)
         if (customerId != null) put("customerId", customerId)
+        if (expectedTotalCents != null) put("expectedTotalCents", expectedTotalCents)
+        if (catalogVersion != null) put("catalogVersion", catalogVersion)
     }
 
 // ---------------------------------------------------------------------------
@@ -629,8 +635,10 @@ class ApiRepository(private val base: String) : ShopRepository {
         cashReceivedCents: Long?,
         customerId: Int?,
         idempotencyKey: String?,
+        expectedTotalCents: Long?,
+        catalogVersion: Long?,
     ): Sale {
-        val body = saleRequest(employeeId, cart, paymentMethod, cashReceivedCents, customerId)
+        val body = saleRequest(employeeId, cart, paymentMethod, cashReceivedCents, customerId, expectedTotalCents, catalogVersion)
         val (code, json) = exchange("/api/sales", body, idempotencyKey = idempotencyKey)
         // 202 (por conciliar) and 502 (PEY rejected) still carry a saleId: keep the reference.
         val reference = json.optString("saleId").ifBlank { json.optString("id") }
@@ -1141,6 +1149,8 @@ class DemoRepository(
         cashReceivedCents: Long?,
         customerId: Int?,
         idempotencyKey: String?,
+        expectedTotalCents: Long?,
+        catalogVersion: Long?,
     ): Sale {
         require(cart.isNotEmpty()) { "El carrito está vacío" }
         val byId = products.associateBy { it.id }
