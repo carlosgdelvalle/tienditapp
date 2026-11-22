@@ -123,6 +123,7 @@ class SaleCoordinator(
         totalCents: Long,
         cashReceivedCents: Long,
         catalogVersion: Long,
+        eventId: String? = null,
     ): OfflineSaleResult {
         require(cart.isNotEmpty()) { "El carrito está vacío" }
         require(totalCents > 0) { "Actualiza el catálogo antes de vender sin conexión" }
@@ -135,6 +136,7 @@ class SaleCoordinator(
             cashReceivedCents = cashReceivedCents,
             catalogVersion = catalogVersion,
             reference = reference,
+            eventId = eventId,
         )
         return OfflineSaleResult(
             reference = reference,

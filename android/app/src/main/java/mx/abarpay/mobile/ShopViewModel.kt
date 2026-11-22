@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.abarpay.mobile.persistence.newUlid
 
 data class ShopState(
     val simulated: Boolean = true,
@@ -759,6 +760,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             }
             val employee = checkNotNull(snapshot.employee) { "Elige quién cobra" }
             val estimate = runCatching { cartEstimate(snapshot.cart, snapshot.bootstrap?.products.orEmpty()) }.getOrDefault(0)
+            val cashEventId = if (method == PAYMENT_CASH && !snapshot.simulated) newUlid() else null
             if (!snapshot.simulated) {
                 check(prefs.edit().putBoolean("creating", true).commit()) {
                     "No se pudo proteger el intento. No se envió el cobro."
@@ -766,7 +768,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             }
             state.update { it.copy(uncertain = true, message = null) }
             try {
-                val created = repo.create(employee.id, snapshot.cart, method, cashReceivedCents, customerId)
+                val created = repo.create(employee.id, snapshot.cart, method, cashReceivedCents, customerId, cashEventId)
                 val sale = if (created.totalCents > 0) created else created.copy(
                     totalCents = estimate,
                     chargedCents = if (created.chargedCents > 0) created.chargedCents else estimate,
@@ -800,7 +802,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 // Servidor inalcanzable (no hubo respuesta HTTP): una venta en
                 // efectivo se finaliza en el teléfono y se sincroniza al reconectar.
                 if (method == PAYMENT_CASH && !snapshot.simulated && e !is ApiFailure) {
-                    finalizeOfflineCashSale(snapshot, employee, estimate, cashReceivedCents)
+                    finalizeOfflineCashSale(snapshot, employee, estimate, cashReceivedCents, cashEventId)
                     return@work
                 }
                 throw e
@@ -808,7 +810,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun finalizeOfflineCashSale(snapshot: ShopState, employee: Employee, totalCents: Long, cashReceivedCents: Long?) {
+    private fun finalizeOfflineCashSale(snapshot: ShopState, employee: Employee, totalCents: Long, cashReceivedCents: Long?, eventId: String?) {
         val storeId = snapshot.bootstrap?.store?.id.orEmpty()
         check(storeId.isNotBlank()) { "Actualiza el catálogo antes de vender sin conexión" }
         coordinator.attach(storeId)
@@ -818,14 +820,23 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             error(reason)
         }
         snapshot.bootstrap?.products?.let { coordinator.seedLocalStock(it) }
-        val received = cashReceivedCents ?: totalCents
-        val catalogVersion = coordinator.snapshot()?.catalogVersion ?: 0L
+        val priceSnapshot = coordinator.snapshot()
+        val issuedTotal = priceSnapshot?.items?.let { items ->
+            val byId = items.associateBy { it.productId }
+            if (snapshot.cart.all { byId.containsKey(it.productId) }) {
+                snapshot.cart.sumOf { line -> lineTotalCents(byId.getValue(line.productId).priceCents, line.qtyMilli) }
+            } else null
+        } ?: 0L
+        val effectiveTotal = if (issuedTotal > 0) issuedTotal else totalCents
+        val received = cashReceivedCents ?: effectiveTotal
+        val catalogVersion = priceSnapshot?.catalogVersion ?: 0L
         val result = coordinator.finalizeOfflineCashSale(
             employeeId = employee.id,
             cart = snapshot.cart,
-            totalCents = totalCents,
+            totalCents = effectiveTotal,
             cashReceivedCents = received,
             catalogVersion = catalogVersion,
+            eventId = eventId,
         )
         val sale = Sale(
             id = result.reference,

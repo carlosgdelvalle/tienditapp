@@ -72,9 +72,10 @@ class AtomicOutbox private constructor(
         occurredAt: Long,
         catalogVersion: Long,
         payload: Map<String, Any?>,
+        eventId: String? = null,
         applyState: (SQLiteDatabase, String) -> Unit,
     ): EnqueuedEvent {
-        val eventId = newUlid()
+        val stableId = eventId ?: newUlid()
         val db = helper.writableDatabase
         db.beginTransaction()
         try {
@@ -89,7 +90,7 @@ class AtomicOutbox private constructor(
 
             val values = ContentValues().apply {
                 put("sequence", sequence)
-                put("event_id", eventId)
+                put("event_id", stableId)
                 put("device_id", deviceId)
                 put("tenant_id", tenantId)
                 put("store_id", storeId)
@@ -102,9 +103,9 @@ class AtomicOutbox private constructor(
             }
             db.insertOrThrow("outbox", null, values)
 
-            applyState(db, eventId)
+            applyState(db, stableId)
             db.setTransactionSuccessful()
-            return EnqueuedEvent(sequence, eventId)
+            return EnqueuedEvent(sequence, stableId)
         } finally {
             db.endTransaction()
         }
@@ -120,6 +121,7 @@ class AtomicOutbox private constructor(
         catalogVersion: Long,
         reference: String,
         occurredAt: Long = System.currentTimeMillis() / 1000,
+        eventId: String? = null,
     ): EnqueuedEvent {
         val payload: Map<String, Any?> = buildMap {
             put("employeeId", employeeId)
@@ -128,7 +130,7 @@ class AtomicOutbox private constructor(
             if (cashReceivedCents != null) put("cashReceivedCents", cashReceivedCents)
             put("reference", reference)
         }
-        return append(EVENT_SALE_CREATED, occurredAt, catalogVersion, payload) { db, eventId ->
+        return append(EVENT_SALE_CREATED, occurredAt, catalogVersion, payload, eventId = eventId) { db, eventId ->
             db.insertOrThrow(
                 "local_sales", null,
                 ContentValues().apply {

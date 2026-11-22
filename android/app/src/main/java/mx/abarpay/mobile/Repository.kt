@@ -71,6 +71,7 @@ interface ShopRepository {
         paymentMethod: String,
         cashReceivedCents: Long? = null,
         customerId: Int? = null,
+        idempotencyKey: String? = null,
     ): Sale
     suspend fun status(saleId: String): Sale
     suspend fun cancel(saleId: String): Sale
@@ -426,11 +427,12 @@ class ApiRepository(private val base: String) : ShopRepository {
 
     override fun actAs(employeeId: Int?) { acting = employeeId }
 
-    private suspend fun exchange(path: String, body: JSONObject? = null, method: String? = null): Pair<Int, JSONObject> =
+    private suspend fun exchange(path: String, body: JSONObject? = null, method: String? = null, idempotencyKey: String? = null): Pair<Int, JSONObject> =
         withContext(Dispatchers.IO) {
             val builder = Request.Builder().url(base + path).header("Accept", "application/json")
             // Identidad simulada: después de elegir perfil el servidor valida rol y permisos.
             acting?.let { builder.header("X-Employee-Id", it.toString()) }
+            idempotencyKey?.let { builder.header("Idempotency-Key", it) }
             if (body != null) {
                 val payload = body.toString().toByteArray(Charsets.UTF_8)
                 builder.method(method ?: "POST", object : RequestBody() {
@@ -626,9 +628,10 @@ class ApiRepository(private val base: String) : ShopRepository {
         paymentMethod: String,
         cashReceivedCents: Long?,
         customerId: Int?,
+        idempotencyKey: String?,
     ): Sale {
         val body = saleRequest(employeeId, cart, paymentMethod, cashReceivedCents, customerId)
-        val (code, json) = exchange("/api/sales", body)
+        val (code, json) = exchange("/api/sales", body, idempotencyKey = idempotencyKey)
         // 202 (por conciliar) and 502 (PEY rejected) still carry a saleId: keep the reference.
         val reference = json.optString("saleId").ifBlank { json.optString("id") }
         if (code in setOf(200, 201, 202)) {
@@ -1137,6 +1140,7 @@ class DemoRepository(
         paymentMethod: String,
         cashReceivedCents: Long?,
         customerId: Int?,
+        idempotencyKey: String?,
     ): Sale {
         require(cart.isNotEmpty()) { "El carrito está vacío" }
         val byId = products.associateBy { it.id }
