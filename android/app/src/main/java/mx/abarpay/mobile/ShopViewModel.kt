@@ -812,7 +812,11 @@ class ShopViewModel @JvmOverloads constructor(
                 throw e
             } catch (e: Exception) {
                 if (e is ApiFailure && definitelyRejected(e.code)) {
-                    if (snapshot.simulated || prefs.edit().putBoolean("creating", false).commit()) {
+                    val cleared = prefs.edit()
+                        .remove("pending_cash_checkout")
+                        .putBoolean("creating", false)
+                        .commit()
+                    if (snapshot.simulated || cleared) {
                         state.update { it.copy(uncertain = false) }
                     }
                     throw e
@@ -846,8 +850,8 @@ class ShopViewModel @JvmOverloads constructor(
         check(storeId.isNotBlank()) { "Actualiza el catálogo antes de vender sin conexión" }
         coordinator.attach(storeId)
         coordinator.offlineBlocker()?.let { reason ->
-            prefs.edit().putBoolean("creating", false).commit()
-            state.update { it.copy(uncertain = false) }
+            // Conserva la intención y la marca de creando: el transporte fue ambiguo
+            // y la venta puede existir; se recupera al renovar el arrendamiento.
             error(reason)
         }
         snapshot.bootstrap?.products?.let { coordinator.seedLocalStock(it) }
@@ -861,7 +865,6 @@ class ShopViewModel @JvmOverloads constructor(
             catalogVersion = catalogVersion,
             eventId = eventId,
         )
-        clearPendingCashCheckout(prefs)
         val sale = Sale(
             id = saleIdFromEventId(result.eventId),
             totalCents = result.totalCents,
@@ -1112,9 +1115,14 @@ class ShopViewModel @JvmOverloads constructor(
     private suspend fun resolveRecoveredSale() {
         val saleId = recoveredSaleId ?: return
         val fetched = runCatching { repo.status(saleId) }.getOrNull() ?: return
-        recoveredSaleId = null
         state.update { it.copy(sale = fetched, uncertain = false, qrHidden = false) }
-        if (!state.value.simulated) persistSale(fetched)
+        if (state.value.simulated) {
+            recoveredSaleId = null
+            return
+        }
+        if (persistSale(fetched)) {
+            recoveredSaleId = null
+        }
     }
 
     private fun persistSale(sale: Sale): Boolean {
