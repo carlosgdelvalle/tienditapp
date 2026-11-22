@@ -129,7 +129,7 @@ sequenceDiagram
 ### Last-unit sale
 
 - A sale that consumes the last unit is honored. Stock may end exactly at 0 and the sale is recorded in full.
-- If two disconnected tills try to sell the last piece, the second sale is rejected at apply time with a 409 `stock_conflict`: stock is checked and applied server-side, never trusted from the device cache. Only the first sale is recorded and stock ends exactly at 0; it never reaches −1 from a sale.
+- An online checkout may return 409 `stock_conflict` before taking payment. If two disconnected tills already accepted cash for the last unit, both sales enter the ledger and the second opens a stock variance linked to the sale and product. Stock is checked server-side. A verified CoDi payment also survives an inventory shortage and opens a variance.
 
 ### Audit variance
 
@@ -241,7 +241,7 @@ The till closeout captures a blind count and a handover from the employee. Offli
 - [ ] The outbox persists after killing the app and after updating from one version to another.
 - [ ] The outbox file on disk does not contain the plaintext payload.
 - [ ] Resending the same batch does not duplicate sales or movements.
-- [ ] A last-piece sale takes stock to zero; a second till selling the same last unit is rejected with `stock_conflict` and records no sale, money, or movement. Repeating both batches changes neither money nor stock.
+- [ ] The first last-unit sale takes stock to zero. When a second till has already accepted cash offline, its sale and payment are retained and the shortage is recorded for review. Repeating both batches adds neither money nor stock movements. Online checkout can still reject a shortage before payment.
 - [ ] A different count records `audit_variance` and does not correct silently.
 - [ ] An offline receipt stays `awaiting_approval` and only increases stock on approval.
 - [ ] An offline fiado charge stays as a draft and is only finalized on sync.
