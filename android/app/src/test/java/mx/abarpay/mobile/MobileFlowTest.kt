@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import java.io.File
 import org.junit.Rule
 import org.junit.Test
+import org.junit.After
 import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -18,6 +19,11 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], qualifiers = "w390dp-h844dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MobileFlowTest {
+    companion object {
+        // Robolectric reuses the first Application for the activities of every
+        // method in this class, even when getApplication() returns a new one.
+        private var sharedSessionApp: android.app.Application? = null
+    }
     @Test fun peyCanBeCanceledWithConfirmation() {
         val vm = androidx.lifecycle.ViewModelProvider(compose.activity)[ShopViewModel::class.java]
         compose.runOnIdle { vm.useSimulation() }
@@ -42,7 +48,8 @@ class MobileFlowTest {
 
     @get:Rule(order = 0) val cleanSession = object : ExternalResource() {
         override fun before() {
-            val app = RuntimeEnvironment.getApplication()
+            val app = sharedSessionApp
+                ?: RuntimeEnvironment.getApplication().also { sharedSessionApp = it }
             app.getSharedPreferences("development_session", 0).edit().clear().commit()
             // Los flujos v1 sin red arrancan con el onboarding del dueño ya hecho.
             app.getSharedPreferences("abarpay_owner", 0).edit().clear()
@@ -51,6 +58,11 @@ class MobileFlowTest {
         }
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
+
+    /** Robolectric conserva la aplicación de la primera actividad entre métodos. */
+    @After fun clearActivitySession() {
+        compose.activity.getSharedPreferences("development_session", 0).edit().clear().commit()
+    }
 
     private fun scrollTo(text: String): SemanticsNodeInteraction {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))

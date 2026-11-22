@@ -64,6 +64,8 @@ class ShopViewModel @JvmOverloads constructor(
     private val coordinator: SaleCoordinator = SaleCoordinator(app),
 ) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("development_session", 0)
+    // Borrador de la venta en curso: sobrevive a cerrar el proceso.
+    private val cartDraftKey = "cart_draft_v1"
 
     /**
      * Onboarding, metas y perfil ligado viven fuera del diario del cobro para que
@@ -87,14 +89,15 @@ class ShopViewModel @JvmOverloads constructor(
         // «¿Qué vendes?» del onboarding v3: solo se guarda en este teléfono.
         val sells = ownerPrefs.getString("owner_sells", "").orEmpty()
             .split("|").map { it.trim() }.filter { it.isNotBlank() }
+        val (sale, uncertain) = recoverJournal(prefs.getString("sale", null), prefs.getBoolean("creating", false))
         val identity = ShopState(
             onboarded = onboarded || linked != null,
             ownerGoals = goals,
             ownerSells = sells,
             linkedEmployeeId = linked,
+            cart = if (sale == null && !uncertain) readCartDraft() else emptyList(),
         )
         val server = if (BuildConfig.DEBUG) prefs.getString("server", "").orEmpty() else BuildConfig.DEMO_SERVER
-        val (sale, uncertain) = recoverJournal(prefs.getString("sale", null), prefs.getBoolean("creating", false))
         state = MutableStateFlow(
             when {
                 server.isNotBlank() -> identity.copy(
@@ -112,6 +115,29 @@ class ShopViewModel @JvmOverloads constructor(
         recoveredSaleId = recoverPendingCashCheckout(prefs, coordinator, state.value.server)
         if (server.isNotBlank()) repo = ApiRepository(server)
         if (server.isNotBlank() || (!uncertain && sale == null)) refresh()
+    }
+
+    private fun readCartDraft(): List<CartLine> {
+        val raw = prefs.getString(cartDraftKey, null).orEmpty()
+        if (raw.isBlank()) return emptyList()
+        return raw.split(",").mapNotNull { entry ->
+            val productId = entry.substringBefore(":", "").toIntOrNull()
+            val qtyMilli = entry.substringAfter(":", "").toIntOrNull()
+            if (productId == null || qtyMilli == null || qtyMilli <= 0) {
+                null
+            } else {
+                CartLine(productId, qtyMilli)
+            }
+        }
+    }
+
+    private fun persistCartDraft(cart: List<CartLine>) {
+        val encoded = cart
+            .filter { it.qtyMilli > 0 }
+            .joinToString(",") { it.productId.toString() + ":" + it.qtyMilli }
+        if (prefs.getString(cartDraftKey, null) != encoded) {
+            prefs.edit().putString(cartDraftKey, encoded).apply()
+        }
     }
 
     private fun work(action: suspend () -> Unit) {
@@ -674,7 +700,10 @@ class ShopViewModel @JvmOverloads constructor(
     fun quantity(productId: Int, deltaMilli: Int) {
         if (state.value.busy || state.value.sale != null || state.value.uncertain) return
         runCatching { changeQuantity(state.value.cart, productId, deltaMilli) }
-            .onSuccess { cart -> state.update { it.copy(cart = cart) } }
+            .onSuccess { cart ->
+                state.update { it.copy(cart = cart) }
+                persistCartDraft(cart)
+            }
             .onFailure { message(it.message.orEmpty()) }
     }
 
@@ -702,6 +731,7 @@ class ShopViewModel @JvmOverloads constructor(
                 ).joinToString(" "),
             )
         }
+        persistCartDraft(cart)
     }
 
     fun lookup(code: String) = work {
@@ -735,7 +765,9 @@ class ShopViewModel @JvmOverloads constructor(
         check(current.bootstrap?.products?.any { it.id == product.id } == true) {
             "Actualiza el catálogo antes de agregar este producto."
         }
-        state.update { it.copy(cart = changeQuantity(current.cart, product.id, qtyMilli), message = message) }
+        val cart = changeQuantity(current.cart, product.id, qtyMilli)
+        state.update { it.copy(cart = cart, message = message) }
+        persistCartDraft(cart)
     }
 
     fun payCash(receivedCents: Long) {
@@ -1020,6 +1052,7 @@ class ShopViewModel @JvmOverloads constructor(
                 qrHidden = false, supportTicket = null, message = "Listo para el siguiente cobro.",
             )
         }
+        persistCartDraft(emptyList())
         refresh()
     }
 

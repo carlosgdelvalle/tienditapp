@@ -95,8 +95,4 @@ abstract class AppUiTest {
 
 internal fun ComposeContentTestRule.openDemoCheckout() {
     onNodeWithTag("tab-Cobrar").performClick()
-    if (BuildConfig.OWNER_API_BASE_URL.isNotBlank()) {
-        onNodeWithText("Caja en efectivo").assertExists()
-        onNodeWithText("Cobros de demostración").performClick()
-    }
 }

@@ -47,7 +47,7 @@ internal fun HomeScreen(
     s: ShopState,
     vm: ShopViewModel,
     startCheckout: () -> Unit,
-    chooseCheckout: Boolean,
+    openCash: (() -> Unit)?,
     openSettings: () -> Unit,
 ) {
     val employee = s.employee
@@ -55,7 +55,7 @@ internal fun HomeScreen(
         EmployeeHome(s, employee, vm)
         return
     }
-    OwnerHome(s, vm, employee, startCheckout, chooseCheckout, openSettings)
+    OwnerHome(s, vm, employee, startCheckout, openCash, openSettings)
 }
 
 @Composable
@@ -64,7 +64,7 @@ private fun OwnerHome(
     vm: ShopViewModel,
     employee: Employee?,
     startCheckout: () -> Unit,
-    chooseCheckout: Boolean,
+    openCash: (() -> Unit)?,
     openSettings: () -> Unit,
 ) {
     val report = s.report
@@ -98,9 +98,9 @@ private fun OwnerHome(
         if (s.employee?.canSell != false) {
             item {
                 Action(
-                    if (chooseCheckout) "Empezar un cobro" else "Cobrar ahora",
+                    "Cobrar ahora",
                     Icons.Outlined.PointOfSale,
-                    if (chooseCheckout) "Caja en efectivo u otra forma de cobro" else "Efectivo, PEY/CoDi o fiado",
+                    "Efectivo, PEY/CoDi o fiado",
                     primary = true,
                     onClick = startCheckout,
                 )
@@ -167,6 +167,17 @@ private fun OwnerHome(
                     Icon(Icons.Outlined.ReceiptLong, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Registrar gasto")
+                }
+                if (openCash != null) {
+                    OutlinedButton(
+                        onClick = openCash,
+                        enabled = !s.busy,
+                        modifier = Modifier.fillMaxWidth().testTag("abrir-caja-efectivo"),
+                    ) {
+                        Icon(Icons.Outlined.Payments, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Caja en efectivo de la tienda")
+                    }
                 }
             }
         }
