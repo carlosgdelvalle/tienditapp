@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-MX">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -53,6 +53,15 @@
       -webkit-font-smoothing: antialiased;
     }
     button, input { font: inherit; }
+    :focus-visible { outline: 3px solid #2a0065; outline-offset: 4px; }
+    .sidebar :focus-visible { outline-color: #fff; }
+    .view-title { scroll-margin-top: 5.5rem; }
+    .skip-link { position: fixed; top: .5rem; left: .5rem; z-index: 100; transform: translateY(-160%);
+      min-height: 44px; display: inline-flex; align-items: center; padding: .65rem 1rem; border-radius: .75rem;
+      background: white; color: var(--purple); font-weight: 750; }
+    .skip-link:focus { transform: none; }
+    .demo-status { margin: .65rem 0; color: #483957; font-size: .94rem; line-height: 1.4; }
+    .demo-status:empty { margin: 0; }
     .login-screen {
       min-height: 100vh;
       display: grid;
@@ -101,7 +110,9 @@
     button:hover { background: var(--violet-deep); }
     button:active { transform: translateY(1px); }
     .error { color: var(--red); font-size: 13px; font-weight: 650; }
-    .fineprint { color: #8a839e; font-size: 12px; line-height: 1.5; }
+    .fineprint { color: #5b526f; font-size: .875rem; line-height: 1.5; }
+    .login-title { margin: .5rem 0 0; font-size: 1.45rem; line-height: 1.25; }
+    .login-card input { border-color: #79688c; }
     .app-shell { min-height: 100vh; }
     .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 5px; box-shadow: 0 0 0 4px rgba(41, 122, 0, 0.14); }
     .ghost-btn { background: transparent; color: var(--ink-soft); padding: 8px 10px; border: 1px solid transparent; border-radius: 14px; }
@@ -342,6 +353,12 @@
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
       .grid .span-2 { grid-column: auto; }
+    }
+    @media (max-width: 1023.98px) {
+      .mobilebar .icon-btn, .sidebar .nav-link { min-height: 44px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
     /* v3 · catálogo, gastos y tareas */
     .toolbar {
@@ -689,19 +706,20 @@
   <section id="login-screen" class="login-screen">
     <div class="login-card">
       <div class="brand">abarpay<span class="dot">.</span></div>
-      <p class="muted">Consola del negocio</p>
-      <p class="fineprint">Vista de demostración del negocio. No usa cuentas ni sesiones de producción.</p>
+      <h1 class="login-title">Consola del negocio</h1>
+      <p class="fineprint">Demostración de Abarpay con un negocio de ejemplo.</p>
       <form id="login-form" autocomplete="off">
         <label for="pin">PIN de dueño</label>
         <input id="pin" name="pin" type="password" inputmode="numeric" maxlength="16" placeholder="••••" autofocus>
         <button type="submit">Entrar a la consola</button>
       </form>
-      <p id="login-error" class="error" hidden></p>
-      <p class="fineprint">Inicio se actualiza cada 3 s; las demás secciones al entrar y cada 30 s.</p>
+      <p id="login-progress" class="demo-status" role="status"></p>
+      <p id="login-error" class="error" role="alert" hidden></p>
     </div>
   </section>
 
   <div id="app" class="app-shell" hidden>
+    <a href="#main-content" id="skip-console" class="skip-link">Saltar al contenido</a>
     <aside class="sidebar" id="sidebar" aria-label="Navegación de la consola">
       <div class="sidebar-brand">
         <div class="brand">abarpay<span class="dot">.</span></div>
@@ -769,7 +787,7 @@
         <span class="mobile-title" id="mobile-title">Inicio</span>
       </header>
 
-      <main class="content">
+      <main class="content" id="main-content">
         <div id="demo-banner" class="demo-banner">
           <strong>Modo demo:</strong>
           <span>se cobra $0.01 MXN por PEY; el total comercial de la venta se conserva.</span>
@@ -1307,7 +1325,7 @@
     </form>
   </dialog>
 
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script>
     (function () {
@@ -1354,6 +1372,7 @@
       var lowOnly = false;
       var pendingOps = {};
       var editingProductId = null;
+      var inventoryTrigger = null;
       var inventoryState = { items: [], totalValueCents: 0, lowCount: 0, source: "v2" };
       var ticketsState = { ok: false, loaded: false, items: [], error: null };
       var pendingTicketOps = {};
@@ -1632,6 +1651,7 @@
         loginScreen.hidden = true;
         app.hidden = false;
         loginError.hidden = true;
+        document.getElementById("login-progress").textContent = "";
       }
 
       function stopViewRefresh() {
@@ -1672,6 +1692,7 @@
         return fetch("/api/console/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(8000),
           body: JSON.stringify({ pin: value })
         }).then(function (response) {
           if (response.status === 401) throw new Error("PIN incorrecto");
@@ -2033,7 +2054,10 @@
 
       function setRefreshBusy(view, busy) {
         var buttons = document.querySelectorAll('[data-refresh="' + view + '"]');
-        for (var i = 0; i < buttons.length; i += 1) buttons[i].classList.toggle("is-busy", Boolean(busy));
+        for (var i = 0; i < buttons.length; i += 1) {
+          buttons[i].classList.toggle("is-busy", Boolean(busy));
+          buttons[i].setAttribute("aria-disabled", busy ? "true" : "false");
+        }
       }
 
       function settle(promise) {
@@ -2071,9 +2095,10 @@
         });
       }
 
-      function openStockEditor(product) {
+      function openStockEditor(product, trigger) {
         if (!product || product.unlimitedStock) return;
         editingProductId = product.productId;
+        inventoryTrigger = trigger;
         document.getElementById("inv-editor").hidden = false;
         document.getElementById("inv-editor-product").textContent = product.name;
         document.getElementById("inv-editor-unit").textContent = displayUnit(product.unit);
@@ -2096,6 +2121,20 @@
         if (errorBox) {
           errorBox.hidden = true;
           errorBox.textContent = "";
+        }
+      }
+
+      function focusInventoryTrigger() {
+        var trigger = inventoryTrigger;
+        inventoryTrigger = null;
+        if (trigger && !trigger.isConnected) {
+          trigger = Array.prototype.find.call(document.querySelectorAll("[data-inv-action='set']"), function (button) {
+            return button.getAttribute("data-product-id") === trigger.getAttribute("data-product-id");
+          });
+        }
+        if (currentView === "inventario") {
+          if (trigger) trigger.focus({ preventScroll: true });
+          else focusView("inventario");
         }
       }
 
@@ -2135,11 +2174,15 @@
             errorBox.textContent = error.message || "No se pudo fijar la cantidad.";
           }
         }).then(function () {
+          var closed = editingProductId === null || editingProductId === undefined;
           saveButton.disabled = false;
           saveButton.textContent = "Guardar";
           delete pendingOps[String(product.productId)];
           renderInventory();
-          if (editingProductId === null || editingProductId === undefined) refreshView("inventario");
+          if (closed) {
+            focusInventoryTrigger();
+            refreshView("inventario");
+          }
         });
       }
 
@@ -3482,6 +3525,13 @@
         if (app) app.setAttribute("data-current-view", view);
       }
 
+      function focusView(view) {
+        var title = document.getElementById("view-title-" + view);
+        if (!title) return;
+        title.tabIndex = -1;
+        title.focus({ preventScroll: true });
+      }
+
       function viewRefreshMs(view) {
         return view === "inicio" ? HOME_REFRESH_MS : VIEW_REFRESH_MS;
       }
@@ -3491,20 +3541,28 @@
         if (!pin || !currentView) return;
         viewTimer = setInterval(function () {
           if (!pin || document.hidden || !currentView) return;
+          var active = document.activeElement;
+          if (document.body.classList.contains("drawer-open") || document.querySelector("dialog[open]") ||
+            (active && active.closest(".content input, .content select, .content textarea, .content tbody"))) return;
           refreshView(currentView);
         }, viewRefreshMs(currentView));
       }
 
-      function refreshView(view) {
+      function refreshView(view, announce) {
         var target = normalizeView(view);
         if (!pin) return Promise.resolve();
-        if (viewRefreshing[target]) return Promise.resolve();
+        if (viewRefreshing[target]) {
+          if (announce) showToast("Ya se está actualizando " + titleFor(target).toLowerCase() + "…");
+          return Promise.resolve();
+        }
         if (!VIEW_REFRESHERS[target]) return Promise.resolve();
         viewRefreshing[target] = true;
         setRefreshBusy(target, true);
+        if (announce) showToast("Actualizando " + titleFor(target).toLowerCase() + "…");
         return VIEW_REFRESHERS[target]().then(function () {
           markUpdated(target);
           maybeRefreshStorePhoto();
+          if (announce && target === currentView) showToast("Datos actualizados.");
         }).catch(function (error) {
           if (error && error.message === "AUTH") return;
           setViewSub(target, "No se pudo actualizar; se reintenta solo");
@@ -3686,6 +3744,7 @@
         refreshView(target);
         scheduleViewRefresh();
         if (!opts.keepDrawer) closeDrawer();
+        if (changed || opts.hash === "push") focusView(target);
       }
 
       function navigate(view) {
@@ -3733,8 +3792,12 @@
         if (drawerBackdrop) drawerBackdrop.hidden = false;
         if (menuButton) menuButton.setAttribute("aria-expanded", "true");
         document.body.classList.add("drawer-open");
+        document.querySelector(".shell-main").inert = true;
+        document.getElementById("skip-console").inert = true;
+        sidebar.setAttribute("role", "dialog");
+        sidebar.setAttribute("aria-modal", "true");
         syncSidebarInert();
-        var firstLink = sidebar.querySelector(".nav-link");
+        var firstLink = sidebar.querySelector('[aria-current="page"]') || sidebar.querySelector(".nav-link");
         if (firstLink) firstLink.focus();
       }
 
@@ -3745,6 +3808,10 @@
           return;
         }
         sidebar.classList.remove("open");
+        document.querySelector(".shell-main").inert = false;
+        document.getElementById("skip-console").inert = false;
+        sidebar.removeAttribute("role");
+        sidebar.removeAttribute("aria-modal");
         if (drawerBackdrop) drawerBackdrop.hidden = true;
         if (menuButton) {
           menuButton.setAttribute("aria-expanded", "false");
@@ -3779,7 +3846,7 @@
       var refreshButtons = document.querySelectorAll("[data-refresh]");
       for (var refreshIndex = 0; refreshIndex < refreshButtons.length; refreshIndex += 1) {
         refreshButtons[refreshIndex].addEventListener("click", function () {
-          refreshView(this.getAttribute("data-refresh"));
+          refreshView(this.getAttribute("data-refresh"), true);
         });
       }
 
@@ -3793,6 +3860,13 @@
 
       if (menuButton) menuButton.addEventListener("click", toggleDrawer);
       if (drawerBackdrop) drawerBackdrop.addEventListener("click", closeDrawer);
+      document.getElementById("skip-console").addEventListener("click", function (event) {
+        event.preventDefault();
+        if (currentView) {
+          focusView(currentView);
+          document.getElementById("view-title-" + currentView).scrollIntoView({ block: "nearest" });
+        }
+      });
 
       window.addEventListener("popstate", syncFromLocation);
       window.addEventListener("hashchange", syncFromLocation);
@@ -3812,7 +3886,7 @@
         var action = button.getAttribute("data-inv-action");
         if (action === "increase") adjustInventory(product, 1000);
         else if (action === "decrease") adjustInventory(product, -1000);
-        else if (action === "set") openStockEditor(product);
+        else if (action === "set") openStockEditor(product, button);
       });
 
       document.getElementById("tickets-body").addEventListener("click", function (event) {
@@ -3854,16 +3928,24 @@
 
       document.getElementById("inv-editor-cancel").addEventListener("click", function () {
         closeStockEditor();
+        focusInventoryTrigger();
       });
 
       loginForm.addEventListener("submit", function (event) {
         event.preventDefault();
+        var submit = loginForm.querySelector('button[type="submit"]');
+        var progress = document.getElementById("login-progress");
+        if (submit.disabled) return;
         var value = pinInput.value.trim();
+        loginError.hidden = true;
         if (!value) {
           loginError.hidden = false;
           loginError.textContent = "Escribe tu PIN.";
+          pinInput.focus();
           return;
         }
+        submit.disabled = true;
+        progress.textContent = "Abriendo la consola…";
         loginRequest(value).then(function () {
           pin = value;
           sessionStorage.setItem(PIN_KEY, value);
@@ -3871,8 +3953,13 @@
           startApp();
         }).catch(function (error) {
           loginError.hidden = false;
-          loginError.textContent = error && error.message ? error.message : "PIN incorrecto";
+          loginError.textContent = error && error.message === "PIN incorrecto" ? "PIN incorrecto." :
+            "No se pudo abrir la consola. Revisa tu conexión e intenta de nuevo.";
+          pinInput.focus();
           pinInput.select();
+        }).finally(function () {
+          submit.disabled = false;
+          progress.textContent = "";
         });
       });
 

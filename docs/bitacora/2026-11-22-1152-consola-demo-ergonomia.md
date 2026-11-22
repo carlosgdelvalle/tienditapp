@@ -1,0 +1,5 @@
+# 2026-11-22 11:52 · Consola demo · Navegación y lectura
+
+- **Qué cambió** La entrada muestra progreso y distingue un PIN incorrecto de un problema de conexión. En las ocho secciones, el teclado llega al título al navegar. En pantalla estrecha, el menú recibe el foco, bloquea los controles de fondo y cierra con Escape. El ajuste de existencias devuelve el foco al producto al cancelar. La actualización manual muestra su estado y la actualización periódica espera mientras hay un diálogo, campo o fila en uso.
+- **Evidencia** En una copia SQLite aislada, las ocho secciones se abrieron a 390 px sin desbordar la página. Se verificaron catálogo, cancelación de ajuste por teclado, confirmación de actualización, salida y error de PIN. Pasaron 183 pruebas del servidor y 16 de la app Python. El escaneo de secretos y la validación de JavaScript pasaron.
+- **Alcance de la entrega** El cambio parte de la revisión `f5ec54d` servida por Render. Se actualizan la interfaz de la consola y esta bitácora. La configuración del servicio, la base SQLite y el flujo de CoDi se conservan.
