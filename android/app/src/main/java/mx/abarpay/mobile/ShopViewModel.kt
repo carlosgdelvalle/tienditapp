@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.jvm.JvmOverloads
 import mx.abarpay.mobile.persistence.newUlid
+import mx.abarpay.mobile.persistence.saleIdFromEventId
 
 data class ShopState(
     val simulated: Boolean = true,
@@ -57,8 +59,10 @@ data class ShopState(
     val tasksOpen: Boolean = false,
     val expenseDraft: ExpenseDraft? = null,
 )
-
-class ShopViewModel(app: Application) : AndroidViewModel(app) {
+class ShopViewModel @JvmOverloads constructor(
+    app: Application,
+    private val coordinator: SaleCoordinator = SaleCoordinator(app),
+) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("development_session", 0)
 
     /**
@@ -68,7 +72,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
     private val ownerPrefs = app.getSharedPreferences("abarpay_owner", 0)
     private var repo: ShopRepository = DemoRepository()
     // Cobros en efectivo sin conexión: outbox cifrado + replay al reconectar.
-    private val coordinator = SaleCoordinator(app)
+    private var recoveredSaleId: String? = null
     private val state: MutableStateFlow<ShopState>
     val ui: StateFlow<ShopState>
     private var checking = false
@@ -105,6 +109,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             }
         )
         ui = state.asStateFlow()
+        recoveredSaleId = recoverPendingCashCheckout(prefs, coordinator, state.value.server)
         if (server.isNotBlank()) repo = ApiRepository(server)
         if (server.isNotBlank() || (!uncertain && sale == null)) refresh()
     }
@@ -184,12 +189,16 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         if (current.simulated || current.server.isBlank()) return
         coordinator.attach(storeId)
         runCatching { coordinator.acquireLease(current.server) }
-        val result = runCatching { coordinator.replay(current.server) }.getOrNull() ?: return
-        if (result.sent == 0) return
-        when {
-            result.acked == result.sent -> message("Ventas sin conexión sincronizadas con el servidor.")
-            result.rejected > 0 -> message("Algunas ventas quedaron por revisar al sincronizar.")
+        val result = runCatching { coordinator.replay(current.server) }.getOrNull()
+        if (result != null && result.sent > 0) {
+            when {
+                result.acked == result.sent -> message("Ventas sin conexión sincronizadas con el servidor.")
+                result.rejected > 0 -> message("Algunas ventas quedaron por revisar al sincronizar.")
+            }
         }
+        // Recupera el recibo de una venta que quedó pendiente tras un cierre, incluso
+        // si el evento ya fue reconocido en un arranque anterior.
+        resolveRecoveredSale()
     }
 
     private suspend fun loadSummary() {
@@ -761,12 +770,32 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             val employee = checkNotNull(snapshot.employee) { "Elige quién cobra" }
             val estimate = runCatching { cartEstimate(snapshot.cart, snapshot.bootstrap?.products.orEmpty()) }.getOrDefault(0)
             val cashEventId = if (method == PAYMENT_CASH && !snapshot.simulated) newUlid() else null
-            if (!snapshot.simulated) {
+            if (cashEventId != null) {
+                // Guarda la clave y la intención ANTES de despachar, junto con la
+                // marca de «creando», en una única escritura verificada.
+                val (issuedTotal, catalogVersion) = offlinePricing(snapshot, estimate)
+                check(
+                    writePendingCashCheckout(
+                        prefs,
+                        PendingCashCheckout(
+                            eventId = cashEventId,
+                            employeeId = employee.id,
+                            storeId = snapshot.bootstrap?.store?.id.orEmpty(),
+                            server = snapshot.server,
+                            cart = snapshot.cart,
+                            totalCents = issuedTotal,
+                            cashReceivedCents = cashReceivedCents,
+                            catalogVersion = catalogVersion,
+                        )
+                    )
+                ) { "No se pudo proteger el intento. No se envió el cobro." }
+            } else if (!snapshot.simulated) {
                 check(prefs.edit().putBoolean("creating", true).commit()) {
                     "No se pudo proteger el intento. No se envió el cobro."
                 }
             }
             state.update { it.copy(uncertain = true, message = null) }
+            var committed: Sale? = null
             try {
                 val created = repo.create(employee.id, snapshot.cart, method, cashReceivedCents, customerId, cashEventId)
                 val sale = if (created.totalCents > 0) created else created.copy(
@@ -778,18 +807,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                     error("El cobro puede existir, pero no se pudo guardar. Revisa el servidor.")
                 }
                 state.update { it.copy(sale = sale, uncertain = false, qrHidden = false, linkCode = null) }
-                if (sale.paymentMethod == PAYMENT_FIADO && sale.customerBalanceCents == null && sale.customerId != null) {
-                    val detail = runCatching { repo.customer(sale.customerId) }.getOrNull()
-                    if (detail != null) {
-                        val updated = sale.copy(
-                            customerName = detail.customer.name,
-                            customerBalanceCents = detail.customer.balanceCents,
-                        )
-                        state.update { it.copy(sale = updated) }
-                        if (!snapshot.simulated) persistSale(updated)
-                    }
-                }
-                loadSummary()
+                committed = sale
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -801,12 +819,25 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 // Servidor inalcanzable (no hubo respuesta HTTP): una venta en
                 // efectivo se finaliza en el teléfono y se sincroniza al reconectar.
-                if (method == PAYMENT_CASH && !snapshot.simulated && e !is ApiFailure) {
+                if (method == PAYMENT_CASH && !snapshot.simulated && e is java.io.IOException) {
                     finalizeOfflineCashSale(snapshot, employee, estimate, cashReceivedCents, cashEventId)
                     return@work
                 }
                 throw e
             }
+            val sale = committed ?: return@work
+            if (sale.paymentMethod == PAYMENT_FIADO && sale.customerBalanceCents == null && sale.customerId != null) {
+                val detail = runCatching { repo.customer(sale.customerId) }.getOrNull()
+                if (detail != null) {
+                    val updated = sale.copy(
+                        customerName = detail.customer.name,
+                        customerBalanceCents = detail.customer.balanceCents,
+                    )
+                    state.update { it.copy(sale = updated) }
+                    if (!snapshot.simulated) persistSale(updated)
+                }
+            }
+            loadSummary()
         }
     }
 
@@ -820,16 +851,8 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             error(reason)
         }
         snapshot.bootstrap?.products?.let { coordinator.seedLocalStock(it) }
-        val priceSnapshot = coordinator.snapshot()
-        val issuedTotal = priceSnapshot?.items?.let { items ->
-            val byId = items.associateBy { it.productId }
-            if (snapshot.cart.all { byId.containsKey(it.productId) }) {
-                snapshot.cart.sumOf { line -> lineTotalCents(byId.getValue(line.productId).priceCents, line.qtyMilli) }
-            } else null
-        } ?: 0L
-        val effectiveTotal = if (issuedTotal > 0) issuedTotal else totalCents
+        val (effectiveTotal, catalogVersion) = offlinePricing(snapshot, totalCents)
         val received = cashReceivedCents ?: effectiveTotal
-        val catalogVersion = priceSnapshot?.catalogVersion ?: 0L
         val result = coordinator.finalizeOfflineCashSale(
             employeeId = employee.id,
             cart = snapshot.cart,
@@ -838,8 +861,9 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
             catalogVersion = catalogVersion,
             eventId = eventId,
         )
+        clearPendingCashCheckout(prefs)
         val sale = Sale(
-            id = result.reference,
+            id = saleIdFromEventId(result.eventId),
             totalCents = result.totalCents,
             chargedCents = received,
             status = "paid_cash",
@@ -1073,11 +1097,32 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { loadSummary() }
     }
 
+    private fun offlinePricing(snapshot: ShopState, fallbackTotal: Long): Pair<Long, Long> {
+        val priceSnapshot = coordinator.snapshot()
+        val issuedTotal = priceSnapshot?.items?.let { items ->
+            val byId = items.associateBy { it.productId }
+            if (snapshot.cart.all { byId.containsKey(it.productId) }) {
+                snapshot.cart.sumOf { line -> lineTotalCents(byId.getValue(line.productId).priceCents, line.qtyMilli) }
+            } else null
+        } ?: 0L
+        val effectiveTotal = if (issuedTotal > 0) issuedTotal else fallbackTotal
+        return effectiveTotal to (priceSnapshot?.catalogVersion ?: 0L)
+    }
+
+    private suspend fun resolveRecoveredSale() {
+        val saleId = recoveredSaleId ?: return
+        val fetched = runCatching { repo.status(saleId) }.getOrNull() ?: return
+        recoveredSaleId = null
+        state.update { it.copy(sale = fetched, uncertain = false, qrHidden = false) }
+        if (!state.value.simulated) persistSale(fetched)
+    }
+
     private fun persistSale(sale: Sale): Boolean {
         val safe = if (sale.qrImage.length > 2_000_000) sale.copy(qrImage = "") else sale
         return prefs.edit()
             .putString("sale", saleJson(safe).toString())
             .putBoolean("creating", false)
+            .remove("pending_cash_checkout")
             .commit()
     }
 }

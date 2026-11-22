@@ -62,3 +62,13 @@ fun resolveDeviceId(context: Context): String {
     prefs.edit().putString(DEVICE_ID_KEY, generated).apply()
     return generated
 }
+
+/**
+ * Server-side folio derived from the idempotency key, mirroring the server's
+ * sale_id_from_event. It is deterministic, so the online commit and the offline
+ * journal both resolve to the same durable sale id without a post-ACK rename.
+ */
+fun saleIdFromEventId(eventId: String): String {
+    val slug = eventId.filter { it.isLetterOrDigit() }.lowercase()
+    return "sale_" + (slug.ifEmpty { newUlid().lowercase().take(20) })
+}

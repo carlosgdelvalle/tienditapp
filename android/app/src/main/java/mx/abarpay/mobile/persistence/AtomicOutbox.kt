@@ -225,6 +225,13 @@ class AtomicOutbox private constructor(
         ).use { cursor -> cursor.moveToFirst() && cursor.getInt(0) == OUTBOX_ACKED }
     }
 
+    fun isAckedByEventId(eventId: String): Boolean {
+        val db = helper.readableDatabase
+        return db.rawQuery(
+            "SELECT acked FROM outbox WHERE event_id = ?", arrayOf(eventId)
+        ).use { cursor -> cursor.moveToFirst() && cursor.getInt(0) == OUTBOX_ACKED }
+    }
+
     // -- Lease and snapshot --------------------------------------------------
 
     fun saveLease(lease: OfflineLease) = saveKv(Companion.LEASE_KEY, lease.toJson())
