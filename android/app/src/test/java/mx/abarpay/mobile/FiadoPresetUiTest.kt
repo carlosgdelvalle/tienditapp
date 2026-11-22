@@ -16,7 +16,7 @@ class FiadoPresetUiTest : AppUiTest() {
     @Test fun ownerUsesTheRoundedPresetAndTheHistoryReloads() {
         loginOwner()
         // Deja un saldo de $53: cargo del ejemplo ($35) + venta a fiado ($18).
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         compose.waitUntil(15_000) { model().ui.value.tab == TAB_SELL && !model().ui.value.busy }
         compose.onNode(hasScrollToIndexAction()).performScrollToKey("product-1")
         addProduct()

@@ -23,7 +23,7 @@ class MobileFlowTest {
         compose.runOnIdle { vm.useSimulation() }
         compose.waitUntil { vm.ui.value.bootstrap != null && !vm.ui.value.busy }
         compose.runOnIdle { vm.select(vm.ui.value.bootstrap!!.employees.first()) }
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         addCokes(1)
         compose.onNodeWithTag("abrir-pago").performClick()
         compose.onNodeWithTag("pago-pey").performClick()
@@ -83,7 +83,7 @@ class MobileFlowTest {
         login()
         compose.onNodeWithText("Hola, Doña Rosa").assertIsDisplayed()
         screenshot("02-inicio")
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         addCokes(2)
         screenshot("03-carrito")
         compose.onNodeWithTag("abrir-pago").performClick()
@@ -100,7 +100,7 @@ class MobileFlowTest {
 
     @Test fun peyQrOnlySucceedsAfterServerConfirmation() {
         login()
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         addCokes(1)
         compose.onNodeWithTag("abrir-pago").performClick()
         compose.onNodeWithTag("pago-pey").performClick()
@@ -115,7 +115,7 @@ class MobileFlowTest {
 
     @Test fun fiadoSaleAddsChargeAndAbonoReducesBalance() {
         login()
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         addCokes(1)
         compose.onNodeWithTag("abrir-pago").performClick()
         compose.onNodeWithTag("pago-fiado").performClick()
@@ -146,7 +146,7 @@ class MobileFlowTest {
 
     @Test fun voiceAndBarcodeEntriesAreExposedWithoutCloudDependencies() {
         login()
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         compose.onNodeWithContentDescription("Dictar venta").assertIsDisplayed()
         compose.onNodeWithText("Escanear código").assertIsDisplayed()
         compose.onNodeWithText("Escribir venta o código").performClick()

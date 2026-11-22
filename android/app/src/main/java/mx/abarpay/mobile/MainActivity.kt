@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Home
@@ -29,6 +32,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
@@ -193,7 +198,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOwner: (() -> Unit)?, openCash: (() -> Unit)?) {
     var settings by rememberSaveable { mutableStateOf(false) }
+    var checkoutChoice by rememberSaveable { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current
+
+    fun startCheckout() {
+        if (openCash == null) vm.tab(TAB_SELL) else checkoutChoice = true
+    }
 
     LaunchedEffect(s.sale?.id, s.simulated) {
         val sale = s.sale ?: return@LaunchedEffect
@@ -207,11 +217,12 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
     }
 
     BackHandler(
-        enabled = settings || s.teamOpen || s.catalogOpen || s.tasksOpen || s.inviteToken != null ||
+        enabled = checkoutChoice || settings || s.teamOpen || s.catalogOpen || s.tasksOpen || s.inviteToken != null ||
             s.customerDetail != null || s.sale != null || s.uncertain || s.tab != TAB_HOME,
     ) {
         when {
             s.inviteToken != null -> vm.dismissInvite()
+            checkoutChoice -> checkoutChoice = false
             settings -> settings = false
             s.catalogOpen -> vm.closeCatalog()
             s.tasksOpen -> vm.closeTasks()
@@ -233,8 +244,14 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
                 NavigationBar(containerColor = Color.White) {
                     tabs.forEach { label ->
                         NavigationBarItem(
-                            selected = s.tab == label,
-                            onClick = { vm.tab(label) },
+                            selected = if (checkoutChoice) label == TAB_SELL else s.tab == label,
+                            onClick = {
+                                if (label == TAB_SELL) startCheckout()
+                                else {
+                                    checkoutChoice = false
+                                    vm.tab(label)
+                                }
+                            },
                             enabled = !s.busy,
                             modifier = Modifier.testTag("tab-" + label),
                             icon = { Icon(tabIcon(label), label) },
@@ -251,7 +268,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         ) {
             Column(Modifier.fillMaxSize().imePadding()) {
-                CompactHeader(onOwner = openOwner, onCash = openCash)
+                CompactHeader(onOwner = openOwner)
                 if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Notice(
                     when {
@@ -268,6 +285,20 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
                     settings -> SettingsScreen(s, vm) { settings = false }
                     !s.busy && (s.uncertain || (!s.simulated && s.server.isBlank())) -> UncertainScreen(s.sale?.id)
                     s.sale != null -> SaleScreen(s, vm)
+                    checkoutChoice && openCash != null -> CheckoutChoice(
+                        onCash = { checkoutChoice = false; openCash() },
+                        demo = s.simulated || s.bootstrap?.demoMode == true,
+                        onOtherPayments = if (s.bootstrap != null && s.employee?.canSell == true) {
+                            { checkoutChoice = false; vm.tab(TAB_SELL) }
+                        } else null,
+                        onBack = { checkoutChoice = false },
+                    )
+                    s.bootstrap == null && openCash != null -> {
+                        Button(onClick = ::startCheckout, modifier = Modifier.padding(horizontal = 20.dp)) {
+                            Text("Empezar un cobro")
+                        }
+                        ConnectingScreen(s, vm) { settings = true }
+                    }
                     s.bootstrap == null -> ConnectingScreen(s, vm) { settings = true }
                     s.catalogOpen -> CatalogScreen(s, vm)
                     s.tasksOpen -> TasksScreen(s, vm)
@@ -275,7 +306,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
                     s.employee == null && !s.onboarded -> OnboardingScreen(s, vm)
                     s.employee == null && s.simulated -> AccessMockups(s, vm::select)
                     s.employee == null -> NoProfileScreen(s, vm)
-                    s.tab == TAB_HOME -> HomeScreen(s, vm) { settings = true }
+                    s.tab == TAB_HOME -> HomeScreen(s, vm, ::startCheckout, openCash != null) { settings = true }
                     s.tab == TAB_SELL -> CheckoutScreen(s, vm, scan)
                     s.tab == TAB_FIADO -> FiadoScreen(s, vm)
                     s.tab == TAB_INVENTORY -> InventoryScreen(s, vm)
@@ -288,7 +319,7 @@ private fun AbarpayApp(s: ShopState, vm: ShopViewModel, scan: () -> Unit, openOw
 
 /** Encabezado compacto: solo el logo pequeño dentro del contenido, sin nombre ni URL. */
 @Composable
-private fun CompactHeader(onOwner: (() -> Unit)?, onCash: (() -> Unit)?) {
+private fun CompactHeader(onOwner: (() -> Unit)?) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -301,16 +332,37 @@ private fun CompactHeader(onOwner: (() -> Unit)?, onCash: (() -> Unit)?) {
             )
         }
         Spacer(Modifier.weight(1f))
-        if (onCash != null) {
-            TextButton(onClick = onCash, modifier = Modifier.testTag("owner-cash-entry")) {
-                Text("Caja")
-            }
-        }
         if (onOwner != null) {
             TextButton(onClick = onOwner, modifier = Modifier.testTag("owner-entry")) {
                 Text("Consola", fontSize = 12.sp)
             }
         }
+    }
+}
+
+@Composable
+private fun CheckoutChoice(
+    onCash: () -> Unit,
+    demo: Boolean,
+    onOtherPayments: (() -> Unit)?,
+    onBack: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Title("Empezar un cobro")
+        Button(onClick = onCash, modifier = Modifier.fillMaxWidth().testTag("owner-cash-entry")) {
+            Text("Caja en efectivo")
+        }
+        Text("Registra ventas de tu tienda. También funciona sin conexión si preparaste la caja.")
+        if (onOtherPayments != null) {
+            OutlinedButton(onClick = onOtherPayments, modifier = Modifier.fillMaxWidth()) {
+                Text(if (demo) "Cobros de demostración" else "CoDi y otros cobros")
+            }
+            Text(if (demo) "Efectivo, CoDi o fiado en el negocio de ejemplo." else "Efectivo, CoDi o fiado.")
+        }
+        TextButton(onClick = onBack) { Text("Volver") }
     }
 }
 

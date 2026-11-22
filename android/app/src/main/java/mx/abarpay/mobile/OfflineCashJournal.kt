@@ -20,27 +20,60 @@ internal data class OfflineCashState(
     val receipt: JSONObject? = null,
 )
 
+internal data class CashDraft(val quantities: Map<String, Int> = emptyMap(), val cash: String = "")
+
 internal class OfflineCashJournal(context: Context, baseUrl: String, tenantId: String) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences("abarpay_offline_cash", Context.MODE_PRIVATE)
     private val key = "$baseUrl:$tenantId"
+    private val draftKey = "$key:draft"
     private val crypto by lazy { CryptoBox(AndroidKeystoreKeyProvider().getOrCreate()) }
 
     val hasSavedState: Boolean get() = prefs.contains(key)
 
     suspend fun read(): OfflineCashState = withContext(Dispatchers.IO) {
-        val raw = prefs.getString(key, null) ?: return@withContext OfflineCashState()
-        val data = JSONObject(crypto.decrypt(Ciphertext.decode(raw)).decodeToString())
-        check(data.getString("scope") == key)
+        val data = readEntry(key) ?: return@withContext OfflineCashState()
         OfflineCashState(data.optJSONObject("lease"), data.getJSONArray("pending").objects(), data.optJSONObject("receipt"))
     }
 
-    suspend fun save(state: OfflineCashState) = withContext(Dispatchers.IO) {
-        val data = JSONObject().put("scope", key).put("lease", state.lease)
-            .put("pending", JSONArray(state.pending)).put("receipt", state.receipt)
-        val encrypted = crypto.encrypt(data.toString().encodeToByteArray()).encode()
-        check(prefs.edit().putString(key, encrypted).commit())
+    suspend fun readDraft(): CashDraft = withContext(Dispatchers.IO) {
+        val data = readEntry(draftKey) ?: return@withContext CashDraft()
+        val quantities = data.getJSONObject("quantities")
+        CashDraft(quantities.keys().asSequence().associateWith { quantities.getInt(it) }, data.getString("cash"))
     }
+
+    // The small draft is committed before the edit is reflected in the UI.
+    // A process killed immediately after a tap can reopen what the cashier saw.
+    fun saveDraft(draft: CashDraft) {
+        if (draft.quantities.isEmpty() && draft.cash.isEmpty()) {
+            clearDraft()
+            return
+        }
+        val data = JSONObject().put("quantities", JSONObject(draft.quantities)).put("cash", draft.cash)
+        check(prefs.edit().putString(draftKey, encodeEntry(draftKey, data)).commit())
+    }
+
+    fun clearDraft() {
+        if (prefs.contains(draftKey)) check(prefs.edit().remove(draftKey).commit())
+    }
+
+    suspend fun save(state: OfflineCashState, clearDraft: Boolean = false) = withContext(Dispatchers.IO) {
+        val data = JSONObject().put("lease", state.lease)
+            .put("pending", JSONArray(state.pending)).put("receipt", state.receipt)
+        val editor = prefs.edit().putString(key, encodeEntry(key, data))
+        if (clearDraft) editor.remove(draftKey)
+        check(editor.commit())
+    }
+
+    private fun readEntry(entry: String): JSONObject? {
+        val raw = prefs.getString(entry, null) ?: return null
+        val data = JSONObject(crypto.decrypt(Ciphertext.decode(raw)).decodeToString())
+        check(data.getString("scope") == entry)
+        return data
+    }
+
+    private fun encodeEntry(entry: String, data: JSONObject) =
+        crypto.encrypt(data.put("scope", entry).toString().encodeToByteArray()).encode()
 
     fun anchor(lease: JSONObject): JSONObject = lease
         .put("wallAtFetch", System.currentTimeMillis())

@@ -43,17 +43,30 @@ import androidx.compose.ui.unit.sp
 
 /** Inicio del dueño: tarjetas de estado y actividades. Sin botones duplicados de pestañas. */
 @Composable
-internal fun HomeScreen(s: ShopState, vm: ShopViewModel, openSettings: () -> Unit) {
+internal fun HomeScreen(
+    s: ShopState,
+    vm: ShopViewModel,
+    startCheckout: () -> Unit,
+    chooseCheckout: Boolean,
+    openSettings: () -> Unit,
+) {
     val employee = s.employee
     if (employee != null && !employee.isOwner) {
         EmployeeHome(s, employee, vm)
         return
     }
-    OwnerHome(s, vm, employee, openSettings)
+    OwnerHome(s, vm, employee, startCheckout, chooseCheckout, openSettings)
 }
 
 @Composable
-private fun OwnerHome(s: ShopState, vm: ShopViewModel, employee: Employee?, openSettings: () -> Unit) {
+private fun OwnerHome(
+    s: ShopState,
+    vm: ShopViewModel,
+    employee: Employee?,
+    startCheckout: () -> Unit,
+    chooseCheckout: Boolean,
+    openSettings: () -> Unit,
+) {
     val report = s.report
     val lowStock = s.bootstrap?.products.orEmpty().filter { it.isLowStock }
     val pending = pendingInvites(s.team)
@@ -80,6 +93,17 @@ private fun OwnerHome(s: ShopState, vm: ShopViewModel, employee: Employee?, open
                     enabled = !s.busy,
                     modifier = Modifier.testTag("abrir-ajustes"),
                 ) { Icon(Icons.Outlined.Settings, "Ajustes y conexión", tint = Purple) }
+            }
+        }
+        if (s.employee?.canSell != false) {
+            item {
+                Action(
+                    if (chooseCheckout) "Empezar un cobro" else "Cobrar ahora",
+                    Icons.Outlined.PointOfSale,
+                    if (chooseCheckout) "Caja en efectivo u otra forma de cobro" else "Efectivo, PEY/CoDi o fiado",
+                    primary = true,
+                    onClick = startCheckout,
+                )
             }
         }
         item {
@@ -118,16 +142,6 @@ private fun OwnerHome(s: ShopState, vm: ShopViewModel, employee: Employee?, open
                     tag = "card-stock",
                     modifier = Modifier.weight(1f),
                 )
-            }
-        }
-        if (s.employee?.canSell != false) {
-            item {
-                Action(
-                    "Cobrar ahora",
-                    Icons.Outlined.PointOfSale,
-                    "Efectivo, PEY/CoDi o fiado",
-                    primary = true,
-                ) { vm.tab(TAB_SELL) }
             }
         }
         item {

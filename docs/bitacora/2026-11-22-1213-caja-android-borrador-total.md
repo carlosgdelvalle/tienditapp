@@ -1,0 +1,8 @@
+# 2026-11-22 12:13 · Caja Android · Entrada, borrador y total
+
+- **Qué cambió** En la app con caja vinculada, **Empezar un cobro** y la pestaña **Cobrar** abren las mismas opciones, con indicaciones para elegir la caja de la tienda o los cobros de la demo. El total permanece visible al recorrer el catálogo. **Ir al cobro** lleva directo al campo de efectivo recibido.
+- **Borrador** Los productos, cantidades y efectivo recibido se guardan cifrados por tienda. Al reabrir, Caja indica que retomó una venta sin registrar. Si el servidor informa un cambio de precio o existencias, se conserva el borrador para revisarlo.
+- **Samsung SM-A165M con Android 16** Se comprobaron las dos rutas al selector y los destinos de caja y demo. El total de MXN 39.00 permaneció fijo tras tres deslizamientos por el catálogo y siguió visible al repetir con el texto del sistema al 200 %. En modo avión, con Wi-Fi desactivado y sin el túnel USB de la API, se detuvo el proceso y se reabrió Caja. Se recuperaron los dos productos, MXN 50.00 recibidos y MXN 11.00 de cambio.
+- **Consistencia** PostgreSQL seguía con cuatro ventas antes de sincronizar. Al registrar el borrador SIMULADO, abrir una nueva venta y reconectar, se agregó un solo folio por MXN 39.00, con un pago y dos movimientos, uno por producto. La nueva venta abrió con el carrito en cero.
+- **Texto grande** Los botones de cada producto pasan a la siguiente línea cuando ya no caben. Al 200 % se probó **Quitar** y se comprobó que el total fijo bajara de MXN 24.00 a MXN 0.00.
+- **Pruebas automatizadas** Pasaron las 176 pruebas Android con la configuración QA, 336 del servidor con PostgreSQL y 16 de la app Python. Pasaron la compilación de release y el escaneo de secretos.

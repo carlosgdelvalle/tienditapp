@@ -6,8 +6,11 @@ import android.net.Network
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +18,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -24,20 +29,25 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -119,6 +129,7 @@ internal fun cashNetworkAvailable(): Boolean {
     return available
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore, onClose: () -> Unit) {
     val context = LocalContext.current
@@ -145,11 +156,33 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
             it.getLong("priceCents"), it.getInt("stockMilli"), it.getBoolean("unlimitedStock"),
         )
     }
-    val cart = remember { mutableStateMapOf<String, Int>() }
-    var cash by rememberSaveable { mutableStateOf("") }
+    var draft by remember(journal) { mutableStateOf(CashDraft()) }
+    var restored by remember(journal) { mutableStateOf(false) }
+    val cart = draft.quantities
+    val cash = draft.cash
     var working by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     val total = products.sumOf { it.price * (cart[it.id] ?: 0) }
+    val availableIds = products.mapTo(mutableSetOf()) { it.id }
+    val missingProducts = cart.keys.any { it !in availableIds }
+    val overStock = products.any { !it.unlimited && (cart[it.id] ?: 0) > it.stockMilli.coerceAtLeast(0) / 1000 }
+    val paymentAnchor = remember { BringIntoViewRequester() }
+
+    fun editDraft(updated: CashDraft) {
+        try {
+            offlineJournal.saveDraft(updated)
+            draft = updated
+            if (updated.quantities.isEmpty()) restored = false
+        } catch (_: Exception) {
+            error = "No se pudo guardar el cambio. Intenta de nuevo antes de cobrar."
+        }
+    }
+
+    fun clearDraft() {
+        offlineJournal.clearDraft()
+        draft = CashDraft()
+        restored = false
+    }
 
     fun runAction(message: String, action: suspend () -> Unit) {
         if (working.isNotEmpty()) return
@@ -175,8 +208,8 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
         }
     }
 
-    suspend fun persist(state: OfflineCashState) {
-        offlineJournal.save(state)
+    suspend fun persist(state: OfflineCashState, clearDraft: Boolean = false) {
+        offlineJournal.save(state, clearDraft)
         offlineState = state
     }
 
@@ -230,7 +263,6 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
             ) {
                 check(prefs.edit().remove(journal + ":intent").commit())
                 pending = null
-                cart.clear()
                 refreshLease()
             }
             throw failure
@@ -238,8 +270,7 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
         check(prefs.edit().remove(journal + ":intent").putString(journal + ":receipt", sale.toString()).commit())
         pending = null
         receipt = sale
-        cart.clear()
-        cash = ""
+        clearDraft()
     }
 
     fun recordOffline(received: Long) = runAction("Guardando la venta en este celular…") {
@@ -266,14 +297,18 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
         val localReceipt = JSONObject().put("saleId", saleId).put("totalCents", total)
             .put("changeCents", received - total).put("offlinePending", true)
         val attempt = JSONObject().put("key", key).put("body", body)
-        persist(OfflineCashState(lease, state.pending + attempt, localReceipt))
-        cart.clear()
-        cash = ""
+        persist(OfflineCashState(lease, state.pending + attempt, localReceipt), clearDraft = true)
+        draft = CashDraft()
+        restored = false
     }
 
     LaunchedEffect(journal) {
         try {
-            offlineState = offlineJournal.read()
+            val state = offlineJournal.read()
+            val saved = offlineJournal.readDraft()
+            draft = saved
+            restored = saved.quantities.isNotEmpty()
+            offlineState = state
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -287,117 +322,156 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
         }
     }
     BackHandler { if (working.isEmpty()) onClose() }
-    Column(
-        Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Caja en efectivo", style = MaterialTheme.typography.headlineSmall)
-        Text(store.name, style = MaterialTheme.typography.titleMedium)
-        if (offlineMode) Text("Sin conexión a la caja · Solo efectivo.")
-        if (!local?.pending.isNullOrEmpty()) {
-            Text("Ventas por sincronizar: ${local?.pending?.size}")
-            if (networkAvailable) {
-                OutlinedButton(onClick = ::syncCash, enabled = working.isEmpty()) { Text("Sincronizar ventas") }
-            }
-        }
-        val savedSale = receipt ?: local?.receipt
-        val authorized = offlineJournal.occurredAt(local?.lease) != null
-        if (savedSale != null) {
-            Text(
-                if (savedSale.optBoolean("offlinePending")) "Venta guardada en este celular" else "Venta registrada",
-                style = MaterialTheme.typography.titleLarge,
-            )
-            if (savedSale.optBoolean("offlinePending")) Text("Se verá en la consola al sincronizar.")
-            Text("Total " + money(savedSale.getLong("totalCents")), modifier = Modifier.testTag("owner-cash-receipt-total"))
-            Text("Cambio " + money(savedSale.getLong("changeCents")))
-            Text("Folio")
-            SelectionContainer {
-                Text(savedSale.getString("saleId"), modifier = Modifier.testTag("owner-cash-receipt-id"))
-            }
-            Button(
-                onClick = {
-                    runAction("Abriendo otra venta…") {
-                        if (receipt != null) {
-                            check(prefs.edit().remove(journal + ":receipt").commit())
-                            receipt = null
-                        } else {
-                            persist(checkNotNull(offlineState).copy(receipt = null))
-                        }
-                        if (!offlineMode && offlineState?.pending.isNullOrEmpty()) refreshLease()
-                    }
-                },
-                enabled = working.isEmpty(),
-            ) { Text("Nueva venta") }
-        } else if (pending != null) {
-            Text("Venta por confirmar", style = MaterialTheme.typography.titleLarge)
-            Text("Total " + money(pending!!.getJSONObject("body").getLong("expectedTotalCents")))
-            Text("Consulta el resultado del mismo cobro antes de recibir efectivo otra vez.")
-            Button(onClick = { record(null) }, enabled = working.isEmpty() && networkAvailable) { Text("Consultar venta pendiente") }
-        } else if (local == null) {
-            if (error.isBlank()) Text("Abriendo la caja guardada…")
-        } else if (products.isEmpty()) {
-            if (working.isEmpty()) Text(
-                if (offlineMode) "Conéctate para preparar esta caja antes de cobrar."
-                else "Agrega productos en la consola para empezar a cobrar."
-            )
-            OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty() && networkAvailable) { Text("Actualizar catálogo") }
-        } else {
-            if (offlineMode && !authorized) Text("Conéctate para renovar el acceso a caja antes de recibir efectivo.")
-            if (cart.isEmpty()) OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty() && networkAvailable) {
-                Text(if (networkAvailable) "Actualizar catálogo" else "Catálogo guardado")
-            }
-            if (networkAvailable && authorized) OutlinedButton(
-                onClick = {
-                    if (offlineSelected && !local.pending.isEmpty()) syncCash()
-                    else offlineSelected = !offlineSelected
-                },
-                enabled = working.isEmpty(),
-            ) { Text(if (offlineSelected) "Volver a caja en línea" else "Trabajar sin conexión") }
-            products.forEach { product ->
-                val count = cart[product.id] ?: 0
-                Text(product.name + " · " + money(product.price) + " / " + product.unit)
-                Text(if (product.unlimited) "Existencia ilimitada" else
-                    "Existencia: " + qtyText(product.stockMilli, product.unit))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { cart[product.id] = count + 1 },
-                        enabled = product.canAdd(count) && working.isEmpty() && (!offlineMode || authorized),
-                    ) { Text("Agregar ${product.name}") }
-                    if (count > 0) OutlinedButton(
-                        onClick = { if (count == 1) cart.remove(product.id) else cart[product.id] = count - 1 },
-                        enabled = working.isEmpty(),
-                    ) { Text("Quitar ($count)") }
+    val savedSale = receipt ?: local?.receipt
+    val authorized = offlineJournal.occurredAt(local?.lease) != null
+    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Caja en efectivo", style = MaterialTheme.typography.headlineSmall)
+            Text(store.name, style = MaterialTheme.typography.titleMedium)
+            if (offlineMode) Text("Sin conexión a la caja · Solo efectivo.")
+            if (!local?.pending.isNullOrEmpty()) {
+                Text("Ventas por sincronizar: ${local?.pending?.size}")
+                if (networkAvailable) {
+                    OutlinedButton(onClick = ::syncCash, enabled = working.isEmpty()) { Text("Sincronizar ventas") }
                 }
-                HorizontalDivider()
             }
-            val received = parseCashCents(cash)
-            Text("Total " + money(total), style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(
-                value = cash,
-                onValueChange = { cash = it },
-                label = { Text("Efectivo recibido (MXN)") },
-                enabled = working.isEmpty(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (received != null && received >= total) Text("Cambio " + money(received - total))
-            Button(
-                onClick = {
-                    if (offlineMode || connectivity.activeNetwork == null) recordOffline(checkNotNull(received))
-                    else record(received)
-                },
-                enabled = working.isEmpty() && cart.isNotEmpty() && received != null &&
-                    (if (offlineMode) authorized else local.pending.isEmpty()) &&
-                    received >= total && received <= Int.MAX_VALUE.toLong(),
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Registrar venta en efectivo") }
+            if (savedSale != null) {
+                Text(
+                    if (savedSale.optBoolean("offlinePending")) "Venta guardada en este celular" else "Venta registrada",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                if (savedSale.optBoolean("offlinePending")) Text("Se verá en la consola al sincronizar.")
+                Text("Total " + money(savedSale.getLong("totalCents")), modifier = Modifier.testTag("owner-cash-receipt-total"))
+                Text("Cambio " + money(savedSale.getLong("changeCents")))
+                Text("Folio")
+                SelectionContainer {
+                    Text(savedSale.getString("saleId"), modifier = Modifier.testTag("owner-cash-receipt-id"))
+                }
+                Button(
+                    onClick = {
+                        runAction("Abriendo otra venta…") {
+                            clearDraft()
+                            if (receipt != null) {
+                                check(prefs.edit().remove(journal + ":receipt").commit())
+                                receipt = null
+                            } else {
+                                persist(checkNotNull(offlineState).copy(receipt = null))
+                            }
+                            if (!offlineMode && offlineState?.pending.isNullOrEmpty()) refreshLease()
+                        }
+                    },
+                    enabled = working.isEmpty(),
+                ) { Text("Nueva venta") }
+            } else if (pending != null) {
+                Text("Venta por confirmar", style = MaterialTheme.typography.titleLarge)
+                Text("Total " + money(pending!!.getJSONObject("body").getLong("expectedTotalCents")))
+                Text("Consulta el resultado del mismo cobro antes de recibir efectivo otra vez.")
+                Button(onClick = { record(null) }, enabled = working.isEmpty() && networkAvailable) { Text("Consultar venta pendiente") }
+            } else if (local == null) {
+                if (error.isBlank()) Text("Abriendo la caja guardada…")
+            } else if (products.isEmpty()) {
+                if (working.isEmpty()) Text(
+                    if (offlineMode) "Conéctate para preparar esta caja antes de cobrar."
+                    else "Agrega productos en la consola para empezar a cobrar."
+                )
+                OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty() && networkAvailable) { Text("Actualizar catálogo") }
+            } else {
+                if (restored) Text("Retomaste una venta sin registrar.")
+                if (missingProducts) {
+                    Text("Hay productos del carrito que ya no aparecen en el catálogo.")
+                    OutlinedButton(
+                        onClick = { editDraft(draft.copy(quantities = cart.filterKeys { it in availableIds })) },
+                        enabled = working.isEmpty(),
+                    ) { Text("Quitar productos que ya no están") }
+                }
+                if (overStock) Text("Quita del carrito las piezas que ya no están disponibles.")
+                if (offlineMode && !authorized) Text("Conéctate para renovar el acceso a caja antes de recibir efectivo.")
+                if (cart.isEmpty()) OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty() && networkAvailable) {
+                    Text(if (networkAvailable) "Actualizar catálogo" else "Catálogo guardado")
+                }
+                if (networkAvailable && authorized) OutlinedButton(
+                    onClick = {
+                        if (offlineSelected && !local.pending.isEmpty()) syncCash()
+                        else offlineSelected = !offlineSelected
+                    },
+                    enabled = working.isEmpty(),
+                ) { Text(if (offlineSelected) "Volver a caja en línea" else "Trabajar sin conexión") }
+                products.forEach { product ->
+                    val count = cart[product.id] ?: 0
+                    Text(product.name + " · " + money(product.price) + " / " + product.unit)
+                    Text(if (product.unlimited) "Existencia ilimitada" else
+                        "Existencia: " + qtyText(product.stockMilli, product.unit))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Button(
+                            onClick = { editDraft(draft.copy(quantities = cart + (product.id to (count + 1)))) },
+                            enabled = product.canAdd(count) && working.isEmpty() && (!offlineMode || authorized),
+                        ) { Text("Agregar ${product.name}") }
+                        if (count > 0) OutlinedButton(
+                            onClick = {
+                                val quantities = if (count == 1) cart - product.id else cart + (product.id to (count - 1))
+                                editDraft(CashDraft(quantities, cash.takeIf { quantities.isNotEmpty() }.orEmpty()))
+                            },
+                            enabled = working.isEmpty(),
+                        ) { Text("Quitar ($count)") }
+                    }
+                    HorizontalDivider()
+                }
+                val received = parseCashCents(cash)
+                Column(Modifier.bringIntoViewRequester(paymentAnchor), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = cash,
+                        onValueChange = { editDraft(draft.copy(cash = it)) },
+                        label = { Text("Efectivo recibido (MXN)") },
+                        enabled = working.isEmpty(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (received != null && received >= total) Text("Cambio " + money(received - total))
+                    Button(
+                        onClick = {
+                            if (offlineMode || connectivity.activeNetwork == null) recordOffline(checkNotNull(received))
+                            else record(received)
+                        },
+                        enabled = working.isEmpty() && cart.isNotEmpty() && received != null &&
+                            !missingProducts && !overStock && (if (offlineMode) authorized else local.pending.isEmpty()) &&
+                            received >= total && received <= Int.MAX_VALUE.toLong(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Registrar venta en efectivo") }
+                }
+            }
+            if (working.isNotEmpty()) {
+                Text(working)
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+            OutlinedButton(onClick = onClose, enabled = working.isEmpty()) { Text("Volver") }
         }
-        if (working.isNotEmpty()) {
-            Text(working)
-            LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (local != null && savedSale == null && pending == null && products.isNotEmpty()) {
+            Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        "Total " + money(total),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f).testTag("cash-running-total")
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                    TextButton(
+                        onClick = { scope.launch { paymentAnchor.bringIntoView() } },
+                        enabled = cart.isNotEmpty() && working.isEmpty(),
+                    ) { Text("Ir al cobro") }
+                }
+            }
         }
-        if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
-        OutlinedButton(onClick = onClose, enabled = working.isEmpty()) { Text("Volver") }
     }
 }

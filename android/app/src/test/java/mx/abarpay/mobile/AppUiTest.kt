@@ -4,6 +4,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -64,7 +65,7 @@ abstract class AppUiTest {
     /** Abre Cobrar con el catálogo listo y la primera fila del catálogo compuesta. */
     protected fun openCheckout() {
         loginOwner()
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         compose.waitUntil(15_000) { model().ui.value.tab == TAB_SELL && !model().ui.value.busy }
         compose.onNode(hasScrollToIndexAction()).performScrollToKey("product-1")
     }
@@ -89,5 +90,13 @@ abstract class AppUiTest {
         scrollToText("Entrar en simulación")
         compose.onNodeWithText("Entrar en simulación").performClick()
         compose.waitUntil(15_000) { model().ui.value.employee != null && !model().ui.value.busy }
+    }
+}
+
+internal fun ComposeContentTestRule.openDemoCheckout() {
+    onNodeWithTag("tab-Cobrar").performClick()
+    if (BuildConfig.OWNER_API_BASE_URL.isNotBlank()) {
+        onNodeWithText("Caja en efectivo").assertExists()
+        onNodeWithText("Cobros de demostración").performClick()
     }
 }

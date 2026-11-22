@@ -12,7 +12,7 @@ import org.junit.Test
 class SupportTicketUiTest : AppUiTest() {
     @Test fun porConciliarSaleLetsTheUserReportAProblem() {
         loginOwner()
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         compose.waitUntil(15_000) { !model().ui.value.busy }
         compose.onNodeWithContentDescription("Agregar Coca-Cola 600 ml").performScrollTo().performClick()
         compose.onNodeWithTag("abrir-pago").performClick()

@@ -17,7 +17,7 @@ import org.junit.Test
 class CategoryChipsUiTest : AppUiTest() {
     @Test fun categoryChipsFilterCatalogAndKeepQuickSection() {
         loginOwner()
-        compose.onNodeWithTag("tab-Cobrar").performClick()
+        compose.openDemoCheckout()
         compose.waitUntil(15_000) { model().ui.value.tab == TAB_SELL && !model().ui.value.busy }
 
         scrollToTag("cat-Todas").assertIsSelected()

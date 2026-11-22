@@ -33,11 +33,18 @@ Label the SMS and store fixtures **SIMULADO** in the test record. Record physica
 
 ## Connected cash and the QR console
 
-Use the same isolated PostgreSQL backend for the QR console and **Caja** in Abarpay QA. Open **Catálogo** in the browser, add a fixture item, then edit its name and price. Check that Caja loads the edited product and that editing leaves the stock unchanged.
+Use the same isolated PostgreSQL backend for the QR console and **Caja en efectivo** in Abarpay QA. Open it from **Empezar un cobro** on Inicio or the **Cobrar** tab. Open **Catálogo** in the browser, add a fixture item, then edit its name and price. Check that Caja loads the edited product and that editing leaves the stock unchanged.
 
-Record one cash sale in **Caja → Entrar a mi tienda**. To test loss of a response, wrap the QA server so the first successful mobile checkout response becomes an error after the database commit. Restart the Android app and select **Consultar venta pendiente**. Compare the full folio and total with **Historial de ventas** and verify one sale, payment, and stock movement for that folio in PostgreSQL. Check **Inicio** for the current business day's count and amount. In a separate browser, use a second verified owner with a different store. The sale must be absent from their history and return HTTP 404 when requested directly.
+Record one cash sale in **Caja en efectivo → Entrar a mi tienda**. To test loss of a response, wrap the QA server so the first successful mobile checkout response becomes an error after the database commit. Restart the Android app and select **Consultar venta pendiente**. Compare the full folio and total with **Historial de ventas** and verify one sale, payment, and stock movement for that folio in PostgreSQL. Check **Inicio** for the current business day's count and amount. In a separate browser, use a second verified owner with a different store. The sale must be absent from their history and return HTTP 404 when requested directly.
 
 The connected owner checkout and the SQLite offline POS fixture use separate routes.
+
+### Checkout entrance, draft recovery and fixed total
+
+1. From **Empezar un cobro** and from the **Cobrar** tab, confirm that the same chooser opens. Check that **Caja en efectivo** opens the linked store till and **Cobros de demostración** opens the demo POS when that POS is in demo mode.
+2. In the linked till, add two fixture products and scroll until their rows are off-screen. Verify that the same total stays visible at the bottom. Check that **Ir al cobro** reaches the received cash field. Repeat with Android font scale set to 200%, then restore the previous font scale.
+3. Enter the cash received and leave the sale unrecorded. Confirm the PostgreSQL sale count is unchanged. Put the phone in airplane mode with Wi-Fi off, remove the API USB reverse tunnel, force-stop Abarpay, and reopen the same till. Confirm the draft notice, both items, total, cash received and change.
+4. Register that draft once in the isolated lab and open **Nueva venta**. Verify the next cart is empty. Reconnect and verify that synchronization adds exactly one sale and one payment for the recovered cart.
 
 ## Inventory between the console and Samsung
 
