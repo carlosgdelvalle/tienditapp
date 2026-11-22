@@ -62,7 +62,7 @@ _TENANT_ISOLATION_TABLES = (
     "inventory_movements", "fiado_customers", "fiado_entries",
     "fiado_drafts", "expenses", "day_tasks", "bank_accounts",
     "purchase_orders", "receipts", "till_shifts", "outbox_devices",
-    "outbox_applied", "webhook_events", "barcodes", "store_settings",
+    "outbox_applied", "cash_offline_leases", "webhook_events", "barcodes", "store_settings",
     "support_tickets",
 )
 

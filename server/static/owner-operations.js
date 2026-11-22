@@ -140,7 +140,8 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
       }));
       $('inventory-movements').replaceChildren(...data.movements.map(entry => {
         const change = (entry.deltaMilli > 0 ? '+' : '') + quantity.format(entry.deltaMilli / 1000);
-        return record(entry.name + ' · ' + change, (entry.reason === 'sale' ? 'Venta' : entry.reason) +
+        const reason = {sale: 'Venta', sale_oversell: 'Faltante por venta sin conexión'}[entry.reason] || entry.reason;
+        return record(entry.name + ' · ' + change, reason +
           ' · ' + formatDate(entry.createdAt));
       }));
       $('inventory-movements-empty').hidden = data.movements.length > 0;

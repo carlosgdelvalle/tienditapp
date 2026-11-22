@@ -63,6 +63,16 @@ adb -d install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Offline cash on the physical phone
 
+### PostgreSQL and phone sign-in
+
+1. Apply migration `006_offline_cash.sql` to a disposable PostgreSQL QA database, start the phone-enabled runtime and open **Caja** on the Samsung. A store owner or employee with **Puede cobrar** can prepare the till. Wait for the catalog and **Trabajar sin conexión**. Keep the owner QR console open in Chrome.
+2. Enable airplane mode, turn off Wi-Fi, and remove the USB reverse tunnel for the phone API. Start a fresh cash sale in **Caja**. Record the folio, total, change, and **Venta guardada en este celular** message. Confirm the folio is absent from PostgreSQL at this point.
+3. Force-stop and reopen Abarpay with the phone still offline. Open **Caja** or the employee's **Cobrar en efectivo**. Check the same receipt and pending count. Change the fixture product's price in the QR console while the phone stays disconnected.
+4. Restore the connection and tunnel. Reopen **Caja** if needed and wait for synchronization. Check the same folio and amounts on the phone and in **Historial de ventas**, with one payment and one inventory movement in PostgreSQL. The recorded price stays the one shown at checkout.
+5. With two independently enrolled tills, prepare them with one available piece. Keep both offline as they sell that piece, then reconnect. Check both sales and the **Faltante por venta sin conexión** movement tied to the sale that applied second. The isolated PostgreSQL acceptance test covers this case with two authenticated devices and concurrent replay.
+
+### SQLite demo
+
 Open the POS fixture at `http://127.0.0.1:8010` in the QA app and confirm the seeded catalog and offline authorization load while connected. Use a fresh cash cart with synthetic products. Cut and restore only the POS transport:
 
 ```bash

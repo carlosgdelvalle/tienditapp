@@ -15,8 +15,9 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
 from .auth_routes import IdentityContext, SessionContext, require_identity, require_owner, require_session
@@ -68,6 +69,11 @@ class SaleIn(BaseModel):
     cashReceivedCents: int | None = None
     note: str | None = None
     expectedTotalCents: int | None = Field(default=None, ge=0, le=PG_INT_MAX)
+
+
+class OfflineCashIn(SaleIn):
+    leaseId: uuid.UUID
+    occurredAt: int = Field(gt=0, le=253402300799)
 
 
 # ---------------------------------------------------------------------------
@@ -370,6 +376,55 @@ class PostgresBusinessStore:
             with conn.cursor(row_factory=dict_row) as cur:
                 return self._fetch_sale(cur, sale_id)
 
+    def lease_cash_catalog(self, tenant_id: str, actor: MobileIdentity) -> dict[str, Any]:
+        with self._pool.connection() as conn:
+            set_tenant_context(conn, tenant_id=tenant_id, user_id=actor.user_id)
+            with conn.cursor(row_factory=dict_row) as cur:
+                catalog = read_catalog(cur)
+                cur.execute(
+                    """SELECT id, issued_at, expires_at FROM cash_offline_leases
+                       WHERE device_id = %s AND items = %s
+                         AND issued_at > now() - interval '5 minutes'
+                       ORDER BY issued_at DESC LIMIT 1""",
+                    (actor.device_id, Jsonb(catalog)),
+                )
+                lease = cur.fetchone()
+                if lease is None:
+                    cur.execute(
+                        """INSERT INTO cash_offline_leases
+                               (tenant_id, user_id, device_id, issued_at, expires_at, items)
+                           VALUES (%s, %s, %s, date_trunc('second', now()),
+                                   date_trunc('second', now()) + interval '12 hours', %s)
+                           RETURNING id, issued_at, expires_at""",
+                        (tenant_id, actor.user_id, actor.device_id, Jsonb(catalog)),
+                    )
+                    lease = cur.fetchone()
+        return {
+            "leaseId": str(lease["id"]),
+            "issuedAt": int(lease["issued_at"].timestamp()),
+            "expiresAt": int(lease["expires_at"].timestamp()),
+            "serverTime": int(datetime.now(timezone.utc).timestamp()),
+            "items": catalog,
+        }
+
+    @staticmethod
+    def _offline_prices(cur, device_id: str, body: OfflineCashIn, now: datetime):
+        cur.execute(
+            """SELECT issued_at, expires_at, items FROM cash_offline_leases
+               WHERE id = %s AND device_id = %s""",
+            (body.leaseId, device_id),
+        )
+        lease = cur.fetchone()
+        if lease is None:
+            raise HTTPException(403, "Esta caja no tiene autorización para sincronizar esta venta.")
+        try:
+            occurred = datetime.fromtimestamp(body.occurredAt, tz=timezone.utc)
+        except (ValueError, OverflowError, OSError):
+            raise HTTPException(422, "La fecha de la venta no es válida.") from None
+        if not lease["issued_at"] <= occurred <= min(lease["expires_at"], now + timedelta(seconds=30)):
+            raise HTTPException(409, "La venta quedó fuera del periodo autorizado. Revisa el folio con Abarpay.")
+        return occurred, {item["id"]: item for item in lease["items"]}
+
     def create_cash_sale(
         self,
         *,
@@ -380,6 +435,8 @@ class PostgresBusinessStore:
         note: str | None,
         idempotency_key: str | None = None,
         expected_total_cents: int | None = None,
+        offline: OfflineCashIn | None = None,
+        device_id: str | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
         sale_id = (
@@ -390,6 +447,7 @@ class PostgresBusinessStore:
         with self._pool.connection() as conn:
             set_tenant_context(conn, tenant_id=tenant_id, user_id=user_id)
             with conn.cursor(row_factory=dict_row) as cur:
+                occurred_at, snapshot = self._offline_prices(cur, device_id, offline, now) if offline else (None, None)
                 if idempotency_key:
                     # Serialize attempts at the same sale before looking at stock.
                     cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (sale_id,))
@@ -425,21 +483,33 @@ class PostgresBusinessStore:
                         raise HTTPException(status_code=404, detail="Producto no encontrado")
                     products[product_id] = product
 
-                # Finite stock is rejected before creating the sale.
                 total_cents = 0
                 lines: list[dict[str, Any]] = []
                 for item in items:
                     product = products[item["product_id"]]
-                    if not bool(product["unlimited_stock"]) and int(product["stock_milli"]) < item["qty_milli"]:
+                    oversold = not product["unlimited_stock"] and product["stock_milli"] < item["qty_milli"]
+                    if oversold and snapshot is None:
                         raise HTTPException(
                             status_code=409,
                             detail="Inventario insuficiente",
                         )
-                    line_total = line_total_cents(int(product["price_cents"]), item["qty_milli"])
+                    if snapshot is not None:
+                        price = snapshot.get(item["product_id"])
+                        if price is None or (not price["unlimitedStock"] and price["stockMilli"] < item["qty_milli"]):
+                            raise HTTPException(409, "El producto o la cantidad no estaban disponibles en el catálogo de esta caja.")
+                        product = {**product, "name": price["name"], "unit": price["unit"], "price_cents": price["priceCents"]}
+                    if oversold and product["stock_milli"] - item["qty_milli"] < -PG_INT_MAX - 1:
+                        raise HTTPException(409, "El faltante excede el límite de inventario. Revisa el folio con Abarpay.")
+                    line_total = line_total_cents(product["price_cents"], item["qty_milli"])
                     total_cents += line_total
-                    lines.append({"product": product, "qty_milli": item["qty_milli"], "line_total": line_total})
+                    lines.append({
+                        "product": product, "qty_milli": item["qty_milli"],
+                        "line_total": line_total, "reason": "sale_oversell" if oversold else "sale",
+                    })
 
                 if expected_total_cents is not None and expected_total_cents != total_cents:
+                    if offline:
+                        raise HTTPException(409, "El total guardado no coincide con el catálogo autorizado. Conserva el folio.")
                     raise HTTPException(409, "El precio cambió. Actualiza el catálogo antes de cobrar.")
                 received = total_cents if cash_received_cents is None else cash_received_cents
                 if total_cents > PG_INT_MAX or received > PG_INT_MAX:
@@ -452,13 +522,14 @@ class PostgresBusinessStore:
                     """INSERT INTO sales
                        (id, tenant_id, store_id, employee_id, status, payment_method,
                         total_cents, charged_cents, cash_received_cents, change_cents,
-                        paid_at, note)
+                        paid_at, note, occurred_at, created_at)
                        VALUES (%s::uuid, %s::uuid, %s::uuid, %s::uuid, 'paid_cash',
-                               'cash', %s, %s, %s, %s, %s, %s)
+                               'cash', %s, %s, %s, %s, %s, %s, %s, %s)
                        ON CONFLICT (id) DO NOTHING RETURNING id""",
                     (
                         sale_id, tenant_id, store_id, user_id,
-                        total_cents, total_cents, received, change, now, note,
+                        total_cents, total_cents, received, change, occurred_at or now, note,
+                        occurred_at, occurred_at or now,
                     ),
                 )
                 if cur.fetchone() is None:
@@ -491,15 +562,15 @@ class PostgresBusinessStore:
                     cur.execute(
                         """INSERT INTO inventory_movements
                            (tenant_id, product_id, delta_milli, reason, sale_id, employee_id)
-                           VALUES (%s::uuid, %s::uuid, %s, 'sale', %s::uuid, %s::uuid)""",
-                        (tenant_id, product_id, -line["qty_milli"], sale_id, user_id),
+                           VALUES (%s::uuid, %s::uuid, %s, %s, %s::uuid, %s::uuid)""",
+                        (tenant_id, product_id, -line["qty_milli"], line["reason"], sale_id, user_id),
                     )
 
                 cur.execute(
                     """INSERT INTO payments
                        (tenant_id, tx_id, sale_id, amount_cents, method, source, applied)
-                       VALUES (%s::uuid, %s, %s::uuid, %s, 'cash', 'pos', true)""",
-                    (tenant_id, "cash_" + sale_id, sale_id, total_cents),
+                       VALUES (%s::uuid, %s, %s::uuid, %s, 'cash', %s, true)""",
+                    (tenant_id, "cash_" + sale_id, sale_id, total_cents, "pos_offline" if offline else "pos"),
                 )
             conn.commit()
         return self.get_sale(tenant_id=tenant_id, sale_id=sale_id) or {}
@@ -597,6 +668,8 @@ def _record_cash_sale(
     tenant_id: str,
     user_id: str,
     idempotency_key: str | None,
+    *,
+    offline_device_id: str | None = None,
 ):
     merged: dict[str, int] = {}
     for item in body.items:
@@ -624,6 +697,8 @@ def _record_cash_sale(
         note=body.note,
         idempotency_key=idempotency_key,
         expected_total_cents=body.expectedTotalCents,
+        offline=body if isinstance(body, OfflineCashIn) else None,
+        device_id=offline_device_id,
     )
 
 
@@ -693,6 +768,35 @@ def record_mobile_cash_sale(
     if body.expectedTotalCents is None or body.cashReceivedCents is None:
         raise HTTPException(400, "Confirma el total y el efectivo recibido.")
     return _record_cash_sale(body, store, str(tenant_id), ctx.user.id, idempotency_key)
+
+
+@router.post("/owner/pos/{tenant_id}/offline-lease")
+def mobile_offline_cash_lease(
+    tenant_id: uuid.UUID,
+    response: Response,
+    ctx: IdentityContext = Depends(_require_mobile_cash_actor),
+    store: PostgresBusinessStore = Depends(_store),
+):
+    assert isinstance(ctx.token, MobileIdentity)
+    response.headers["Cache-Control"] = "no-store"
+    return store.lease_cash_catalog(str(tenant_id), ctx.token)
+
+
+@router.post("/owner/pos/{tenant_id}/offline-sales")
+def record_offline_cash_sale(
+    tenant_id: uuid.UUID,
+    body: OfflineCashIn,
+    ctx: IdentityContext = Depends(_require_mobile_cash_actor),
+    store: PostgresBusinessStore = Depends(_store),
+    idempotency_key: uuid.UUID = Header(alias="Idempotency-Key"),
+):
+    assert isinstance(ctx.token, MobileIdentity)
+    if body.expectedTotalCents is None or body.cashReceivedCents is None:
+        raise HTTPException(400, "La venta debe conservar el total y el efectivo recibido.")
+    return _record_cash_sale(
+        body, store, str(tenant_id), ctx.user.id, str(idempotency_key),
+        offline_device_id=ctx.token.device_id,
+    )
 
 
 # ---------------------------------------------------------------------------

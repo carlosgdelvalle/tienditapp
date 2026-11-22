@@ -26,6 +26,11 @@ from .identity import IdentityError, load_public_key, sha256_hex, verify_device_
 TOKEN_PREFIX = "abarpay_owner_"
 TOKEN_SECONDS = 300
 Sender = Callable[[str, str], None]
+LABSMOBILE_SEND_URL = "https://api.labsmobile.com/json/send"
+
+
+def _sms_message(code: str) -> str:
+    return f"Abarpay: tu código es {code}. No lo compartas."
 
 
 def normalize_phone(phone: str) -> str:
@@ -45,10 +50,37 @@ class PhoneSettings:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> PhoneSettings | None:
+        provider = env.get("ABARPAY_OWNER_SMS_PROVIDER", "").strip().lower()
+        if provider == "labsmobile":
+            pepper = env.get("ABARPAY_OWNER_CODE_KEY", "").strip().encode()
+            username = env.get("ABARPAY_LABSMOBILE_USERNAME", "").strip()
+            token = env.get("ABARPAY_LABSMOBILE_TOKEN", "").strip()
+            prefix = env.get("ABARPAY_LABSMOBILE_MX_PREFIX", "").strip()
+            if len(pepper) < 32 or not username or not token or prefix not in {"52", "521"}:
+                raise RuntimeError("LabsMobile requires a code key, username, token and confirmed Mexico prefix")
+
+            def send_labsmobile(phone: str, code: str) -> None:
+                if not re.fullmatch(r"\+52[0-9]{10}", phone):
+                    raise ValueError("Unsupported SMS destination")
+                response = httpx.post(
+                    LABSMOBILE_SEND_URL,
+                    json={"recipient": [{"msisdn": prefix + phone[3:]}], "message": _sms_message(code)},
+                    auth=(username, token),
+                    timeout=5.0,
+                    follow_redirects=False,
+                )
+                response.raise_for_status()
+                body = response.json()
+                if not isinstance(body, dict) or str(body.get("code")) != "0":
+                    raise RuntimeError("LabsMobile did not accept the message")
+
+            return cls(pepper, send_labsmobile)
+        if provider not in {"", "generic"}:
+            raise RuntimeError("Unknown owner SMS provider")
         raw = [env.get(name, "").strip() for name in (
             "ABARPAY_OWNER_CODE_KEY", "ABARPAY_OWNER_SMS_URL", "ABARPAY_OWNER_SMS_TOKEN",
         )]
-        if not any(raw):
+        if not any(raw) and not provider:
             return None
         pepper, url, token = raw
         target = urlsplit(url)
@@ -59,7 +91,7 @@ class PhoneSettings:
         def send(phone: str, code: str) -> None:
             response = httpx.post(
                 url,
-                json={"to": phone, "message": f"Abarpay: tu código es {code}. No lo compartas."},
+                json={"to": phone, "message": _sms_message(code)},
                 headers={"Authorization": f"Bearer {token}"},
                 timeout=5.0,
                 follow_redirects=False,

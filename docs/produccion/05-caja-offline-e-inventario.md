@@ -22,6 +22,8 @@ Make the till work offline with cash finalized on the device, record offline goo
 
 ## Offline authorization and signed price snapshot
 
+The PostgreSQL cash pilot uses the authenticated phone routes `POST /api/owner/pos/{tenantId}/offline-lease` and `POST /api/owner/pos/{tenantId}/offline-sales`. PostgreSQL holds an immutable price snapshot under an opaque lease ID tied to the tenant, verified user, and enrolled device. Android encrypts the cash journal and lease cache using Android Keystore. Checkout assigns the folio before the network request, and sync uses that same checkout key. PostgreSQL validates the recorded time and snapshot on replay. The signed payloads below describe the separate SQLite sync contract.
+
 The 12 hours are only the duration of an offline authorization (lease). They do not force a till closeout or a shift handover.
 
 ### Offline authorization lease

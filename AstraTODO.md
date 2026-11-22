@@ -2,6 +2,8 @@
 
 Baseline `355db73`. Use the candidate SHA from the integration run for acceptance. The [recorded device run](docs/bitacora/2026-11-21-1455-b4-venta-offline.md) covers one offline cash sale using an ADB reverse tunnel. The current work follows the [full acceptance scenarios](docs/produccion/09-paquetes-y-aceptacion.md#acceptance-scenarios-and-evidence).
 
+The [PostgreSQL Samsung run](docs/bitacora/2026-11-22-0145-caja-offline-postgresql-sms.md) covers airplane mode, app restart, and synchronization at the original checkout price after a catalog edit. The PostgreSQL regression covers two independently enrolled tills selling the last piece. Still to verify on hardware are two physical tills, reboot during pending synchronization, and offline goods receipt approval.
+
 ## B3 and B4 · Payment and offline regressions
 
 The [automated acceptance tests](server/tests/test_payment_offline_acceptance.py) use a temporary database and FakePey SIMULADO. From the repo root with the server test environment activated, run:

@@ -50,7 +50,22 @@ fun OwnerQrApprovalScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val employeeApi = remember(apiBaseUrl, ownerAuth) { EmployeeApi(apiBaseUrl, ownerAuth) }
-    var step by rememberSaveable { mutableStateOf(if (employeeInvitation == null) "ready" else "invitation") }
+    val connected = cashNetworkAvailable()
+    val cashStores = remember(context) { context.getSharedPreferences("abarpay_cash_store", android.content.Context.MODE_PRIVATE) }
+    val cachedStore = remember(apiBaseUrl) {
+        val id = cashStores.getString("$apiBaseUrl:id", null)
+        val name = cashStores.getString("$apiBaseUrl:name", null)
+        if (id != null && name != null && OfflineCashJournal(context, apiBaseUrl, id).hasSavedState) {
+            OwnerStore(id, name)
+        } else null
+    }
+    var step by rememberSaveable {
+        mutableStateOf(when {
+            employeeInvitation != null -> "invitation"
+            startInCash && !connected && cachedStore != null -> "cash"
+            else -> "ready"
+        })
+    }
     var invitedName by rememberSaveable { mutableStateOf("") }
     var preview by remember { mutableStateOf<JSONObject?>(null) }
     var phone by rememberSaveable { mutableStateOf("") }
@@ -63,7 +78,9 @@ fun OwnerQrApprovalScreen(
     var resendSeconds by remember { mutableStateOf(0) }
     var error by remember { mutableStateOf("") }
     var working by remember { mutableStateOf("") }
-    var stores by remember { mutableStateOf(emptyList<OwnerStore>()) }
+    var stores by remember {
+        mutableStateOf(if (startInCash && !connected && cachedStore != null) listOf(cachedStore) else emptyList())
+    }
     var selectedId by rememberSaveable { mutableStateOf("") }
 
     suspend fun ownerApi(): OwnerQrApi {
@@ -159,6 +176,10 @@ fun OwnerQrApprovalScreen(
     if (step == "cash") {
         val selected = stores.singleOrNull() ?: stores.find { it.tenantId == selectedId }
         if (selected != null) {
+            LaunchedEffect(selected) {
+                cashStores.edit().putString("$apiBaseUrl:id", selected.tenantId)
+                    .putString("$apiBaseUrl:name", selected.name).apply()
+            }
             OwnerCashScreen(ownerAuth, apiBaseUrl, selected, onClose)
             return
         }
@@ -345,6 +366,12 @@ fun OwnerQrApprovalScreen(
                 Text("Entra a tu tienda", style = MaterialTheme.typography.headlineSmall)
                 Button(onClick = { runAction("Abriendo tu tienda…") { openStore() } }, enabled = idle,
                     modifier = Modifier.fillMaxWidth().testTag("owner-start")) { Text("Entrar a mi tienda") }
+                if (startInCash && cachedStore != null) {
+                    OutlinedButton(onClick = {
+                        stores = listOf(cachedStore)
+                        step = "cash"
+                    }, enabled = idle) { Text("Abrir caja guardada") }
+                }
             }
         }
 

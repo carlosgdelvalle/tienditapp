@@ -1,6 +1,10 @@
 package mx.abarpay.mobile
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +26,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -68,16 +73,12 @@ private class OwnerCashApi(
     private val client = OkHttpClient.Builder().callTimeout(10, TimeUnit.SECONDS)
         .followRedirects(false).followSslRedirects(false).build()
 
-    suspend fun catalog(): List<CashProduct> = request("/catalog").getJSONArray("items").objects().map {
-        CashProduct(
-            it.getString("id"), it.getString("name"), it.getString("unit"),
-            it.getLong("priceCents"), it.getInt("stockMilli"), it.getBoolean("unlimitedStock"),
-        )
-    }
+    suspend fun lease(): JSONObject = request("/offline-lease", issueLease = true)
 
-    suspend fun record(intent: JSONObject): JSONObject = request("/sales", intent)
+    suspend fun record(intent: JSONObject, offline: Boolean = false): JSONObject =
+        request(if (offline) "/offline-sales" else "/sales", intent)
 
-    private suspend fun request(suffix: String, intent: JSONObject? = null): JSONObject {
+    private suspend fun request(suffix: String, intent: JSONObject? = null, issueLease: Boolean = false): JSONObject {
         val token = auth.accessToken() ?: throw ApiFailure(401, "Vuelve a entrar con tu celular.")
         return withContext(Dispatchers.IO) {
             val request = Request.Builder().url(path + suffix).header("Authorization", "Bearer " + token)
@@ -85,6 +86,8 @@ private class OwnerCashApi(
                 request.header("Idempotency-Key", intent.getString("key")).post(
                     intent.getJSONObject("body").toString().toRequestBody("application/json".toMediaType()),
                 )
+            } else if (issueLease) {
+                request.post("{}".toRequestBody("application/json".toMediaType()))
             }
             client.newCall(request.build()).execute().use { response ->
                 val data = JSONObject(checkNotNull(response.body).string())
@@ -98,8 +101,28 @@ private class OwnerCashApi(
 }
 
 @Composable
+internal fun cashNetworkAvailable(): Boolean {
+    val context = LocalContext.current
+    val manager = remember(context) { context.getSystemService(ConnectivityManager::class.java) }
+    var available by remember(manager) { mutableStateOf(manager.activeNetwork != null) }
+    DisposableEffect(manager) {
+        val handler = Handler(Looper.getMainLooper())
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { handler.post { available = true } }
+            override fun onLost(network: Network) {
+                handler.post { available = manager.activeNetwork?.let { it != network } == true }
+            }
+        }
+        manager.registerDefaultNetworkCallback(callback)
+        onDispose { manager.unregisterNetworkCallback(callback) }
+    }
+    return available
+}
+
+@Composable
 internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore, onClose: () -> Unit) {
     val context = LocalContext.current
+    val connectivity = remember(context) { context.getSystemService(ConnectivityManager::class.java) }
     val scope = rememberCoroutineScope()
     val api = remember(auth, baseUrl, store.tenantId) { OwnerCashApi(auth, baseUrl, store.tenantId) }
     val prefs = remember(context) { context.getSharedPreferences("abarpay_owner_cash", Context.MODE_PRIVATE) }
@@ -110,7 +133,18 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
     var receipt by remember(journal) {
         mutableStateOf(prefs.getString(journal + ":receipt", null)?.let(::JSONObject))
     }
-    var products by remember { mutableStateOf(emptyList<CashProduct>()) }
+    val offlineJournal = remember(journal) { OfflineCashJournal(context, baseUrl, store.tenantId) }
+    var offlineState by remember(journal) { mutableStateOf<OfflineCashState?>(null) }
+    val networkAvailable = cashNetworkAvailable()
+    var offlineSelected by rememberSaveable { mutableStateOf(false) }
+    val offlineMode = !networkAvailable || offlineSelected
+    val local = offlineState
+    val products = local?.lease?.getJSONArray("items")?.objects().orEmpty().map {
+        CashProduct(
+            it.getString("id"), it.getString("name"), it.getString("unit"),
+            it.getLong("priceCents"), it.getInt("stockMilli"), it.getBoolean("unlimitedStock"),
+        )
+    }
     val cart = remember { mutableStateMapOf<String, Int>() }
     var cash by rememberSaveable { mutableStateOf("") }
     var working by remember { mutableStateOf("") }
@@ -141,7 +175,39 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
         }
     }
 
-    fun loadCatalog() = runAction("Cargando el catálogo…") { products = api.catalog() }
+    suspend fun persist(state: OfflineCashState) {
+        offlineJournal.save(state)
+        offlineState = state
+    }
+
+    suspend fun refreshLease() {
+        val state = checkNotNull(offlineState)
+        try {
+            persist(state.copy(lease = offlineJournal.anchor(api.lease())))
+        } catch (failure: ApiFailure) {
+            if (failure.code == 401 || failure.code == 403) persist(state.copy(lease = null))
+            throw failure
+        }
+    }
+
+    fun loadCatalog() = runAction("Cargando el catálogo…") { refreshLease() }
+
+    fun syncCash() = runAction("Sincronizando ventas…") {
+        offlineSelected = false
+        var state = checkNotNull(offlineState)
+        while (state.pending.isNotEmpty()) {
+            val attempt = state.pending.first()
+            val result = api.record(attempt, offline = true)
+            val expectedId = cashSaleId(store.tenantId, attempt.getString("key"))
+            check(result.getString("saleId") == expectedId)
+            state = state.copy(
+                pending = state.pending.drop(1),
+                receipt = if (state.receipt?.optString("saleId") == expectedId) result else state.receipt,
+            )
+            persist(state)
+        }
+        if (cart.isEmpty()) refreshLease()
+    }
 
     fun record(received: Long?) = runAction("Confirmando la venta…") {
         val attempt = pending ?: JSONObject()
@@ -165,7 +231,7 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
                 check(prefs.edit().remove(journal + ":intent").commit())
                 pending = null
                 cart.clear()
-                products = api.catalog()
+                refreshLease()
             }
             throw failure
         }
@@ -176,8 +242,49 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
         cash = ""
     }
 
+    fun recordOffline(received: Long) = runAction("Guardando la venta en este celular…") {
+        val state = checkNotNull(offlineState)
+        val occurred = offlineJournal.occurredAt(state.lease)
+        if (occurred == null) {
+            error = "Conéctate para renovar el acceso a caja antes de recibir efectivo."
+            return@runAction
+        }
+        val lease = JSONObject(checkNotNull(state.lease).toString())
+        val key = UUID.randomUUID().toString()
+        val saleId = cashSaleId(store.tenantId, key)
+        val items = JSONArray(cart.map { (id, count) ->
+            JSONObject().put("productId", id).put("qtyMilli", count * 1000)
+        })
+        val body = JSONObject().put("items", items).put("expectedTotalCents", total)
+            .put("cashReceivedCents", received).put("leaseId", lease.getString("leaseId")).put("occurredAt", occurred)
+        for (product in lease.getJSONArray("items").objects()) {
+            val count = cart[product.getString("id")] ?: continue
+            if (!product.getBoolean("unlimitedStock")) {
+                product.put("stockMilli", product.getInt("stockMilli") - count * 1000)
+            }
+        }
+        val localReceipt = JSONObject().put("saleId", saleId).put("totalCents", total)
+            .put("changeCents", received - total).put("offlinePending", true)
+        val attempt = JSONObject().put("key", key).put("body", body)
+        persist(OfflineCashState(lease, state.pending + attempt, localReceipt))
+        cart.clear()
+        cash = ""
+    }
+
     LaunchedEffect(journal) {
-        if (pending == null && receipt == null) loadCatalog()
+        try {
+            offlineState = offlineJournal.read()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            error = "No se pudo abrir la caja guardada. Contacta a Abarpay antes de cobrar."
+        }
+    }
+    LaunchedEffect(journal, local != null, networkAvailable) {
+        if (local != null && networkAvailable && !offlineSelected && pending == null) {
+            if (local.pending.isNotEmpty()) syncCash()
+            else if (receipt == null && cart.isEmpty()) loadCatalog()
+        }
     }
     BackHandler { if (working.isEmpty()) onClose() }
     Column(
@@ -186,9 +293,21 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
     ) {
         Text("Caja en efectivo", style = MaterialTheme.typography.headlineSmall)
         Text(store.name, style = MaterialTheme.typography.titleMedium)
-        val savedSale = receipt
+        if (offlineMode) Text("Sin conexión a la caja · Solo efectivo.")
+        if (!local?.pending.isNullOrEmpty()) {
+            Text("Ventas por sincronizar: ${local?.pending?.size}")
+            if (networkAvailable) {
+                OutlinedButton(onClick = ::syncCash, enabled = working.isEmpty()) { Text("Sincronizar ventas") }
+            }
+        }
+        val savedSale = receipt ?: local?.receipt
+        val authorized = offlineJournal.occurredAt(local?.lease) != null
         if (savedSale != null) {
-            Text("Venta registrada", style = MaterialTheme.typography.titleLarge)
+            Text(
+                if (savedSale.optBoolean("offlinePending")) "Venta guardada en este celular" else "Venta registrada",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            if (savedSale.optBoolean("offlinePending")) Text("Se verá en la consola al sincronizar.")
             Text("Total " + money(savedSale.getLong("totalCents")), modifier = Modifier.testTag("owner-cash-receipt-total"))
             Text("Cambio " + money(savedSale.getLong("changeCents")))
             Text("Folio")
@@ -197,26 +316,43 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
             }
             Button(
                 onClick = {
-                    if (prefs.edit().remove(journal + ":receipt").commit()) {
-                        receipt = null
-                        loadCatalog()
-                    } else {
-                        error = "No se pudo abrir otra venta. Intenta de nuevo."
+                    runAction("Abriendo otra venta…") {
+                        if (receipt != null) {
+                            check(prefs.edit().remove(journal + ":receipt").commit())
+                            receipt = null
+                        } else {
+                            persist(checkNotNull(offlineState).copy(receipt = null))
+                        }
+                        if (!offlineMode && offlineState?.pending.isNullOrEmpty()) refreshLease()
                     }
                 },
+                enabled = working.isEmpty(),
             ) { Text("Nueva venta") }
         } else if (pending != null) {
             Text("Venta por confirmar", style = MaterialTheme.typography.titleLarge)
             Text("Total " + money(pending!!.getJSONObject("body").getLong("expectedTotalCents")))
             Text("Consulta el resultado del mismo cobro antes de recibir efectivo otra vez.")
-            Button(onClick = { record(null) }, enabled = working.isEmpty()) { Text("Consultar venta pendiente") }
+            Button(onClick = { record(null) }, enabled = working.isEmpty() && networkAvailable) { Text("Consultar venta pendiente") }
+        } else if (local == null) {
+            if (error.isBlank()) Text("Abriendo la caja guardada…")
         } else if (products.isEmpty()) {
-            if (working.isEmpty()) Text("Agrega productos en la consola para empezar a cobrar.")
-            OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty()) { Text("Actualizar catálogo") }
+            if (working.isEmpty()) Text(
+                if (offlineMode) "Conéctate para preparar esta caja antes de cobrar."
+                else "Agrega productos en la consola para empezar a cobrar."
+            )
+            OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty() && networkAvailable) { Text("Actualizar catálogo") }
         } else {
-            if (cart.isEmpty()) OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty()) {
-                Text("Actualizar catálogo")
+            if (offlineMode && !authorized) Text("Conéctate para renovar el acceso a caja antes de recibir efectivo.")
+            if (cart.isEmpty()) OutlinedButton(onClick = ::loadCatalog, enabled = working.isEmpty() && networkAvailable) {
+                Text(if (networkAvailable) "Actualizar catálogo" else "Catálogo guardado")
             }
+            if (networkAvailable && authorized) OutlinedButton(
+                onClick = {
+                    if (offlineSelected && !local.pending.isEmpty()) syncCash()
+                    else offlineSelected = !offlineSelected
+                },
+                enabled = working.isEmpty(),
+            ) { Text(if (offlineSelected) "Volver a caja en línea" else "Trabajar sin conexión") }
             products.forEach { product ->
                 val count = cart[product.id] ?: 0
                 Text(product.name + " · " + money(product.price) + " / " + product.unit)
@@ -225,7 +361,7 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { cart[product.id] = count + 1 },
-                        enabled = product.canAdd(count) && working.isEmpty(),
+                        enabled = product.canAdd(count) && working.isEmpty() && (!offlineMode || authorized),
                     ) { Text("Agregar ${product.name}") }
                     if (count > 0) OutlinedButton(
                         onClick = { if (count == 1) cart.remove(product.id) else cart[product.id] = count - 1 },
@@ -247,8 +383,12 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
             )
             if (received != null && received >= total) Text("Cambio " + money(received - total))
             Button(
-                onClick = { record(received) },
+                onClick = {
+                    if (offlineMode || connectivity.activeNetwork == null) recordOffline(checkNotNull(received))
+                    else record(received)
+                },
                 enabled = working.isEmpty() && cart.isNotEmpty() && received != null &&
+                    (if (offlineMode) authorized else local.pending.isEmpty()) &&
                     received >= total && received <= Int.MAX_VALUE.toLong(),
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Registrar venta en efectivo") }

@@ -88,11 +88,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Instalar cliente psql
+      - name: Instalar PostgreSQL para pruebas aisladas
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Aplicar migraciones 001-005
+          sudo apt-get install -y --no-install-recommends postgresql
+          pg_config --bindir >> "$GITHUB_PATH"
+      - name: Aplicar migraciones 001-006
         env:
           PGPASSWORD: postgres
         run: |
@@ -101,6 +102,7 @@ jobs:
           psql -h 127.0.0.1 -U postgres -d abarpay_dev -v ON_ERROR_STOP=1 -f migrations/003_onboarding.sql
           psql -h 127.0.0.1 -U postgres -d abarpay_dev -v ON_ERROR_STOP=1 -f migrations/004_owner_phone.sql
           psql -h 127.0.0.1 -U postgres -d abarpay_dev -v ON_ERROR_STOP=1 -f migrations/005_employee_phone.sql
+          psql -h 127.0.0.1 -U postgres -d abarpay_dev -v ON_ERROR_STOP=1 -f migrations/006_offline_cash.sql
       - name: Instalar dependencias del servidor
         run: |
           python -m venv .venv
@@ -108,4 +110,4 @@ jobs:
       - name: Pruebas PostgreSQL (tenancy, aislamiento, migración)
         env:
           ABARPAY_PG_DSN: host=127.0.0.1 port=5432 dbname=abarpay_dev user=postgres password=postgres
-        run: .venv/bin/python -m pytest -q server/tests/test_tenancy_pg.py server/tests/test_identity_pg.py server/tests/test_employee_phone_pg.py
+        run: .venv/bin/python -m pytest -q server/tests/test_tenancy_pg.py server/tests/test_identity_pg.py server/tests/test_employee_phone_pg.py server/tests/test_offline_cash_pg.py

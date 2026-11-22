@@ -37,12 +37,21 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
 @Composable
 internal fun EmployeeWorkspace(auth: OwnerAuth, baseUrl: String) {
     val api = remember(auth, baseUrl) { EmployeeApi(baseUrl, auth) }
+    val context = LocalContext.current
+    val connected = cashNetworkAvailable()
+    val prefs = remember(context) { context.getSharedPreferences("abarpay_employee_cash_stores", Context.MODE_PRIVATE) }
+    var cashStores by remember(baseUrl) {
+        mutableStateOf(JSONArray(prefs.getString(baseUrl, "[]")).objects().map {
+            EmployeeAccess(it.getString("id"), it.getString("name"), true, false, false)
+        })
+    }
     val scope = rememberCoroutineScope()
     var stores by remember { mutableStateOf<List<EmployeeAccess>?>(null) }
     var selectedId by rememberSaveable { mutableStateOf("") }
@@ -52,13 +61,19 @@ internal fun EmployeeWorkspace(auth: OwnerAuth, baseUrl: String) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     fun refresh() {
-        if (busy) return
+        if (busy || !connected) return
         busy = true
         error = ""
         scope.launch {
             try {
                 val current = api.memberships()
                 stores = current
+                cashStores = current.filter { it.canSell }.map {
+                    it.copy(canFiado = false, canInventory = false)
+                }
+                prefs.edit().putString(baseUrl, JSONArray(cashStores.map {
+                    JSONObject().put("id", it.tenantId).put("name", it.name)
+                }).toString()).apply()
                 if (current.none { it.tenantId == selectedId }) {
                     selectedId = current.singleOrNull()?.tenantId.orEmpty()
                 }
@@ -82,8 +97,8 @@ internal fun EmployeeWorkspace(auth: OwnerAuth, baseUrl: String) {
         }
     }
 
-    LaunchedEffect(api) { refresh() }
-    DisposableEffect(lifecycle, api) {
+    LaunchedEffect(api, connected) { refresh() }
+    DisposableEffect(lifecycle, api, connected) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) refresh()
         }
@@ -91,7 +106,8 @@ internal fun EmployeeWorkspace(auth: OwnerAuth, baseUrl: String) {
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    val access = stores.orEmpty().find { it.tenantId == selectedId }
+    val availableStores = if (connected) stores.orEmpty() else cashStores
+    val access = availableStores.find { it.tenantId == selectedId } ?: availableStores.singleOrNull()
     val closeOperation: () -> Unit = { operation = ""; refresh() }
     if (access != null) {
         if (operation == "cash" && access.canSell) {
@@ -106,8 +122,8 @@ internal fun EmployeeWorkspace(auth: OwnerAuth, baseUrl: String) {
 
     EmployeeLayout {
         Text("Mi turno", style = MaterialTheme.typography.headlineSmall)
-        if (stores.orEmpty().size > 1) {
-            stores.orEmpty().forEach { store ->
+        if (availableStores.size > 1) {
+            availableStores.forEach { store ->
                 OutlinedButton(onClick = { selectedId = store.tenantId }, enabled = !busy) {
                     Text(if (selectedId == store.tenantId) "Tienda elegida: ${store.name}" else store.name)
                 }
@@ -125,13 +141,18 @@ internal fun EmployeeWorkspace(auth: OwnerAuth, baseUrl: String) {
                 Text("Tu acceso está activo. Pide al dueño que te asigne una tarea.")
             }
         }
-        if (stores?.isEmpty() == true) Text("Por ahora no tienes acceso a una tienda. Habla con el dueño.")
+        if (!connected) {
+            Text(if (cashStores.isEmpty()) "Conéctate para consultar tu acceso."
+                else "Sin conexión · Solo caja en efectivo.")
+        } else if (stores?.isEmpty() == true) {
+            Text("Por ahora no tienes acceso a una tienda. Habla con el dueño.")
+        }
         if (busy) {
             Text("Revisando tu acceso…")
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
-        OutlinedButton(onClick = ::refresh, enabled = !busy) { Text("Actualizar acceso") }
+        OutlinedButton(onClick = ::refresh, enabled = !busy && connected) { Text("Actualizar acceso") }
     }
 }
 

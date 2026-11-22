@@ -165,6 +165,7 @@ def _apply_migrations(dsn: str) -> None:
                 "003_onboarding.sql",
                 "004_owner_phone.sql",
                 "005_employee_phone.sql",
+                "006_offline_cash.sql",
             ):
                 cur.execute((REPO_ROOT / "migrations" / name).read_text(encoding="utf-8"))
     finally:
