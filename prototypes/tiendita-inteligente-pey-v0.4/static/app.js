@@ -92,9 +92,33 @@ async function confirmCollect(id){
 }
 function render(){if(!state.data){$('#screen').innerHTML='<div class="empty">Sin datos iniciales. Abre la aplicación una vez con el servidor disponible.</div>';return}$('.nav.active')?.classList.remove('active');$(`.nav[data-tab="${state.tab}"]`)?.classList.add('active');$('#role').value=state.role;let f={inicio:home,vender:sell,inventario:inventory,pedidos:purchases,avisos:notices,fiados:credits}[state.tab]||home;$('#screen').innerHTML=f()}
 function showModal(html){$('#modal').innerHTML=`<div class="modal"><button class="button ghost" style="float:right" data-action="close">✕</button>${html}</div>`;$('#modal').hidden=false}
-function hideModal(){$('#modal').hidden=true;$('#modal').innerHTML=''}
+let qrStatusPoller=null;
+function stopQrStatusPolling(){if(qrStatusPoller){clearInterval(qrStatusPoller);qrStatusPoller=null}}
+function hideModal(){stopQrStatusPolling();$('#modal').hidden=true;$('#modal').innerHTML=''}
+function watchQrPayment(saleId){
+ stopQrStatusPolling();
+ let checking=false;
+ qrStatusPoller=setInterval(async()=>{
+  if(checking||state.activeSale!==saleId)return;
+  checking=true;
+  try{
+   const p=await api('/api/sales/'+saleId+'/status');
+   if(p.status==='PAGADA'||p.status==='PAGADA_PRUEBA'){
+    stopQrStatusPolling();
+    await reload(true);
+    showModal('<div class="eyebrow">PEY · Pago confirmado</div><h2>✅ '+(p.status==='PAGADA_PRUEBA'?'Cobro de prueba verificado':'Cobro real verificado')+'</h2><p class="big receipt">'+fmt(p.charged_cents)+'</p><p class="sub">Confirmado por PEY; referencia: '+esc(p.transaction_id||'')+'</p>'+(p.status==='PAGADA_PRUEBA'?'<div class="alert">Este pago de $0.01 es una prueba. No cubre el total comercial del carrito.</div>':'')+btn('Ver mi tienda','tab:inicio','dark full'));
+    state.tab='inicio';render();
+   }else{
+    const label=document.getElementById('qr-payment-status');
+    if(label)label.textContent=p.status==='PENDIENTE'?'Esperando pago; consultando la confirmación de PEY…':'Pendiente de revisión: '+p.status;
+    if(p.status!=='PENDIENTE')stopQrStatusPolling();
+   }
+  }catch(e){const label=document.getElementById('qr-payment-status');if(label)label.textContent='Sin confirmación disponible; no asumas que se pagó.'}
+  finally{checking=false}
+ },3000);
+}
 async function createSale(){if(!state.online){toast('Sin conexión: el carrito está guardado. Reconecta antes de cobrar.');return}const items=Object.entries(state.cart).filter(([,q])=>q>0).map(([id,qty])=>({id,qty}));if(!items.length)return;
-try{const r=await api('/api/sales',{method:'POST',body:JSON.stringify({items,employee:state.role==='Dueño'?'Dueño':state.role})});state.activeSale=r.id;state.cart={};saveCart();await reload(true);showModal(`<div class="eyebrow">Venta #${r.id}</div><h2>Listo para cobrar</h2><h1>${fmt(r.amount_cents)}</h1><p class="sub">El pedido está reservado, pero todavía NO se ha pagado.</p>${btn('Mostrar QR de cobro','make-qr','dark full')}<div class="topgap">${btn('Solicitar CoDi Push al celular','make-push','secondary full')}</div><p class="sub">El siguiente paso requiere conexión con el servidor.</p>${state.data.clients?.length?`<div class="line"></div><h3>O anotar a fiado</h3><select id="credit-client" class="input">${state.data.clients.map(c=>`<option value="${c.id}">${esc(c.name)} · debe ${fmt(c.balance_cents)}</option>`).join('')}</select><div class="topgap">${btn('📒 Fiar esta venta','credit-sale','secondary full')}</div>`:''}`);render()}catch(e){toast(e.message)}}
+try{const r=await api('/api/sales',{method:'POST',body:JSON.stringify({items,employee:state.role==='Dueño'?'Dueño':state.role})});state.activeSale=r.id;state.cart={};saveCart();await reload(true);showModal(`<div class="eyebrow">Venta #${r.id}</div><h2>Listo para cobrar</h2><h1>${fmt(r.amount_cents)}</h1><p class="sub">El pedido está reservado, pero todavía NO se ha pagado.</p>${btn('Mostrar QR de cobro','make-qr','dark full')}${state.data.config.evaluator_demo?'':'<div class="topgap">'+btn('Solicitar CoDi Push al celular','make-push','secondary full')+'</div>'}<p class="sub">El siguiente paso requiere conexión con el servidor.</p>${!state.data.config.evaluator_demo&&state.data.clients?.length?`<div class="line"></div><h3>O anotar a fiado</h3><select id="credit-client" class="input">${state.data.clients.map(c=>`<option value="${c.id}">${esc(c.name)} · debe ${fmt(c.balance_cents)}</option>`).join('')}</select><div class="topgap">${btn('📒 Fiar esta venta','credit-sale','secondary full')}</div>`:''}`);render()}catch(e){toast(e.message)}}
 async function createQr(){
  if(!state.activeSale)return;
  const real=state.data.config.pey_mode==='REAL';
@@ -107,7 +131,8 @@ async function createQr(){
  <div class="big receipt">${fmt(r.amount_cents)}</div>
  <img class="qr-img" src="data:image/png;base64,${r.qr_image}" alt="${real?'QR de cobro CoDi':'QR DEMO'}"/>
  <div class="${real?'good':'demo-watermark'}">${esc(r.label)}</div>
- ${real?'<p class="sub">Espera a que PEY confirme el pago. No entregues sólo por mostrar el QR.</p>':btn('✅ Simular confirmación','demo-pay','dark full')}`);
+ ${real?'<p id="qr-payment-status" class="sub" role="status" aria-live="polite">Esperando pago y verificación de PEY…</p>':btn('✅ Simular confirmación','demo-pay','dark full')}`);
+ if(real)watchQrPayment(state.activeSale);
  await reload(true)
  }catch(e){toast(e.message)}
 }
