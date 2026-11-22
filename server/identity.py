@@ -175,7 +175,8 @@ class Invite:
     expires_at: float
     accepted_at: float | None
     revoked_at: float | None
-    accepted_by: str | None  # in-memory bookkeeping; not part of the frozen schema
+    accepted_by: str | None
+    phone: str | None = None  # E.164; phone-bound invites only
 
 
 @dataclass(frozen=True)
@@ -385,6 +386,9 @@ class IdentityStore(ABC):
 
     @abstractmethod
     def claim_invite(self, token_hash: str, user_id: str, accepted_at: float) -> str | None: ...
+
+    @abstractmethod
+    def accept_invite(self, token_hash: str, user_id: str, tenant_id: str, name: str | None, phone: str | None) -> Membership | None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -633,6 +637,16 @@ class MemoryIdentityStore(IdentityStore):
     # -- invites -----------------------------------------------------------
     def save_invite(self, invite: Invite) -> None:
         with self._lock:
+            if invite.phone:
+                for key, existing in list(self.invites.items()):
+                    if (
+                        existing.tenant_id == invite.tenant_id
+                        and existing.phone == invite.phone
+                        and existing.accepted_at is None
+                        and existing.revoked_at is None
+                        and key != invite.token_hash
+                    ):
+                        self.invites[key] = replace(existing, revoked_at=time.time())
             self.invites[invite.token_hash] = invite
 
     def get_invite(self, token_hash: str) -> Invite | None:
@@ -655,6 +669,35 @@ class MemoryIdentityStore(IdentityStore):
             )
             self.invites[token_hash] = updated
             return user_id
+
+    def accept_invite(self, token_hash: str, user_id: str, tenant_id: str, name: str | None, phone: str | None) -> Membership | None:
+        with self._lock:
+            invite = self.invites.get(token_hash)
+            if invite is None or invite.revoked_at is not None or invite.tenant_id != tenant_id or invite.phone != phone:
+                return None
+            existing = self.memberships.get((user_id, tenant_id))
+            if invite.accepted_at is not None:
+                return existing if invite.accepted_by == user_id else None
+            self.invites[token_hash] = replace(
+                invite, accepted_at=time.time(), accepted_by=user_id
+            )
+            if name:
+                user = self._user_by_id(user_id)
+                if user is not None and not user.name:
+                    self.users[self._key(user.idp, user.external_sub)] = replace(user, name=name)
+            if existing is None:
+                membership = Membership(
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    role=invite.role,
+                    can_sell=invite.can_sell,
+                    can_fiado=invite.can_fiado,
+                    can_inventory=invite.can_inventory,
+                    active=True,
+                )
+                self.memberships[(user_id, tenant_id)] = membership
+                return membership
+            return existing
 
 
 # ---------------------------------------------------------------------------
@@ -887,7 +930,7 @@ class IdentityService:
         membership = self._store.get_membership(user_id, tenant_id)
         if membership is None or not membership.active:
             raise ForbiddenError("La membresía ya no está activa")
-        if challenge.intent == "browser_login" and membership.role != "owner":
+        if membership.role != "owner":
             raise ForbiddenError("Solo el dueño puede abrir la consola")
 
         return self._issue_session(user_id, tenant_id)
@@ -938,6 +981,7 @@ class IdentityService:
         actor_user_id: str,
         tenant_id: str,
         email: str | None,
+        phone: str | None = None,
         role: str,
         can_sell: bool,
         can_fiado: bool,
@@ -954,6 +998,7 @@ class IdentityService:
             token_hash=token_hash,
             tenant_id=tenant_id,
             email=(email or "").strip() or None,
+            phone=(phone or "").strip() or None,
             role="employee",
             can_sell=bool(can_sell),
             can_fiado=bool(can_fiado),
@@ -975,23 +1020,23 @@ class IdentityService:
             raise NotFoundError("La invitación expiró")
         return invite
 
-    def accept_invite(self, token: str, user_id: str) -> tuple[Membership, TenantRecord]:
+    def accept_invite(
+        self,
+        token: str,
+        user_id: str,
+        *,
+        name: str | None = None,
+        verified_phone: str | None = None,
+    ) -> tuple[Membership, TenantRecord]:
         invite = self.get_invite(token)
-        now = self._now()
-        winner = self._store.claim_invite(invite.token_hash, user_id, now)
-        if winner != user_id:
-            raise ConflictError("La invitación ya fue aceptada")
-        # Role comes from the persisted invite (always 'employee'): acceptance
-        # cannot elevate the role, and the client never supplies one.
-        membership = self._store.upsert_membership(
-            user_id=user_id,
-            tenant_id=invite.tenant_id,
-            role=invite.role,
-            can_sell=invite.can_sell,
-            can_fiado=invite.can_fiado,
-            can_inventory=invite.can_inventory,
-            active=True,
+        if invite.phone is not None and invite.phone != verified_phone:
+            raise ForbiddenError("La invitación no corresponde a este número.")
+        membership = self._store.accept_invite(
+            invite.token_hash, user_id, invite.tenant_id, (name or "").strip() or None,
+            invite.phone,
         )
+        if membership is None:
+            raise ConflictError("La invitación ya fue aceptada")
         tenant = self._store.get_tenant(invite.tenant_id)
         if tenant is None:
             raise NotFoundError("La tienda de la invitación no existe")
@@ -1070,6 +1115,7 @@ class IdentityService:
             "tenantId": invite.tenant_id,
             "tenantName": tenant.name if tenant else "",
             "storeName": store.name if store else "",
+            "expiresAt": invite.expires_at,
         }
 
     # -- tenant resolution -------------------------------------------------

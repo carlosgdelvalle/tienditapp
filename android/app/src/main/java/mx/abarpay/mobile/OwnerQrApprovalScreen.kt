@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 @Composable
 fun OwnerQrApprovalScreen(
@@ -42,10 +44,15 @@ fun OwnerQrApprovalScreen(
     apiBaseUrl: String,
     onClose: () -> Unit,
     startInCash: Boolean = false,
+    employeeInvitation: String? = null,
+    onEmployeeJoined: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var step by rememberSaveable { mutableStateOf("ready") }
+    val employeeApi = remember(apiBaseUrl, ownerAuth) { EmployeeApi(apiBaseUrl, ownerAuth) }
+    var step by rememberSaveable { mutableStateOf(if (employeeInvitation == null) "ready" else "invitation") }
+    var invitedName by rememberSaveable { mutableStateOf("") }
+    var preview by remember { mutableStateOf<JSONObject?>(null) }
     var phone by rememberSaveable { mutableStateOf("") }
     var challengeId by rememberSaveable { mutableStateOf("") }
     var resendAt by rememberSaveable { mutableStateOf(0L) }
@@ -69,6 +76,13 @@ fun OwnerQrApprovalScreen(
         val token = ownerAuth.accessToken()
         if (token == null) {
             step = "phone"
+            return
+        }
+        if (employeeInvitation != null) {
+            // A dropped response can be retried with the same verified phone and link.
+            step = "join-confirm"
+            employeeApi.accept(employeeInvitation, invitedName.trim())
+            onEmployeeJoined()
             return
         }
         stores = withContext(Dispatchers.IO) { OwnerQrApi(apiBaseUrl, token).ownerStores() }
@@ -99,10 +113,14 @@ fun OwnerQrApprovalScreen(
     }
 
     fun sendCode() = runAction("Enviando SMS…") {
-        challengeId = ownerAuth.startEnrollment(phone)
+        challengeId = ownerAuth.startEnrollment(phone, employeeInvitation)
         code = ""
         resendAt = android.os.SystemClock.elapsedRealtime() + 30_000
         step = "code"
+    }
+
+    fun loadInvitation() = runAction("Cargando invitación…") {
+        preview = employeeApi.invitation(checkNotNull(employeeInvitation))
     }
 
     fun goBack() {
@@ -110,6 +128,7 @@ fun OwnerQrApprovalScreen(
         error = ""
         when (step) {
             "code" -> { code = ""; step = "phone" }
+            "phone" -> if (employeeInvitation != null) step = "invitation" else onClose()
             "confirm", "scanning" -> { rawQr = ""; step = "scanReady" }
             else -> onClose()
         }
@@ -121,6 +140,10 @@ fun OwnerQrApprovalScreen(
                 .toInt().coerceAtLeast(0)
             if (resendSeconds > 0) delay(500)
         } while (resendSeconds > 0)
+    }
+
+    LaunchedEffect(employeeInvitation) {
+        if (employeeInvitation != null && step == "invitation") loadInvitation()
     }
 
     // An activity recreation can restore the confirmation but not the cached membership.
@@ -162,13 +185,49 @@ fun OwnerQrApprovalScreen(
     BackHandler(onBack = ::goBack)
     val idle = working.isEmpty()
     Column(
-        modifier = Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when (step) {
+            "invitation" -> {
+                Text("Invitación al equipo", style = MaterialTheme.typography.headlineSmall)
+                val offer = preview
+                if (offer != null) {
+                    Text("Únete a " + offer.optString("tenantName"))
+                    val permissions = buildList {
+                        if (offer.optBoolean("canSell")) add("cobrar en efectivo")
+                        if (offer.optBoolean("canFiado")) add("registrar fiado")
+                        if (offer.optBoolean("canInventory")) add("ajustar inventario")
+                    }
+                    if (permissions.isNotEmpty()) Text("Podrás " + permissions.joinToString(", ") + ".")
+                    else Text("El dueño puede asignarte permisos después de que entres.")
+                    OutlinedTextField(
+                        value = invitedName, onValueChange = { invitedName = it.take(120) },
+                        label = { Text("Tu nombre") }, singleLine = true, enabled = idle,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = { runAction("Validando tu acceso…") { openStore() } },
+                        enabled = idle && invitedName.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth().testTag("employee-accept"),
+                    ) { Text("Aceptar invitación") }
+                } else if (idle) {
+                    Button(onClick = ::loadInvitation) { Text("Volver a cargar") }
+                }
+            }
+            "join-confirm" -> {
+                Text("Confirma tu ingreso", style = MaterialTheme.typography.headlineSmall)
+                Text("Si la respuesta se interrumpió, consulta la misma invitación con tu celular vinculado.")
+                Button(
+                    onClick = { runAction("Confirmando tu ingreso…") { openStore() } },
+                    enabled = idle,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Confirmar ingreso") }
+            }
             "phone" -> {
                 Text("¿Cuál es tu número de celular?", style = MaterialTheme.typography.headlineSmall)
-                Text("Te enviaremos un código por SMS para vincular este celular.")
+                Text(if (employeeInvitation == null) "Te enviaremos un código por SMS para vincular este celular."
+                    else "Escribe el número al que te invitó la tienda. Te enviaremos un código por SMS.")
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it.filter { c -> c in '0'..'9' }.take(10) },

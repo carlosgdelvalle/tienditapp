@@ -19,6 +19,7 @@ fun gradleConfig(name: String, default: String = "") : String =
     (project.findProperty(name) as String?) ?: System.getenv(name) ?: default
 
 val deviceTest = providers.gradleProperty("ABARPAY_DEVICE_TEST").orNull == "true"
+val employeeDeviceTest = deviceTest && providers.gradleProperty("ABARPAY_DEVICE_TEST_ROLE").orNull == "employee"
 
 android {
     namespace = "mx.abarpay.mobile"
@@ -54,8 +55,13 @@ android {
     }
     buildTypes {
         debug {
-            applicationIdSuffix = if (deviceTest) ".qa" else ".dev"
-            if (deviceTest) manifestPlaceholders["abarpayLabel"] = "Abarpay QA"
+            applicationIdSuffix = when {
+                employeeDeviceTest -> ".qa.equipo"
+                deviceTest -> ".qa"
+                else -> ".dev"
+            }
+            if (deviceTest) manifestPlaceholders["abarpayLabel"] =
+                if (employeeDeviceTest) "Abarpay QA Equipo" else "Abarpay QA"
         }
         release {
             isMinifyEnabled = false

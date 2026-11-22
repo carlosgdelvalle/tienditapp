@@ -25,7 +25,7 @@ class OwnerQrApprovalScreenTest {
         var sentTo: String? = null
         val fakeAuth = object : OwnerAuth {
             override suspend fun accessToken(): String? = null
-            override suspend fun startEnrollment(phone: String): String {
+            override suspend fun startEnrollment(phone: String, inviteToken: String?): String {
                 sentTo = phone
                 return "synthetic-challenge"
             }

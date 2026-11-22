@@ -659,7 +659,7 @@ def get_sale(
     return sale
 
 
-def _require_mobile_cash_owner(
+def _require_mobile_cash_actor(
     tenant_id: uuid.UUID,
     request: Request,
     ctx: IdentityContext = Depends(require_identity),
@@ -668,7 +668,7 @@ def _require_mobile_cash_owner(
         raise HTTPException(403, "Entra desde tu celular vinculado.")
     service: IdentityService = request.app.state.identity_service
     membership = service.select_tenant(ctx.user.id, str(tenant_id))
-    if membership.role != "owner" or not membership.can_sell:
+    if membership.role not in {"owner", "employee"} or not membership.can_sell:
         raise HTTPException(403, "No tienes permiso para cobrar en esta tienda.")
     return ctx
 
@@ -676,7 +676,7 @@ def _require_mobile_cash_owner(
 @router.get("/owner/pos/{tenant_id}/catalog")
 def mobile_cash_catalog(
     tenant_id: uuid.UUID,
-    ctx: IdentityContext = Depends(_require_mobile_cash_owner),
+    ctx: IdentityContext = Depends(_require_mobile_cash_actor),
     store: PostgresBusinessStore = Depends(_store),
 ):
     return store.list_products(tenant_id=str(tenant_id))
@@ -686,7 +686,7 @@ def mobile_cash_catalog(
 def record_mobile_cash_sale(
     tenant_id: uuid.UUID,
     body: SaleIn,
-    ctx: IdentityContext = Depends(_require_mobile_cash_owner),
+    ctx: IdentityContext = Depends(_require_mobile_cash_actor),
     store: PostgresBusinessStore = Depends(_store),
     idempotency_key: str = Header(alias="Idempotency-Key", min_length=1),
 ):

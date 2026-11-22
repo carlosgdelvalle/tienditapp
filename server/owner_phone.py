@@ -21,7 +21,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel, Field
 
-from .identity import load_public_key, sha256_hex, verify_device_signature
+from .identity import IdentityError, load_public_key, sha256_hex, verify_device_signature
 
 TOKEN_PREFIX = "abarpay_owner_"
 TOKEN_SECONDS = 300
@@ -227,6 +227,15 @@ class PhoneAuth:
             row = cur.fetchone()
         return MobileIdentity(str(row[0]), str(row[1]), int(row[2])) if row else None
 
+    def phone_for_user(self, user_id: str) -> str | None:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT phone FROM owner_auth.credentials WHERE user_id = %s::uuid",
+                (user_id,),
+            )
+            row = cur.fetchone()
+        return row[0] if row else None
+
 
 class DeviceStart(BaseModel):
     deviceId: UUID
@@ -235,6 +244,7 @@ class DeviceStart(BaseModel):
 class PhoneStart(DeviceStart):
     phone: str = Field(min_length=10, max_length=28)
     publicKey: str = Field(min_length=256, max_length=1000)
+    inviteToken: str | None = Field(default=None, max_length=128)
 
 
 class DeviceFinish(BaseModel):
@@ -262,6 +272,23 @@ class PrivateInputRoute(APIRoute):
 router = APIRouter(prefix="/api/auth/owner", route_class=PrivateInputRoute)
 
 
+def _require_invite_matches_phone(
+    request: Request, token: str, normalized_phone: str
+) -> None:
+    """Reject enrollment when the invite is not active for this exact phone.
+
+    The message stays generic so it never reveals the intended number.
+    """
+
+    service = getattr(request.app.state, "identity_service", None)
+    try:
+        invite = service.get_invite(token) if service is not None else None
+    except IdentityError:
+        invite = None
+    if invite is None or invite.accepted_at is not None or invite.phone != normalized_phone:
+        raise HTTPException(403, "La invitación no es válida o no corresponde a este número.")
+
+
 @router.post("/phone/start")
 def start_phone(body: PhoneStart, request: Request):
     key = load_public_key(body.publicKey)
@@ -269,8 +296,11 @@ def start_phone(body: PhoneStart, request: Request):
         raise HTTPException(422, "No se pudo verificar este celular.")
     if not re.fullmatch(r"[+0-9() .-]+", body.phone):
         raise HTTPException(422, "Escribe un número celular de México de 10 dígitos.")
+    normalized = normalize_phone(body.phone)
+    if body.inviteToken:
+        _require_invite_matches_phone(request, body.inviteToken, normalized)
     pem = key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
-    challenge = request.app.state.owner_phone.start(body.deviceId, normalize_phone(body.phone), pem.decode())
+    challenge = request.app.state.owner_phone.start(body.deviceId, normalized, pem.decode())
     return {"challengeId": challenge, "retryAfterSeconds": 30}
 
 

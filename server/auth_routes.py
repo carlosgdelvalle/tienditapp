@@ -18,7 +18,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .auth import AuthConfig, TokenValidationError, TokenValidator, ValidatedToken
 from .identity import (
@@ -34,7 +34,7 @@ from .identity import (
     User,
 )
 from .identity_pg import actor_context
-from .owner_phone import MobileIdentity, TOKEN_PREFIX
+from .owner_phone import MobileIdentity, TOKEN_PREFIX, normalize_phone
 
 INVITE_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://abarpay-api.onrender.com")
 
@@ -91,6 +91,7 @@ class SessionStoreIn(BaseModel):
 
 class InviteCreateIn(BaseModel):
     email: str | None = None
+    phone: str | None = Field(default=None, max_length=28)
     role: str = "employee"
     canSell: bool = False
     canFiado: bool = False
@@ -106,7 +107,7 @@ class MemberPatchIn(BaseModel):
 
 
 class InviteAcceptIn(BaseModel):
-    pass
+    name: str | None = Field(default=None, max_length=120)
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +125,15 @@ def _validator(request: Request) -> TokenValidator | None:
 
 def _config(request: Request) -> AuthConfig:
     return getattr(request.app.state, "auth_config", None) or AuthConfig()
+
+
+def _verified_phone(request: Request, user_id: str) -> str | None:
+    """Resolve the E.164 phone bound to a phone-account user, if any."""
+
+    phone = getattr(request.app.state, "owner_phone", None)
+    if phone is None:
+        return None
+    return phone.phone_for_user(user_id)
 
 
 def require_identity(
@@ -467,27 +477,38 @@ def list_members(
 @router.post("/tenant/members/invite")
 def create_invite(
     body: InviteCreateIn,
+    response: Response,
     ctx: SessionContext = Depends(require_owner),
     service: IdentityService = Depends(_service),
 ):
+    phone = normalize_phone(body.phone) if (body.phone or "").strip() else None
+    email = (body.email or "").strip() or None
     try:
-        token, _invite = service.create_invite(
-            actor_user_id=ctx.user_id,
-            tenant_id=ctx.tenant_id,
-            email=body.email,
-            role=body.role,
-            can_sell=body.canSell,
-            can_fiado=body.canFiado,
-            can_inventory=body.canInventory,
-        )
+        with actor_context(ctx.user_id):
+            token, invite = service.create_invite(
+                actor_user_id=ctx.user_id,
+                tenant_id=ctx.tenant_id,
+                email=email,
+                phone=phone,
+                role=body.role,
+                can_sell=body.canSell,
+                can_fiado=body.canFiado,
+                can_inventory=body.canInventory,
+            )
     except IdentityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    return {"token": token, "url": f"{INVITE_BASE_URL}/invite/{token}"}
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "token": token,
+        "url": f"{INVITE_BASE_URL}/invite/{token}",
+        "expiresAt": invite.expires_at,
+    }
 
 
 @router.get("/tenant/members/invites/{token}")
 def get_invite(
     token: str,
+    response: Response,
     service: IdentityService = Depends(_service),
 ):
     try:
@@ -495,24 +516,35 @@ def get_invite(
         payload = service.invite_payload(invite)
     except IdentityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
     return payload
 
 
 @router.post("/tenant/members/invites/{token}/accept")
 def accept_invite(
     token: str,
+    request: Request,
+    body: InviteAcceptIn | None = None,
     ctx: IdentityContext = Depends(require_identity),
     service: IdentityService = Depends(_service),
 ):
-    ctx.require_external_identity()
+    name = (body.name or "").strip() if body else ""
+    verified_phone = (
+        _verified_phone(request, ctx.user.id)
+        if isinstance(ctx.token, MobileIdentity)
+        else None
+    )
     try:
-        membership, tenant = service.accept_invite(token, ctx.user.id)
+        membership, tenant = service.accept_invite(
+            token, ctx.user.id, name=name, verified_phone=verified_phone
+        )
     except IdentityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    user = service.get_user(ctx.user.id)
     return {
         "userId": ctx.user.id,
-        "email": ctx.user.email,
-        "name": ctx.user.name,
+        "email": user.email if user else ctx.user.email,
+        "name": user.name if user else ctx.user.name,
         "tenantId": membership.tenant_id,
         "tenantName": tenant.name,
         "role": membership.role,

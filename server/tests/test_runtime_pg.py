@@ -159,7 +159,13 @@ def _apply_migrations(dsn: str) -> None:
     conn = psycopg.connect(dsn, autocommit=True)
     try:
         with conn.cursor() as cur:
-            for name in ("001_schema.sql", "002_seed.sql", "003_onboarding.sql", "004_owner_phone.sql"):
+            for name in (
+                "001_schema.sql",
+                "002_seed.sql",
+                "003_onboarding.sql",
+                "004_owner_phone.sql",
+                "005_employee_phone.sql",
+            ):
                 cur.execute((REPO_ROOT / "migrations" / name).read_text(encoding="utf-8"))
     finally:
         conn.close()

@@ -1,4 +1,9 @@
-"""Owner operations backed by the existing tenant-scoped PostgreSQL ledgers."""
+"""Owner operations backed by the existing tenant-scoped PostgreSQL ledgers.
+
+The audited operations are extracted into reusable functions so the employee
+router can exercise the exact same ledgers and idempotency rules without
+widening their authorization.
+"""
 
 from contextlib import contextmanager
 from typing import Literal
@@ -16,17 +21,17 @@ router = APIRouter(prefix="/api/owner")
 
 
 @contextmanager
-def _transaction(request: Request, ctx: SessionContext, *, snapshot: bool = False):
+def _transaction(request: Request, tenant_id: str, user_id: str, *, snapshot: bool = False):
     with request.app.state.pool.connection() as conn:
         if snapshot:
             conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-        set_tenant_context(conn, tenant_id=ctx.tenant_id, user_id=ctx.user_id)
+        set_tenant_context(conn, tenant_id=tenant_id, user_id=user_id)
         with conn.cursor(row_factory=dict_row) as cursor:
             yield cursor
 
 
-def _lock_intent(cursor, ctx: SessionContext, domain: str, key: UUID) -> UUID:
-    row_id = uuid5(UUID(ctx.tenant_id), f"{domain}:{key}")
+def _lock_intent(cursor, tenant_id: str, domain: str, key: UUID) -> UUID:
+    row_id = uuid5(UUID(tenant_id), f"{domain}:{key}")
     cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(row_id),))
     return row_id
 
@@ -35,77 +40,6 @@ class StockAdjust(BaseModel):
     expectedStockMilli: int = Field(ge=-PG_INT_MAX - 1, le=PG_INT_MAX)
     stockMilli: int = Field(ge=0, le=PG_INT_MAX)
     reason: str = Field(min_length=1, max_length=200)
-
-
-@router.get("/inventory")
-def inventory(request: Request, ctx: SessionContext = Depends(require_owner)):
-    with _transaction(request, ctx, snapshot=True) as cursor:
-        items = read_catalog(cursor)
-        cursor.execute(
-            """SELECT m.id, p.name, m.delta_milli, m.reason, m.created_at
-               FROM inventory_movements m
-               JOIN products p ON (p.tenant_id, p.id) = (m.tenant_id, m.product_id)
-               ORDER BY m.created_at DESC, m.id DESC LIMIT 50"""
-        )
-        movements = [
-            {
-                "id": str(row["id"]), "name": row["name"],
-                "deltaMilli": row["delta_milli"], "reason": row["reason"],
-                "createdAt": row["created_at"].timestamp(),
-            }
-            for row in cursor.fetchall()
-        ]
-    return {"items": items, "total": len(items), "movements": movements}
-
-
-@router.post("/inventory/{product_id}/adjust")
-def adjust_stock(
-    product_id: UUID,
-    body: StockAdjust,
-    request: Request,
-    key: UUID = Header(alias="Idempotency-Key"),
-    ctx: SessionContext = Depends(require_owner),
-):
-    reason = body.reason.strip()
-    if not reason:
-        raise HTTPException(400, "Escribe el motivo del ajuste.")
-    reason = "Ajuste: " + reason
-    delta = body.stockMilli - body.expectedStockMilli
-    if delta > PG_INT_MAX:
-        raise HTTPException(400, "El ajuste supera el máximo permitido por movimiento.")
-    with _transaction(request, ctx) as cursor:
-        movement_id = _lock_intent(cursor, ctx, "inventory", key)
-        cursor.execute(
-            "SELECT stock_milli, unlimited_stock FROM products WHERE id = %s FOR UPDATE",
-            (product_id,),
-        )
-        product = cursor.fetchone()
-        if product is None:
-            raise HTTPException(404, "Producto no encontrado.")
-        cursor.execute(
-            "SELECT product_id, delta_milli, reason, employee_id FROM inventory_movements WHERE id = %s",
-            (movement_id,),
-        )
-        existing = cursor.fetchone()
-        if existing:
-            if (existing["product_id"], existing["delta_milli"], existing["reason"], str(existing["employee_id"])) != (
-                product_id, delta, reason, ctx.user_id,
-            ):
-                raise HTTPException(409, "El intento guardado corresponde a otro ajuste.")
-            return {"productId": str(product_id), "stockMilli": product["stock_milli"], "duplicate": True}
-        if product["unlimited_stock"]:
-            raise HTTPException(409, "Este producto tiene existencia ilimitada.")
-        if product["stock_milli"] != body.expectedStockMilli:
-            raise HTTPException(409, "La existencia cambió. Actualiza el inventario antes de guardar.")
-        if delta:
-            cursor.execute("UPDATE products SET stock_milli = %s WHERE id = %s", (body.stockMilli, product_id))
-            cursor.execute(
-                """INSERT INTO inventory_movements
-                   (id, tenant_id, product_id, delta_milli, reason, employee_id)
-                   VALUES (%s, %s, %s, %s, %s, %s)""",
-                (movement_id, ctx.tenant_id, product_id, delta, reason, ctx.user_id),
-            )
-    return {"productId": str(product_id), "stockMilli": body.stockMilli, "duplicate": False}
 
 
 class CustomerCreate(BaseModel):
@@ -131,9 +65,100 @@ def _note(body: AmountNote) -> str:
     return note
 
 
-@router.get("/fiado/customers")
-def list_customers(request: Request, ctx: SessionContext = Depends(require_owner)):
-    with _transaction(request, ctx) as cursor:
+def _customer(cursor, customer_id: UUID, *, for_update: bool = False):
+    query = "SELECT id, name, credit_limit_cents FROM fiado_customers WHERE id = %s AND active"
+    cursor.execute(query + (" FOR UPDATE" if for_update else ""), (customer_id,))
+    row = cursor.fetchone()
+    if row is None:
+        raise HTTPException(404, "Cliente no encontrado.")
+    return row
+
+
+def _balance(cursor, customer_id: UUID) -> int:
+    cursor.execute(f"SELECT COALESCE(SUM({_SIGNED_AMOUNT}), 0) AS balance FROM fiado_entries WHERE customer_id = %s", (customer_id,))
+    return cursor.fetchone()["balance"]
+
+
+def _entry(row) -> dict:
+    return {
+        "id": str(row["id"]), "amountCents": row["amount_cents"],
+        "note": row["note"], "createdAt": row["created_at"].timestamp(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Shared audited operations (owner and employee routers reuse these)
+# ---------------------------------------------------------------------------
+
+
+def list_inventory(request: Request, tenant_id: str, user_id: str) -> dict:
+    with _transaction(request, tenant_id, user_id, snapshot=True) as cursor:
+        items = read_catalog(cursor)
+        cursor.execute(
+            """SELECT m.id, p.name, m.delta_milli, m.reason, m.created_at
+               FROM inventory_movements m
+               JOIN products p ON (p.tenant_id, p.id) = (m.tenant_id, m.product_id)
+               ORDER BY m.created_at DESC, m.id DESC LIMIT 50"""
+        )
+        movements = [
+            {
+                "id": str(row["id"]), "name": row["name"],
+                "deltaMilli": row["delta_milli"], "reason": row["reason"],
+                "createdAt": row["created_at"].timestamp(),
+            }
+            for row in cursor.fetchall()
+        ]
+    return {"items": items, "total": len(items), "movements": movements}
+
+
+def adjust_stock(
+    request: Request, tenant_id: str, user_id: str,
+    product_id: UUID, body: StockAdjust, key: UUID,
+) -> dict:
+    reason = body.reason.strip()
+    if not reason:
+        raise HTTPException(400, "Escribe el motivo del ajuste.")
+    reason = "Ajuste: " + reason
+    delta = body.stockMilli - body.expectedStockMilli
+    if delta > PG_INT_MAX:
+        raise HTTPException(400, "El ajuste supera el máximo permitido por movimiento.")
+    with _transaction(request, tenant_id, user_id) as cursor:
+        movement_id = _lock_intent(cursor, tenant_id, "inventory", key)
+        cursor.execute(
+            "SELECT stock_milli, unlimited_stock FROM products WHERE id = %s FOR UPDATE",
+            (product_id,),
+        )
+        product = cursor.fetchone()
+        if product is None:
+            raise HTTPException(404, "Producto no encontrado.")
+        cursor.execute(
+            "SELECT product_id, delta_milli, reason, employee_id FROM inventory_movements WHERE id = %s",
+            (movement_id,),
+        )
+        existing = cursor.fetchone()
+        if existing:
+            if (existing["product_id"], existing["delta_milli"], existing["reason"], str(existing["employee_id"])) != (
+                product_id, delta, reason, user_id,
+            ):
+                raise HTTPException(409, "El intento guardado corresponde a otro ajuste.")
+            return {"productId": str(product_id), "stockMilli": product["stock_milli"], "duplicate": True}
+        if product["unlimited_stock"]:
+            raise HTTPException(409, "Este producto tiene existencia ilimitada.")
+        if product["stock_milli"] != body.expectedStockMilli:
+            raise HTTPException(409, "La existencia cambió. Actualiza el inventario antes de guardar.")
+        if delta:
+            cursor.execute("UPDATE products SET stock_milli = %s WHERE id = %s", (body.stockMilli, product_id))
+            cursor.execute(
+                """INSERT INTO inventory_movements
+                   (id, tenant_id, product_id, delta_milli, reason, employee_id)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (movement_id, tenant_id, product_id, delta, reason, user_id),
+            )
+    return {"productId": str(product_id), "stockMilli": body.stockMilli, "duplicate": False}
+
+
+def list_customers(request: Request, tenant_id: str, user_id: str) -> dict:
+    with _transaction(request, tenant_id, user_id) as cursor:
         cursor.execute(
             f"""SELECT c.id, c.name, COALESCE(SUM({_SIGNED_AMOUNT}), 0) AS balance_cents
                 FROM fiado_customers c
@@ -157,8 +182,8 @@ def add_customer(
     name = body.name.strip()
     if not name:
         raise HTTPException(400, "Escribe el nombre del cliente.")
-    with _transaction(request, ctx) as cursor:
-        customer_id = _lock_intent(cursor, ctx, "fiado-customer", key)
+    with _transaction(request, ctx.tenant_id, ctx.user_id) as cursor:
+        customer_id = _lock_intent(cursor, ctx.tenant_id, "fiado-customer", key)
         cursor.execute("SELECT name FROM fiado_customers WHERE id = %s", (customer_id,))
         existing = cursor.fetchone()
         if existing and existing["name"] != name:
@@ -171,32 +196,9 @@ def add_customer(
         return {"id": str(customer_id), "name": name}
 
 
-def _customer(cursor, customer_id: UUID, *, for_update: bool = False):
-    query = "SELECT id, name, credit_limit_cents FROM fiado_customers WHERE id = %s AND active"
-    cursor.execute(query + (" FOR UPDATE" if for_update else ""), (customer_id,))
-    row = cursor.fetchone()
-    if row is None:
-        raise HTTPException(404, "Cliente no encontrado.")
-    return row
-
-
-def _balance(cursor, customer_id: UUID) -> int:
-    cursor.execute(f"SELECT COALESCE(SUM({_SIGNED_AMOUNT}), 0) AS balance FROM fiado_entries WHERE customer_id = %s", (customer_id,))
-    return cursor.fetchone()["balance"]
-
-
-def _entry(row) -> dict:
-    return {
-        "id": str(row["id"]), "amountCents": row["amount_cents"],
-        "note": row["note"], "createdAt": row["created_at"].timestamp(),
-    }
-
-
-@router.get("/fiado/customers/{customer_id}")
-def customer_detail(customer_id: UUID, request: Request, ctx: SessionContext = Depends(require_owner)):
-    with _transaction(request, ctx) as cursor:
+def customer_detail(request: Request, tenant_id: str, user_id: str, customer_id: UUID) -> dict:
+    with _transaction(request, tenant_id, user_id) as cursor:
         customer = _customer(cursor, customer_id)
-        # Use the full ledger for the balance even when history is bounded.
         cursor.execute(
             f"""SELECT id, kind, amount_cents, note, created_at, SUM({_SIGNED_AMOUNT}) OVER () AS balance
                 FROM fiado_entries WHERE customer_id = %s
@@ -211,17 +213,13 @@ def customer_detail(customer_id: UUID, request: Request, ctx: SessionContext = D
         }
 
 
-@router.post("/fiado/customers/{customer_id}/entries")
 def add_fiado_entry(
-    customer_id: UUID,
-    request: Request,
-    body: FiadoEntryCreate,
-    key: UUID = Header(alias="Idempotency-Key"),
-    ctx: SessionContext = Depends(require_owner),
-):
+    request: Request, tenant_id: str, user_id: str,
+    customer_id: UUID, body: FiadoEntryCreate, key: UUID,
+) -> dict:
     note = _note(body)
-    with _transaction(request, ctx) as cursor:
-        entry_id = _lock_intent(cursor, ctx, "fiado-entry", key)
+    with _transaction(request, tenant_id, user_id) as cursor:
+        entry_id = _lock_intent(cursor, tenant_id, "fiado-entry", key)
         customer = _customer(cursor, customer_id, for_update=True)
         cursor.execute(
             "SELECT customer_id, kind, amount_cents, note, employee_id FROM fiado_entries WHERE id = %s",
@@ -231,7 +229,7 @@ def add_fiado_entry(
         if existing:
             recorded = (existing["customer_id"], existing["kind"], existing["amount_cents"], existing["note"],
                         str(existing["employee_id"]))
-            if recorded != (customer_id, body.kind, body.amountCents, note, ctx.user_id):
+            if recorded != (customer_id, body.kind, body.amountCents, note, user_id):
                 raise HTTPException(409, "El intento guardado corresponde a otro movimiento.")
             return {"id": str(entry_id)}
         balance = _balance(cursor, customer_id)
@@ -243,14 +241,14 @@ def add_fiado_entry(
         cursor.execute(
             """INSERT INTO fiado_entries (id, tenant_id, customer_id, kind, amount_cents, note, employee_id)
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-            (entry_id, ctx.tenant_id, customer_id, body.kind, body.amountCents, note, ctx.user_id),
+            (entry_id, tenant_id, customer_id, body.kind, body.amountCents, note, user_id),
         )
         return {"id": str(entry_id)}
 
 
 @router.get("/expenses")
 def list_expenses(request: Request, ctx: SessionContext = Depends(require_owner)):
-    with _transaction(request, ctx) as cursor:
+    with _transaction(request, ctx.tenant_id, ctx.user_id) as cursor:
         cursor.execute(
             """SELECT id, amount_cents, note, created_at, sum(amount_cents) OVER () AS total_cents
                FROM expenses ORDER BY created_at DESC, id DESC LIMIT 50"""
@@ -267,8 +265,8 @@ def add_expense(
     ctx: SessionContext = Depends(require_owner),
 ):
     note = _note(body)
-    with _transaction(request, ctx) as cursor:
-        expense_id = _lock_intent(cursor, ctx, "expense", key)
+    with _transaction(request, ctx.tenant_id, ctx.user_id) as cursor:
+        expense_id = _lock_intent(cursor, ctx.tenant_id, "expense", key)
         cursor.execute("SELECT amount_cents, note, employee_id FROM expenses WHERE id = %s", (expense_id,))
         existing = cursor.fetchone()
         if existing:
@@ -282,3 +280,45 @@ def add_expense(
             (expense_id, ctx.tenant_id, ctx.user_id, body.amountCents, note),
         )
         return {"id": str(expense_id)}
+
+
+# ---------------------------------------------------------------------------
+# Owner routes
+# ---------------------------------------------------------------------------
+
+
+@router.get("/inventory")
+def inventory(request: Request, ctx: SessionContext = Depends(require_owner)):
+    return list_inventory(request, ctx.tenant_id, ctx.user_id)
+
+
+@router.post("/inventory/{product_id}/adjust")
+def adjust_stock_route(
+    product_id: UUID,
+    body: StockAdjust,
+    request: Request,
+    key: UUID = Header(alias="Idempotency-Key"),
+    ctx: SessionContext = Depends(require_owner),
+):
+    return adjust_stock(request, ctx.tenant_id, ctx.user_id, product_id, body, key)
+
+
+@router.get("/fiado/customers")
+def list_customers_route(request: Request, ctx: SessionContext = Depends(require_owner)):
+    return list_customers(request, ctx.tenant_id, ctx.user_id)
+
+
+@router.get("/fiado/customers/{customer_id}")
+def customer_detail_route(customer_id: UUID, request: Request, ctx: SessionContext = Depends(require_owner)):
+    return customer_detail(request, ctx.tenant_id, ctx.user_id, customer_id)
+
+
+@router.post("/fiado/customers/{customer_id}/entries")
+def add_fiado_entry_route(
+    customer_id: UUID,
+    request: Request,
+    body: FiadoEntryCreate,
+    key: UUID = Header(alias="Idempotency-Key"),
+    ctx: SessionContext = Depends(require_owner),
+):
+    return add_fiado_entry(request, ctx.tenant_id, ctx.user_id, customer_id, body, key)

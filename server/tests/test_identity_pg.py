@@ -71,6 +71,8 @@ def pg_admin():
     conn.autocommit = True
     with conn.cursor() as cur:
         cur.execute((REPO_ROOT / "migrations" / "001_schema.sql").read_text())
+        cur.execute((REPO_ROOT / "migrations" / "004_owner_phone.sql").read_text())
+        cur.execute((REPO_ROOT / "migrations" / "005_employee_phone.sql").read_text())
     yield conn
     conn.close()
 

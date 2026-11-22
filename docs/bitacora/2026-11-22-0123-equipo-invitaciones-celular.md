@@ -1,0 +1,7 @@
+# 2026-11-22 01:23 · Equipo · Invitaciones por celular
+
+- **Qué cambió** El dueño crea un enlace en Equipo con el celular y los permisos elegidos. La app confirma el número por SMS y abre Mi turno. PostgreSQL canjea la invitación una sola vez y comprueba la membresía vigente para Caja, Inventario y Fiado.
+- **Por qué** El alta de invitaciones en PostgreSQL fallaba sin el contexto del dueño. El canje antiguo tampoco vinculaba el número del empleado con la invitación.
+- **Evidencia en el Samsung SM-A165M** Con la consola QR y PostgreSQL de QA, un empleado nuevo completó el alta por SMS SIMULADO. Con permiso de Caja registró una venta de MXN 21.00 que apareció una vez en el historial de Chrome con el mismo folio. Con permiso de Inventario cambió la existencia de 4 a 8 piezas. Con permiso de Fiado registró un abono de MXN 5.00 y dejó un saldo de MXN 45.00. La consola mostró los mismos resultados y PostgreSQL atribuyó los tres registros al empleado. Al suspenderlo desaparecieron las operaciones del teléfono, incluso después de reiniciar la app.
+- **Pruebas** `./scripts/verificar.sh` pasó 331 pruebas de servidor con PostgreSQL, 16 de la app Python y el escaneo de secretos. Android pasó 175 pruebas unitarias y compiló el APK de release. Las pruebas PostgreSQL verificaron el rechazo de números distintos, el reemplazo de enlaces, el canje repetido tras suspender, el aislamiento por tienda y el bloqueo del acceso a la consola del dueño.
+- **Pendiente** Verificar la entrega de un SMS real con proveedor. La prueba física usó datos de QA y efectivo simulado.

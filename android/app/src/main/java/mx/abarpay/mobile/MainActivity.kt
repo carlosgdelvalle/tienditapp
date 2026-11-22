@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,6 +63,9 @@ class MainActivity : ComponentActivity() {
     private var deepLink by mutableStateOf<String?>(null)
     private var showOwnerApproval by mutableStateOf(false)
     private var openOwnerCash by mutableStateOf(false)
+    private var employeeInvite by mutableStateOf<String?>(null)
+    private var linkedEmployee by mutableStateOf(false)
+    private val employeePrefs by lazy { getSharedPreferences("abarpay_employee_entry", MODE_PRIVATE) }
     private val ownerAuth: OwnerAuth by lazy {
         OwnerPhoneAuth(applicationContext, BuildConfig.OWNER_API_BASE_URL)
     }
@@ -72,6 +76,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         showOwnerApproval = savedInstanceState?.getBoolean("ownerApproval") == true
         openOwnerCash = savedInstanceState?.getBoolean("ownerCash") == true
+        linkedEmployee = ownerConfigured && employeePrefs.getBoolean("linked", false)
         handleIncomingIntent(intent)
         setContent {
             var splashDone by remember { mutableStateOf(BuildConfig.DEBUG) }
@@ -80,18 +85,25 @@ class MainActivity : ComponentActivity() {
                 return@setContent
             }
             AbarpayTheme {
-                val model: ShopViewModel = viewModel()
-                val state by model.ui.collectAsStateWithLifecycle()
-                var scanning by rememberSaveable { mutableStateOf(false) }
-                val pendingInvite = deepLink
-                LaunchedEffect(pendingInvite) {
-                    if (pendingInvite != null) {
-                        deepLink = null
-                        model.openInvite(pendingInvite)
-                    }
-                }
                 Box(Modifier.fillMaxSize()) {
-                    if (showOwnerApproval || openOwnerCash) {
+                    val invitation = employeeInvite
+                    if (invitation != null) {
+                        key(invitation) {
+                            OwnerQrApprovalScreen(
+                                ownerAuth = ownerAuth,
+                                apiBaseUrl = BuildConfig.OWNER_API_BASE_URL,
+                                onClose = ::clearEmployeeInvitation,
+                                employeeInvitation = invitation,
+                                onEmployeeJoined = {
+                                    check(employeePrefs.edit().putBoolean("linked", true).commit())
+                                    linkedEmployee = true
+                                    clearEmployeeInvitation()
+                                },
+                            )
+                        }
+                    } else if (linkedEmployee) {
+                        EmployeeWorkspace(ownerAuth, BuildConfig.OWNER_API_BASE_URL)
+                    } else if (showOwnerApproval || openOwnerCash) {
                         OwnerQrApprovalScreen(
                             ownerAuth = ownerAuth,
                             apiBaseUrl = BuildConfig.OWNER_API_BASE_URL,
@@ -99,20 +111,30 @@ class MainActivity : ComponentActivity() {
                             startInCash = openOwnerCash,
                         )
                     } else {
+                        val model: ShopViewModel = viewModel()
+                        val state by model.ui.collectAsStateWithLifecycle()
+                        var scanning by rememberSaveable { mutableStateOf(false) }
+                        val pendingInvite = deepLink
+                        LaunchedEffect(pendingInvite) {
+                            if (pendingInvite != null) {
+                                deepLink = null
+                                model.openInvite(pendingInvite)
+                            }
+                        }
                         AbarpayApp(
                             state, model, scan = { scanning = true },
                             openOwner = if (ownerConfigured) ({ showOwnerApproval = true }) else null,
                             openCash = if (ownerConfigured) ({ openOwnerCash = true }) else null,
                         )
-                    }
-                    if (scanning) {
-                        ContinuousScannerScreen(
-                            onResult = { code ->
-                                scanning = false
-                                model.lookup(code)
-                            },
-                            onClose = { scanning = false },
-                        )
+                        if (scanning) {
+                            ContinuousScannerScreen(
+                                onResult = { code ->
+                                    scanning = false
+                                    model.lookup(code)
+                                },
+                                onClose = { scanning = false },
+                            )
+                        }
                     }
                 }
             }
@@ -134,8 +156,29 @@ class MainActivity : ComponentActivity() {
     private val ownerConfigured: Boolean
         get() = BuildConfig.OWNER_API_BASE_URL.isNotBlank()
 
+    private fun clearEmployeeInvitation() {
+        employeeInvite = null
+        setIntent(Intent(this, MainActivity::class.java))
+    }
+
     private fun handleIncomingIntent(intent: Intent?) {
         val data = intent?.data
+        if (ownerConfigured && data != null) {
+            val server = android.net.Uri.parse(BuildConfig.OWNER_API_BASE_URL)
+            val token = when {
+                data.scheme == "abarpay" && data.host == "equipo" && data.pathSegments.size == 1 ->
+                    data.lastPathSegment
+                data.scheme == "https" && data.host == server.host && data.pathSegments.size == 2 &&
+                    data.port == server.port && data.pathSegments.first() == "invite" -> data.lastPathSegment
+                else -> null
+            }
+            if (token != null && token.matches(Regex("^[A-Za-z0-9_-]{4,128}$"))) {
+                showOwnerApproval = false
+                openOwnerCash = false
+                employeeInvite = token
+                return
+            }
+        }
         if (data != null && data.scheme == "abarpay" && data.host == "dueno") {
             if (ownerConfigured) {
                 openOwnerCash = false

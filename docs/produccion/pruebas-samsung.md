@@ -45,6 +45,22 @@ In the QR console, open **Inventario**, choose a finite-stock fixture product, a
 
 From a different owner's QR session, confirm that the product and movements are absent and that the adjustment endpoint returns HTTP 404 for the first store's product. To check stale counts, open an adjustment and change the same stock from a second authorized request. The stale save must return 409. Refresh inventory and confirm the old editor closes so the owner starts from the latest count.
 
+## Employee invitation and phone enrollment
+
+Use the isolated PostgreSQL lab with the employee phone migration applied and the private simulated SMS sender. Install a separate employee QA build. The owner QA package and the employee QA package each have a separate signing key in Android Keystore.
+
+```bash
+cd android
+./gradlew -PABARPAY_DEVICE_TEST=true -PABARPAY_DEVICE_TEST_ROLE=employee \
+  -POWNER_API_BASE_URL=http://127.0.0.1:8011 assembleDebug
+adb -d install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+1. In the owner QR console, open **Equipo**, enter a synthetic Mexican number, grant **Puede cobrar**, and create the invitation. Open the link in the employee QA build (`mx.abarpay.mobile.qa.equipo`). Keep the link and code private.
+2. Review the store and grants, enter a fictional name, and request the simulated code for the invited number. Enter it in Abarpay QA Equipo. Verify that **Mi turno** shows only **Cobrar en efectivo** and that the new employee appears in the owner's Team list.
+3. Record a fixture cash sale. Verify that the sale is attributed to the employee and appears in the store history. Replace the cash grant with **Puede ajustar inventario** from the owner console, then refresh the employee's access. Confirm only **Inventario** is shown and record a fixture adjustment.
+4. Replace the inventory grant with **Puede fiar** and check that only **Fiado** is offered. Record a fixture movement. Suspend employee access, refresh and reopen the app, and verify that the employee cannot enter a store. The backend must reject denied operations even if a client calls an endpoint directly.
+
 ## Offline cash on the physical phone
 
 Open the POS fixture at `http://127.0.0.1:8010` in the QA app and confirm the seeded catalog and offline authorization load while connected. Use a fresh cash cart with synthetic products. Cut and restore only the POS transport:

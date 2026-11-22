@@ -18,6 +18,8 @@ service role and then fails closed.
 
 from __future__ import annotations
 
+import html
+import json
 import logging
 import os
 from pathlib import Path
@@ -27,7 +29,7 @@ from typing import Any, Iterator, Mapping
 
 import psycopg
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from .auth import AuthConfig, TokenValidator, ValidatedToken
@@ -39,6 +41,7 @@ from .auth_routes import (
 )
 from .config import Settings
 from .db_pg import SERVICE_ROLE, create_pool
+from .employee_operations_pg import router as employee_operations_router
 from .identity_pg import PostgresIdentityStore
 from .owner_phone import PhoneAuth, PhoneSettings, register_phone
 from .owner_operations_pg import router as owner_operations_router
@@ -172,6 +175,7 @@ def _onboarding_service(request: Request) -> OnboardingService:
 signup_router = APIRouter(prefix="/api")
 health_router = APIRouter(prefix="/api")
 console_router = APIRouter()
+invite_router = APIRouter()
 
 
 @console_router.get("/console", include_in_schema=False)
@@ -185,6 +189,39 @@ def owner_console():
 @console_router.get("/console/operations.js", include_in_schema=False)
 def owner_console_operations():
     return FileResponse(SERVER_ROOT / "static" / "owner-operations.js", media_type="text/javascript")
+
+
+@invite_router.get("/invite/{token}", include_in_schema=False)
+def invite_page(token: str):
+    """Serve the employee invitation CTA that deep-links into the app."""
+
+    safe_token = html.escape(token)
+    deep_link = "abarpay://equipo/" + safe_token
+    page = "".join(
+        [
+            "<!doctype html>",
+            '<html lang="es">',
+            "<head>",
+            '<meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            "<title>Abarpay · Invitación de empleado</title>",
+            "</head>",
+            "<body>",
+            "<h1>Abarpay</h1>",
+            "<p>Te invitaron a unirte al equipo de la tienda.</p>",
+            f'<p><a href="{html.escape(deep_link, quote=True)}">Abrir Abarpay</a></p>',
+            "<p>Si la app no se abre sola, toca el botón.</p>",
+            "<script>window.location.href = "
+            + json.dumps(deep_link)
+            + ";</script>",
+            "</body>",
+            "</html>",
+        ]
+    )
+    return HTMLResponse(content=page, headers={
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+    })
 
 
 @signup_router.post("/signup")
@@ -342,10 +379,12 @@ def create_production_app(
             register_phone(app, PhoneAuth(pool, phone_settings))
         register_business_routes(app, pool)
         app.include_router(owner_operations_router)
+        app.include_router(employee_operations_router)
         app.add_exception_handler(OnboardingError, _onboarding_error_handler)
         app.include_router(signup_router)
         app.include_router(health_router)
         app.include_router(console_router)
+        app.include_router(invite_router)
         logger.info("production runtime initialized: PostgreSQL verified, RLS enforced")
         return app
     except Exception:

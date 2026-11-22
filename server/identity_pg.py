@@ -166,7 +166,8 @@ def _invite_from_row(row: dict) -> Invite:
         expires_at=_to_epoch(row["expires_at"]),
         accepted_at=_to_epoch(row["accepted_at"]),
         revoked_at=_to_epoch(row["revoked_at"]),
-        accepted_by=None,  # in-memory bookkeeping; not part of the frozen schema
+        accepted_by=str(row["accepted_by"]) if row["accepted_by"] else None,
+        phone=row["phone"],
     )
 
 
@@ -564,10 +565,11 @@ class PostgresIdentityStore(IdentityStore):
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT public.create_invite("
-                    "%s::uuid, %s, %s, %s, %s, %s, %s, %s::timestamptz)",
+                    "%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::timestamptz)",
                     (
                         invite.tenant_id,
                         invite.email,
+                        invite.phone,
                         invite.role,
                         invite.can_sell,
                         invite.can_fiado,
@@ -588,7 +590,7 @@ class PostgresIdentityStore(IdentityStore):
         invite = self.lookup_invite(token_hash)
         if invite is None:
             return None
-        if invite.revoked_at is not None or invite.accepted_at is not None:
+        if invite.phone is not None or invite.revoked_at is not None or invite.accepted_at is not None:
             # Already accepted/revoked: any value that is not user_id signals a
             # conflict to the caller.
             return ""
@@ -606,13 +608,36 @@ class PostgresIdentityStore(IdentityStore):
             # the invite is gone; report a conflict rather than crashing.
             return ""
 
+    def accept_invite(
+        self,
+        token_hash: str,
+        user_id: str,
+        tenant_id: str,
+        name: str | None,
+        phone: str | None,
+    ) -> "Membership | None":
+        try:
+            with self._conn() as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        "SELECT user_id, tenant_id, role, can_sell, can_fiado, "
+                        "can_inventory, active FROM public.accept_invite("
+                        "%s, %s::uuid, %s::uuid, %s, %s)",
+                        (token_hash, tenant_id, user_id, name, phone),
+                    )
+                    row = cur.fetchone()
+                conn.commit()
+        except (psycopg.errors.InvalidParameterValue, psycopg.errors.InsufficientPrivilege):
+            return None
+        return _membership_from_row(row) if row else None
+
     def _invite_by_hash(self, token_hash: str) -> Invite | None:
         with self._conn() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
-                    "SELECT token_hash, tenant_id, email, role, can_sell, can_fiado, "
-                    "can_inventory, created_at, expires_at, accepted_at, revoked_at "
-                    "FROM public.get_invite_by_hash(%s)",
+                    "SELECT token_hash, tenant_id, email, phone, role, can_sell, can_fiado, "
+                    "can_inventory, created_at, expires_at, accepted_at, revoked_at, accepted_by "
+                    "FROM public.get_employee_invite_by_hash(%s)",
                     (token_hash,),
                 )
                 row = cur.fetchone()

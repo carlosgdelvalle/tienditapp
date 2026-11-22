@@ -223,6 +223,22 @@
         <button id="refresh-team" type="button" class="secondary">Actualizar equipo</button>
         <p id="team-status" class="status" role="status"></p>
         <ul id="team-items" class="records" aria-label="Personas vinculadas"></ul>
+        <h3>Invitar al equipo</h3>
+        <form id="team-invite-form">
+          <label>Número de celular (+52)
+            <input id="team-invite-phone" type="tel" inputmode="tel" required maxlength="18" autocomplete="off">
+          </label>
+          <label class="choice"><input id="invite-sell" type="checkbox"> Puede cobrar</label>
+          <label class="choice"><input id="invite-fiado" type="checkbox"> Puede fiar</label>
+          <label class="choice"><input id="invite-inventory" type="checkbox"> Puede ajustar inventario</label>
+          <button id="create-team-invite">Crear invitación</button>
+        </form>
+        <p id="team-invite-status" class="status" role="status"></p>
+        <div id="team-invite-result" class="stack" hidden>
+          <label>Enlace de invitación <input id="team-invite-url" readonly></label>
+          <div class="row"><button id="copy-team-invite" type="button" class="secondary">Copiar enlace</button></div>
+          <p id="team-invite-expiry" class="muted"></p>
+        </div>
       </section>
       <section id="team-editor" aria-labelledby="team-member" hidden>
         <h2 id="team-member"></h2>

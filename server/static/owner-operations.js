@@ -392,6 +392,57 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
   $('cancel-team').addEventListener('click', () => { teamMember = null; syncTeam(); });
   $('refresh-team').addEventListener('click', loadTeam);
 
+  function clearInviteLink() {
+    $('team-invite-result').hidden = true;
+    $('team-invite-url').value = '';
+    $('team-invite-expiry').textContent = '';
+  }
+
+  $('team-invite-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const identity = session();
+    const button = $('create-team-invite');
+    if (!identity || button.disabled) return;
+    const digits = $('team-invite-phone').value.replace(/\D/g, '');
+    const phone = digits.length === 12 && digits.startsWith('52') ? digits.slice(2) : digits;
+    if (phone.length !== 10) {
+      status('team-invite-status', 'Escribe un número mexicano de 10 dígitos.', true);
+      return;
+    }
+    const body = {
+      phone, canSell: $('invite-sell').checked, canFiado: $('invite-fiado').checked,
+      canInventory: $('invite-inventory').checked,
+    };
+    const controls = [...event.currentTarget.elements];
+    for (const control of controls) control.disabled = true;
+    clearInviteLink();
+    status('team-invite-status', 'Preparando la invitación…');
+    try {
+      const invite = await api('/api/tenant/members/invite', {method: 'POST', body});
+      if (session() !== identity) return;
+      $('team-invite-url').value = new URL('/invite/' + encodeURIComponent(invite.token), location.origin).href;
+      $('team-invite-expiry').textContent = invite.expiresAt ? 'Vence el ' + formatDate(invite.expiresAt) : '';
+      $('team-invite-result').hidden = false;
+      $('team-invite-form').reset();
+      status('team-invite-status', 'Invitación lista. Comparte el enlace con la persona invitada.');
+    } catch (error) {
+      if (session() === identity) requestError('team-invite-status', error, 'No se pudo confirmar la invitación. Intenta de nuevo.');
+    } finally {
+      for (const control of controls) control.disabled = false;
+    }
+  });
+
+  $('copy-team-invite').addEventListener('click', async () => {
+    const field = $('team-invite-url');
+    try {
+      await navigator.clipboard.writeText(field.value);
+      status('team-invite-status', 'Enlace copiado.');
+    } catch (_) {
+      field.select();
+      status('team-invite-status', 'Copia el enlace seleccionado.');
+    }
+  });
+
   const sections = {inventario: loadInventory, fiado: loadFiado, gastos: loadExpenses, equipo: loadTeam};
   return {
     load(section) {
@@ -401,11 +452,13 @@ window.ownerOperations = ({api, status, requestError, money, quantity, scaledInp
       adjustment = null;
       customer = null;
       teamMember = null;
+      clearInviteLink();
       for (const id of ['adjust-panel', 'fiado-detail', 'team-editor']) $(id).hidden = true;
       for (const id of ['inventory-items', 'inventory-movements', 'fiado-items', 'fiado-entries', 'expenses-items',
         'team-items', 'expenses-total']) $(id).replaceChildren();
-      for (const id of ['adjust-status', 'customer-status', 'fiado-entry-status', 'expense-status', 'team-edit-status']) status(id, '');
-      for (const id of ['adjust-form', 'customer-form', 'fiado-entry-form', 'expense-form', 'team-form']) $(id).reset();
+      for (const id of ['adjust-status', 'customer-status', 'fiado-entry-status', 'expense-status', 'team-edit-status',
+        'team-invite-status']) status(id, '');
+      for (const id of ['adjust-form', 'customer-form', 'fiado-entry-form', 'expense-form', 'team-form', 'team-invite-form']) $(id).reset();
     },
   };
 };

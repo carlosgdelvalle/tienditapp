@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 
 interface OwnerAuth {
     suspend fun accessToken(): String?
-    suspend fun startEnrollment(phone: String): String
+    suspend fun startEnrollment(phone: String, inviteToken: String? = null): String
     suspend fun verifyEnrollment(challengeId: String, code: String)
 }
 
@@ -45,12 +45,13 @@ internal class OwnerPhoneAuth(context: Context, private val baseUrl: String) : O
         }
     }
 
-    override suspend fun startEnrollment(phone: String): String = withContext(Dispatchers.IO) {
+    override suspend fun startEnrollment(phone: String, inviteToken: String?): String = withContext(Dispatchers.IO) {
         val pair = OwnerDeviceKey.getOrCreate()
         post(
             "phone/start",
             JSONObject().put("phone", phone).put("deviceId", ownerDeviceId(app))
-                .put("publicKey", OwnerQrCrypto.publicKeyPem(pair.public)),
+                .put("publicKey", OwnerQrCrypto.publicKeyPem(pair.public))
+                .put("inviteToken", inviteToken),
         ).getString("challengeId")
     }
 
@@ -88,6 +89,7 @@ internal class OwnerPhoneAuth(context: Context, private val baseUrl: String) : O
             if (!response.isSuccessful) {
                 val message = when (response.code) {
                     401 -> "Ese código ya no sirve o no coincide. Revísalo o pide otro."
+                    403 -> "Usa el número al que te invitó la tienda. Si el enlace venció, pide otro."
                     409 -> "Este número ya está vinculado. Usa el otro celular o contacta a Abarpay."
                     422 -> "Revisa que el número y el código estén completos."
                     429 -> "Espera un momento antes de volver a intentar."
