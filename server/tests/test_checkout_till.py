@@ -89,6 +89,7 @@ def test_last_unit_conflict_between_two_tills(client, db):
     first_event = sale_event("till-a", 1, "01HXTILLA00000000000000001", base)
     first = sync(client, lease_a, [first_event])
     assert first["acks"][0]["applied"] is True
+    assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == 0
 
     second_event = sale_event("till-b", 1, "01HXTILLB00000000000000001", base + 1)
     ack = sync(client, lease_b, [second_event])["acks"][0]
@@ -96,6 +97,11 @@ def test_last_unit_conflict_between_two_tills(client, db):
     first_sale = first["acks"][0]["receipt"]["saleId"]
     second_sale = ack["receipt"]["saleId"]
     assert second_sale != first_sale
+    stock_after_sales = db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0]
+    movements_after_sales = db.execute(
+        "SELECT id, sale_id, delta_milli, reason FROM inventory_movements WHERE product_id = 1 ORDER BY id",
+    ).fetchall()
+    assert any(row["sale_id"] == first_sale and row["delta_milli"] == -1000 for row in movements_after_sales)
 
     for lease, event, original in (
         (lease_a, first_event, first["acks"][0]),
@@ -104,6 +110,10 @@ def test_last_unit_conflict_between_two_tills(client, db):
         replay = sync(client, lease, [event])["acks"][0]
         assert replay["duplicate"] is True
         assert replay["receipt"] == original["receipt"]
+    assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == stock_after_sales
+    assert db.execute(
+        "SELECT id, sale_id, delta_milli, reason FROM inventory_movements WHERE product_id = 1 ORDER BY id",
+    ).fetchall() == movements_after_sales
 
     sales = db.execute(
         "SELECT id, status, total_cents FROM sales WHERE store_id = ?", (STORE_ID,),
