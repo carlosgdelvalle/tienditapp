@@ -89,6 +89,12 @@ def test_offline_cash_uses_issued_price_after_catalog_edit_and_lost_ack(client, 
     assert duplicate["duplicate"] is True
     assert duplicate["receipt"] == receipt
     sale_id = receipt["saleId"]
+    sale = db.execute(
+        "SELECT status, total_cents, charged_cents, cash_received_cents, change_cents "
+        "FROM sales WHERE id = ?",
+        (sale_id,),
+    ).fetchone()
+    assert tuple(sale) == ("paid_cash", 1800, 1800, 2000, 200)
     lines = db.execute(
         "SELECT unit_price_cents, line_total_cents FROM sale_items WHERE sale_id = ?",
         (sale_id,),
@@ -96,6 +102,10 @@ def test_offline_cash_uses_issued_price_after_catalog_edit_and_lost_ack(client, 
     assert [tuple(row) for row in lines] == [(1800, 1800)]
     payments = db.execute("SELECT amount_cents FROM payments WHERE sale_id = ?", (sale_id,)).fetchall()
     assert [row[0] for row in payments] == [1800]
+    movements = db.execute(
+        "SELECT product_id, delta_milli FROM inventory_movements WHERE sale_id = ?", (sale_id,),
+    ).fetchall()
+    assert [tuple(row) for row in movements] == [(1, -1000)]
     assert db.execute("SELECT stock_milli FROM products WHERE id = 1").fetchone()[0] == 23000
 
 
@@ -118,7 +128,11 @@ def test_checkout_commit_survives_lost_response_and_offline_replay(settings, fak
         # Model the loss boundary by discarding the response after the request commits.
         assert client.post("/api/sales", json=checkout, headers={"Idempotency-Key": event_id}).status_code == 200
 
-    sale_id = db.execute("SELECT id FROM sales WHERE payment_method = 'cash'").fetchone()[0]
+    original_sales = db.execute("SELECT id FROM sales WHERE payment_method = 'cash'").fetchall()
+    assert len(original_sales) == 1
+    sale_id = original_sales[0][0]
+    assert db.execute("SELECT COUNT(*) FROM payments WHERE sale_id = ?", (sale_id,)).fetchone()[0] == 1
+    assert db.execute("SELECT COUNT(*) FROM inventory_movements WHERE sale_id = ?", (sale_id,)).fetchone()[0] == 1
     with TestClient(create_app(settings=settings, pey_client=fake_pey)) as restarted:
         for _ in range(2):
             ack = sync(restarted, lease, [event])["acks"][0]

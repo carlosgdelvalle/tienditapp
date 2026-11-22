@@ -86,10 +86,8 @@ def test_last_unit_conflict_between_two_tills(client, db):
     lease_b = get_lease(client, "till-b")
     base = lease_a["issuedAt"] + 1
 
-    first = sync(
-        client, lease_a,
-        [sale_event("till-a", 1, "01HXTILLA00000000000000001", base)],
-    )
+    first_event = sale_event("till-a", 1, "01HXTILLA00000000000000001", base)
+    first = sync(client, lease_a, [first_event])
     assert first["acks"][0]["applied"] is True
 
     second_event = sale_event("till-b", 1, "01HXTILLB00000000000000001", base + 1)
@@ -99,9 +97,13 @@ def test_last_unit_conflict_between_two_tills(client, db):
     second_sale = ack["receipt"]["saleId"]
     assert second_sale != first_sale
 
-    replay = sync(client, lease_b, [second_event])["acks"][0]
-    assert replay["duplicate"] is True
-    assert replay["receipt"] == ack["receipt"]
+    for lease, event, original in (
+        (lease_a, first_event, first["acks"][0]),
+        (lease_b, second_event, ack),
+    ):
+        replay = sync(client, lease, [event])["acks"][0]
+        assert replay["duplicate"] is True
+        assert replay["receipt"] == original["receipt"]
 
     sales = db.execute(
         "SELECT id, status, total_cents FROM sales WHERE store_id = ?", (STORE_ID,),

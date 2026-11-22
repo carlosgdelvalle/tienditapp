@@ -10,6 +10,8 @@ The [automated acceptance tests](server/tests/test_payment_offline_acceptance.py
 python -m pytest -q server/tests/test_payment_offline_acceptance.py server/tests/test_checkout_till.py
 ```
 
+With JDK 21 and the Android SDK configured, run `./gradlew testDebugUnitTest --tests mx.abarpay.mobile.SaleCoordinatorTest` from `android/`. The MockWebServer case drops the sync connection after receiving the event and checks that reopening the outbox resends the same event before accepting the duplicate acknowledgment.
+
 | Scenario | Acceptance evidence |
 | --- | --- |
 | Confirmed CoDi after another till sells the last unit | Signed webhook and provider readback each persist the confirmed payment. Repeat delivery leaves one payment for the transaction. Inventory shortage has a traceable variance. |

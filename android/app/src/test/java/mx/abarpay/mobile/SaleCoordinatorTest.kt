@@ -5,6 +5,7 @@ import mx.abarpay.mobile.persistence.KeyProvider
 import mx.abarpay.mobile.persistence.OfflineLease
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -15,6 +16,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 
@@ -98,6 +101,66 @@ class SaleCoordinatorTest {
             assertTrue(coordinator.outbox().isAcked(result.sequence))
         } finally {
             server.shutdown()
+        }
+    }
+
+    @Test
+    fun lostAcknowledgmentKeepsTheSameSaleAcrossOutboxReopen() = runBlocking {
+        val app = RuntimeEnvironment.getApplication()
+        val keys = FakeKeyProvider()
+        val store = "tienda-reintento"
+        val first = SaleCoordinator(app, keys)
+        val restarted = SaleCoordinator(app, keys)
+        MockWebServer().use { server ->
+            try {
+                val base = server.url("/").toString().trimEnd('/')
+                first.attach(store)
+                val now = System.currentTimeMillis() / 1000
+                first.outbox().saveLease(
+                    OfflineLease(
+                        tenantId = store,
+                        storeId = store,
+                        deviceId = first.deviceId,
+                        membershipId = "mem-" + first.deviceId,
+                        issuedAt = now - 10,
+                        expiresAt = now + 3600,
+                        signature = "SIMULADO",
+                    )
+                )
+                first.seedLocalStock(listOf(Product(1, "Producto SIMULADO", "pieza", 1800, 24000)))
+                val sale = first.finalizeOfflineCashSale(
+                    employeeId = 1,
+                    cart = listOf(CartLine(1, 1000)),
+                    totalCents = 1800,
+                    cashReceivedCents = 2000,
+                    catalogVersion = 1,
+                )
+                server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+                assertTrue(runCatching { first.replay(base) }.exceptionOrNull() is IOException)
+                val original = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
+                assertEquals(sale.eventId, first.outbox().pending().single().eventId)
+                first.close()
+
+                restarted.attach(store)
+                assertEquals(sale.eventId, restarted.outbox().pending().single().eventId)
+                assertNotNull(restarted.outbox().localSale(sale.reference))
+                val ack = JSONObject()
+                    .put("sequence", sale.sequence)
+                    .put("eventId", sale.eventId)
+                    .put("applied", false)
+                    .put("duplicate", true)
+                server.enqueue(MockResponse().setBody(JSONObject().put("acks", JSONArray().put(ack)).toString()))
+
+                assertEquals(1, restarted.replay(base).acked)
+                val replay = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
+                assertEquals("/api/sync/events", replay.path)
+                assertEquals(original.body.readUtf8(), replay.body.readUtf8())
+                assertEquals(23000, restarted.outbox().localStock(1))
+                assertTrue(restarted.outbox().pending().isEmpty())
+            } finally {
+                first.close()
+                restarted.close()
+            }
         }
     }
 
