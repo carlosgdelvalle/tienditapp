@@ -90,6 +90,11 @@ class Issuer:
     audience: str
     kind: str  # 'auth0' | 'entra'
     discovery_uri: str | None = None
+    # Auth0 API access tokens carry email/name in namespaced claims set by an
+    # Action (e.g. https://abarpay.app/email), not at the root. Set by
+    # AuthConfig.from_env; leave empty to read only root claims.
+    email_claim: str | None = None
+    name_claim: str | None = None
 
 
 @dataclass(frozen=True)
@@ -136,6 +141,8 @@ class AuthConfig:
 
         auth0_domain = get("AUTH0_DOMAIN").rstrip("/")
         auth0_audience = get("AUTH0_AUDIENCE")
+        auth0_email_claim = get("AUTH0_EMAIL_CLAIM") or "https://abarpay.app/email"
+        auth0_name_claim = get("AUTH0_NAME_CLAIM") or "https://abarpay.app/name"
         if auth0_domain and auth0_audience:
             if "://" not in auth0_domain:
                 auth0_domain = "https://" + auth0_domain
@@ -147,6 +154,8 @@ class AuthConfig:
                     audience=auth0_audience,
                     kind="auth0",
                     discovery_uri=discovery,
+                    email_claim=auth0_email_claim,
+                    name_claim=auth0_name_claim,
                 )
             )
 
@@ -473,6 +482,12 @@ def _map_claims(issuer: Issuer, claims: dict[str, Any]) -> ValidatedToken:
     sub = claims.get("sub")
     if not isinstance(sub, str) or not sub:
         raise InvalidTokenError("Auth0 token is missing the 'sub' claim")
+    email = _optional_str(claims.get("email"))
+    if email is None and issuer.email_claim:
+        email = _optional_str(claims.get(issuer.email_claim))
+    name = _optional_str(claims.get("name"))
+    if name is None and issuer.name_claim:
+        name = _optional_str(claims.get(issuer.name_claim))
     return ValidatedToken(
         issuer=issuer.issuer,
         audience=issuer.audience,
@@ -481,8 +496,8 @@ def _map_claims(issuer: Issuer, claims: dict[str, Any]) -> ValidatedToken:
         sub=sub,
         oid=None,
         tid=None,
-        email=_optional_str(claims.get("email")),
-        name=_optional_str(claims.get("name")),
+        email=email,
+        name=name,
         issued_at=_optional_int(claims.get("iat")),
         expires_at=_optional_int(claims.get("exp")),
     )

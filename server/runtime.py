@@ -20,16 +20,18 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
 import psycopg
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from .auth import AuthConfig, TokenValidator
+from .business_pg import register as register_business_routes
 from .auth_routes import (
     IdentityContext,
     register as register_auth_routes,
@@ -48,6 +50,7 @@ from .onboarding import (
 logger = logging.getLogger("abarpay.production")
 
 _TRUE_VALUES = {"1", "true", "yes", "si", "sí", "on"}
+SERVER_ROOT = Path(__file__).resolve().parent
 
 _TENANT_ISOLATION_TABLES = (
     "stores", "products", "sales", "sale_items", "payments",
@@ -166,6 +169,15 @@ def _onboarding_service(request: Request) -> OnboardingService:
 
 signup_router = APIRouter(prefix="/api")
 health_router = APIRouter(prefix="/api")
+console_router = APIRouter()
+
+
+@console_router.get("/console", include_in_schema=False)
+def owner_console():
+    page = SERVER_ROOT / "static" / "owner-console.html"
+    if not page.exists():
+        return JSONResponse(status_code=404, content={"detail": "Consola no disponible"})
+    return FileResponse(page, media_type="text/html")
 
 
 @signup_router.post("/signup")
@@ -311,9 +323,11 @@ def create_production_app(
             validator=token_validator,
             auth_config=config,
         )
+        register_business_routes(app, pool)
         app.add_exception_handler(OnboardingError, _onboarding_error_handler)
         app.include_router(signup_router)
         app.include_router(health_router)
+        app.include_router(console_router)
         logger.info("production runtime initialized: PostgreSQL verified, RLS enforced")
         return app
     except Exception:
