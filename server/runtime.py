@@ -11,7 +11,7 @@ points at the demo):
 
 Migrations are a separate setup/release step (the migrator principal), not a
 runtime concern: apply migrations/001_schema.sql, 002_seed.sql and
-003_onboarding.sql before starting the app (the CI postgres job already does
+003_onboarding.sql and 004_owner_phone.sql before starting the app (CI already does
 this with psql). The app itself only verifies the migrated schema and the
 service role and then fails closed.
 """
@@ -22,7 +22,7 @@ import logging
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Iterator, Mapping
 
 import psycopg
@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from .auth import AuthConfig, TokenValidator
+from .auth import AuthConfig, TokenValidator, ValidatedToken
 from .business_pg import register as register_business_routes
 from .auth_routes import (
     IdentityContext,
@@ -40,6 +40,7 @@ from .auth_routes import (
 from .config import Settings
 from .db_pg import SERVICE_ROLE, create_pool
 from .identity_pg import PostgresIdentityStore
+from .owner_phone import PhoneAuth, PhoneSettings, register_phone
 from .onboarding import (
     DEFAULT_TIMEZONE,
     OnboardingError,
@@ -188,23 +189,22 @@ def signup(
 ) -> dict[str, Any]:
     """Atomic signup: tenant + store + owner membership from verified identity.
 
-    idp, external_sub and email come from the validated OIDC access token, never
-    from the request body or a caller-supplied header. Only Auth0 (business)
-    identities may open a store; Entra staff identities never create a tenant.
+    The account comes from verified credentials. Staff identities cannot
+    create merchant tenants.
     """
 
-    if ctx.token.idp != "auth0":
+    if ctx.user.idp not in {"phone", "auth0"}:
         raise HTTPException(
             status_code=403,
-            detail="El registro de tiendas es solo para identidades Auth0",
+            detail="Esta cuenta no puede registrar tiendas.",
         )
     try:
         result = service.signup(
-            email=ctx.token.email or "",
+            email=(ctx.token.email or "") if isinstance(ctx.token, ValidatedToken) else "",
             owner_name=body.name,
             store_name=body.storeName,
-            idp=ctx.token.idp,
-            external_sub=ctx.token.external_sub,
+            idp=ctx.user.idp,
+            external_sub=ctx.user.external_sub,
             timezone=body.timezone or DEFAULT_TIMEZONE,
         )
     except OnboardingError as exc:
@@ -266,13 +266,18 @@ def create_production_app(
     env: Mapping[str, str] | None = None,
     auth_config: AuthConfig | None = None,
     validator: TokenValidator | None = None,
+    phone_settings: PhoneSettings | None = None,
 ) -> FastAPI:
     """Build the production app. Raises (fails closed) if preconditions fail."""
 
     runtime = ProductionRuntime.from_env(env)
-    config = auth_config or AuthConfig.from_env(env)
-    if not config.enabled:
-        raise RuntimeError("production runtime requires at least one OIDC issuer")
+    environ = os.environ if env is None else env
+    phone_settings = phone_settings or PhoneSettings.from_env(environ)
+    config = auth_config or AuthConfig.from_env(environ)
+    if phone_settings:
+        config = replace(config, issuers=tuple(i for i in config.issuers if i.kind != "auth0"))
+    if not config.enabled and not phone_settings:
+        raise RuntimeError("production runtime requires owner phone sign-in or at least one OIDC issuer")
 
     try:
         verify_conn = psycopg.connect(runtime.service_dsn, autocommit=True)
@@ -282,6 +287,10 @@ def create_production_app(
         ) from exc
     try:
         _verify_invariants(verify_conn)
+        if phone_settings and not verify_conn.execute(
+            "SELECT to_regclass('owner_auth.mobile_sessions')"
+        ).fetchone()[0]:
+            raise RuntimeError("apply 004_owner_phone.sql before enabling owner phone sign-in")
     finally:
         verify_conn.close()
 
@@ -323,6 +332,8 @@ def create_production_app(
             validator=token_validator,
             auth_config=config,
         )
+        if phone_settings:
+            register_phone(app, PhoneAuth(pool, phone_settings))
         register_business_routes(app, pool)
         app.add_exception_handler(OnboardingError, _onboarding_error_handler)
         app.include_router(signup_router)

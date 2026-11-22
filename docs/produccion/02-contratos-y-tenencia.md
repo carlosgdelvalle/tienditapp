@@ -4,7 +4,7 @@ Status: handoff package for the DSH team. Written 21-nov-2026. Implementation in
 
 ## Purpose
 
-Convert the single-store demo backend (FastAPI + SQLite, one connection per request) into a multi-tenant service on PostgreSQL, with row-level security (RLS) and user-to-tenant membership. User identity (Auth0 and Microsoft Entra ID) lives in `04-identidad-onboarding-y-pey.md`, which this document consumes.
+Convert the single-store demo backend (FastAPI + SQLite, one connection per request) into a multi-tenant service on PostgreSQL, with row-level security (RLS) and user-to-tenant membership. User identity (Abarpay phone accounts and Microsoft Entra ID) lives in `04-identidad-onboarding-y-pey.md`, which this document consumes.
 
 ## Inherited context
 

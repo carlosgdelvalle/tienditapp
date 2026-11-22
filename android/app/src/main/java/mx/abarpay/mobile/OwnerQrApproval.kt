@@ -1,7 +1,6 @@
 package mx.abarpay.mobile
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -22,8 +21,7 @@ import java.util.UUID
 /**
  * Flujo del dueño para aprobar el QR del navegador (J-11). Vive en un archivo
  * separado del resto de la app para no acoplarse a ShopViewModel/Repository ni
- * al outbox. La identidad OIDC entra por [OwnerAuth]; para pruebas se inyecta un
- * token sintético con [OwnerAuthSeam] sin depender de Auth0.
+ * al outbox. La app se autentica con el celular ya vinculado.
  */
 
 /** Reto leído del QR abarpay://challenge/{id}?code=...&nonce=...&exp=...&intent=... */
@@ -86,38 +84,10 @@ object OwnerQrCrypto {
     }
 }
 
-/** Contrato OIDC que implementa OwnerOidcClient (el integrador lo provee). */
-interface OwnerAuth {
-    fun beginSignIn(): Intent
-    suspend fun completeSignIn(callback: Uri): String
-    fun accessToken(): String?
-    fun clearAccessToken()
-}
+data class OwnerStore(val tenantId: String, val name: String)
 
-/** Costura inyectable para pruebas: sustituye el OIDC real por un token sintético. */
-object OwnerAuthSeam {
-    var tokenProvider: (suspend () -> String)? = null
-}
-
-/** Cliente HTTP mínimo para el registro del dispositivo y la aprobación del reto. */
+/** Cliente HTTP para preparar y aprobar el ingreso a la consola. */
 class OwnerQrApi(private val baseUrl: String, private val accessToken: String) {
-    fun registerDevice(deviceId: String, publicKey: String, label: String) {
-        val body = org.json.JSONObject()
-            .put("deviceId", deviceId)
-            .put("publicKey", publicKey)
-            .put("label", label)
-        val request = okhttp3.Request.Builder()
-            .url(baseUrl.trimEnd('/') + "/api/auth/device/register")
-            .header("Authorization", "Bearer " + accessToken)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-        okhttp3.OkHttpClient().newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw ApiFailure(response.code, "No se pudo registrar el dispositivo")
-            }
-        }
-    }
-
     fun approve(challengeId: String, deviceId: String, deviceSignature: String, code: String, tenantId: String?) {
         val body = org.json.JSONObject()
             .put("deviceSignature", deviceSignature)
@@ -138,8 +108,7 @@ class OwnerQrApi(private val baseUrl: String, private val accessToken: String) {
         }
     }
 
-    /** Tenants donde este dueño tiene rol owner (para firmar con la tienda elegida). */
-    fun ownerTenantIds(): List<String> {
+    fun ownerStores(): List<OwnerStore> {
         val request = Request.Builder()
             .url(baseUrl.trimEnd('/') + "/api/me/memberships")
             .header("Authorization", "Bearer " + accessToken)
@@ -147,43 +116,17 @@ class OwnerQrApi(private val baseUrl: String, private val accessToken: String) {
             .build()
         OkHttpClient().newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw ApiFailure(response.code, "No se pudieron leer las membresías")
+                throw ApiFailure(response.code, "No se pudo cargar tu tienda.")
             }
-            val items = JSONObject(response.body!!.string()).optJSONArray("items")
-            val result = mutableListOf<String>()
-            if (items != null) {
+            val items = JSONObject(checkNotNull(response.body).string()).getJSONArray("items")
+            return buildList {
                 for (i in 0 until items.length()) {
-                    val member = items.optJSONObject(i) ?: continue
+                    val member = items.getJSONObject(i)
                     if (member.optString("role") == "owner") {
-                        result.add(member.getString("tenantId"))
+                        add(OwnerStore(member.getString("tenantId"), member.optString("storeName")))
                     }
                 }
             }
-            return result
-        }
-    }
-
-    /** Nombre de la tienda del primer dueño (para el código de verificación). */
-    fun ownerStoreName(): String {
-        val request = Request.Builder()
-            .url(baseUrl.trimEnd('/') + "/api/me/memberships")
-            .header("Authorization", "Bearer " + accessToken)
-            .get()
-            .build()
-        OkHttpClient().newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw ApiFailure(response.code, "No se pudieron leer las membresías")
-            }
-            val items = JSONObject(response.body!!.string()).optJSONArray("items")
-            if (items != null) {
-                for (i in 0 until items.length()) {
-                    val member = items.optJSONObject(i) ?: continue
-                    if (member.optString("role") == "owner") {
-                        return member.optString("storeName")
-                    }
-                }
-            }
-            return ""
         }
     }
 
@@ -204,14 +147,6 @@ class OwnerQrApi(private val baseUrl: String, private val accessToken: String) {
             return JSONObject(response.body!!.string())
         }
     }
-}
-
-/** Adapta el OwnerOidcClient concreto al contrato [OwnerAuth] sin tocar su archivo. */
-internal class OwnerOidcAuthAdapter(private val delegate: OwnerOidcClient) : OwnerAuth {
-    override fun beginSignIn(): Intent = delegate.beginSignIn()
-    override suspend fun completeSignIn(callback: Uri): String = delegate.completeSignIn(callback)
-    override fun accessToken(): String? = delegate.accessToken()
-    override fun clearAccessToken() = delegate.clearAccessToken()
 }
 
 /** Clave RSA por dispositivo en Android Keystore (firma PKCS#1 v1.5 / SHA-256). */
@@ -236,7 +171,7 @@ object OwnerDeviceKey {
     }
 }
 
-private fun ownerDeviceId(context: Context): String {
+internal fun ownerDeviceId(context: Context): String {
     val prefs = context.getSharedPreferences("abarpay_owner_device", Context.MODE_PRIVATE)
     prefs.getString("id", null)?.let { return it }
     val id = UUID.randomUUID().toString()
@@ -244,49 +179,13 @@ private fun ownerDeviceId(context: Context): String {
     return id
 }
 
-internal suspend fun resolveOwnerToken(ownerAuth: OwnerAuth): String {
-    OwnerAuthSeam.tokenProvider?.let { provider -> return provider() }
-    ownerAuth.accessToken()?.let { return it }
-    throw IllegalStateException("Inicia sesión primero")
-}
-
-internal data class OwnerApproval(
-    val token: String,
-    val deviceId: String,
-    val keyPair: KeyPair,
-    val api: OwnerQrApi,
-)
-
-internal suspend fun prepareOwnerApproval(
+internal suspend fun approveOwnerChallenge(
     context: Context,
-    ownerAuth: OwnerAuth,
-    apiBaseUrl: String,
-): OwnerApproval {
-    val token = resolveOwnerToken(ownerAuth)
-    val keyPair = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        OwnerDeviceKey.getOrCreate()
-    }
-    val deviceId = ownerDeviceId(context)
-    val api = OwnerQrApi(apiBaseUrl, token)
-    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        api.registerDevice(deviceId, OwnerQrCrypto.publicKeyPem(keyPair.public), "Abarpay")
-    }
-    return OwnerApproval(token = token, deviceId = deviceId, keyPair = keyPair, api = api)
-}
-
-internal suspend fun approveOwnerChallenge(prepared: OwnerApproval, raw: String): String {
-    val challenge = OwnerQrParser.parse(raw)
-    val tenants = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        prepared.api.ownerTenantIds()
-    }
-    require(tenants.isNotEmpty()) { "Solo el dueño puede abrir la consola" }
-    val chosen = tenants.first()
-    val payload = OwnerQrCrypto.challengePayload(challenge, chosen)
-    val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        OwnerQrCrypto.sign(prepared.keyPair.private, payload)
-    }
-    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        prepared.api.approve(challenge.id, prepared.deviceId, signature, challenge.code, chosen)
-    }
-    return challenge.id
+    api: OwnerQrApi,
+    challenge: OwnerChallenge,
+    tenantId: String,
+) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    val payload = OwnerQrCrypto.challengePayload(challenge, tenantId)
+    val signature = OwnerQrCrypto.sign(OwnerDeviceKey.getOrCreate().private, payload)
+    api.approve(challenge.id, ownerDeviceId(context), signature, challenge.code, tenantId)
 }

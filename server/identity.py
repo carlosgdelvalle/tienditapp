@@ -879,11 +879,16 @@ class IdentityService:
 
         user_id = challenge.approver_user_id
         tenant_id = challenge.selected_tenant_id
+        device_id = challenge.approver_device_id
         if not user_id or not tenant_id:
             raise ForbiddenError("El reto no seleccionó una tienda")
+        if not device_id or self._store.get_device(user_id, device_id) is None:
+            raise ForbiddenError("Este dispositivo ya no está vinculado")
         membership = self._store.get_membership(user_id, tenant_id)
         if membership is None or not membership.active:
             raise ForbiddenError("La membresía ya no está activa")
+        if challenge.intent == "browser_login" and membership.role != "owner":
+            raise ForbiddenError("Solo el dueño puede abrir la consola")
 
         return self._issue_session(user_id, tenant_id)
 

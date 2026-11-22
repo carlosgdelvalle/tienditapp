@@ -1,256 +1,278 @@
 package mx.abarpay.mobile
 
-import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-/**
- * Pantalla del dueño para aprobar el ingreso por QR a la consola (J-11).
- * El primer "Entrar" lanza el navegador con OwnerAuth.beginSignIn() si no hay
- * token; cuando el retorno OIDC incrementa [authRevision] se retoman las
- * membresías y se sigue al alta o al escáner. Si el navegador vuelve sin
- * retorno se limpia el estado para reintentar. Toda llamada de red corre en
- * Dispatchers.IO.
- */
 @Composable
-fun OwnerQrApprovalScreen(
-    ownerAuth: OwnerAuth,
-    apiBaseUrl: String,
-    authRevision: Int,
-    authError: String?,
-    onApproved: (String) -> Unit,
-    onClose: () -> Unit,
-) {
+fun OwnerQrApprovalScreen(ownerAuth: OwnerAuth, apiBaseUrl: String, onClose: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var busy by remember { mutableStateOf(false) }
+    var step by rememberSaveable { mutableStateOf("ready") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var challengeId by rememberSaveable { mutableStateOf("") }
+    var resendAt by rememberSaveable { mutableStateOf(0L) }
+    var signupName by rememberSaveable { mutableStateOf("") }
+    var signupStore by rememberSaveable { mutableStateOf("") }
+    var rawQr by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var resendSeconds by remember { mutableStateOf(0) }
     var error by remember { mutableStateOf("") }
-    var step by remember { mutableStateOf("ready") }
+    var working by remember { mutableStateOf("") }
+    var stores by remember { mutableStateOf(emptyList<OwnerStore>()) }
+    var selectedId by rememberSaveable { mutableStateOf("") }
 
-    var signupName by remember { mutableStateOf("") }
-    var signupStore by remember { mutableStateOf("") }
-
-    var pendingCode by remember { mutableStateOf("") }
-    var pendingStore by remember { mutableStateOf("") }
-    var pendingRaw by remember { mutableStateOf("") }
-    var waitingOidc by remember { mutableStateOf(false) }
-    var oidcRevisionAtClick by remember { mutableStateOf(0) }
-
-    suspend fun proceed() {
-        busy = true
-        runCatching {
-            val token = resolveOwnerToken(ownerAuth)
-            val api = OwnerQrApi(apiBaseUrl, token)
-            val tenants = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                api.ownerTenantIds()
-            }
-            if (tenants.isEmpty()) step = "signup" else step = "scanning"
-        }.onFailure { error = it.message ?: "No se pudo iniciar sesión" }
-        busy = false
+    suspend fun ownerApi(): OwnerQrApi {
+        val token = ownerAuth.accessToken()
+            ?: throw IllegalStateException("Vuelve a entrar con tu celular.")
+        return OwnerQrApi(apiBaseUrl, token)
     }
 
-    LaunchedEffect(authRevision) {
-        if (authRevision > 0) {
-            waitingOidc = false
-            if (authError != null) {
-                error = authError
-                busy = false
-            } else {
-                proceed()
+    suspend fun openStore() {
+        val token = ownerAuth.accessToken()
+        if (token == null) {
+            step = "phone"
+            return
+        }
+        stores = withContext(Dispatchers.IO) { OwnerQrApi(apiBaseUrl, token).ownerStores() }
+        step = if (stores.isEmpty()) "signup" else "scanReady"
+    }
+
+    fun runAction(message: String, action: suspend () -> Unit) {
+        if (working.isNotEmpty()) return
+        error = ""
+        working = message
+        scope.launch {
+            try {
+                action()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: ApiFailure) {
+                error = failure.message.orEmpty()
+            } catch (_: Exception) {
+                error = "No se pudo completar. Revisa tu conexión e intenta de nuevo."
+            } finally {
+                working = ""
             }
         }
     }
 
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && waitingOidc && authRevision == oidcRevisionAtClick) {
-                waitingOidc = false
-                busy = false
-                error = "No se completó el inicio de sesión. Intenta de nuevo."
+    fun sendCode() = runAction("Enviando SMS…") {
+        challengeId = ownerAuth.startEnrollment(phone)
+        code = ""
+        resendAt = android.os.SystemClock.elapsedRealtime() + 30_000
+        step = "code"
+    }
+
+    fun goBack() {
+        if (working.isNotEmpty()) return
+        error = ""
+        when (step) {
+            "code" -> { code = ""; step = "phone" }
+            "confirm", "scanning" -> { rawQr = ""; step = "scanReady" }
+            else -> onClose()
+        }
+    }
+
+    LaunchedEffect(resendAt) {
+        do {
+            resendSeconds = ((resendAt - android.os.SystemClock.elapsedRealtime() + 999) / 1000)
+                .toInt().coerceAtLeast(0)
+            if (resendSeconds > 0) delay(500)
+        } while (resendSeconds > 0)
+    }
+
+    // An activity recreation can restore the confirmation but not the cached membership.
+    LaunchedEffect(step) {
+        if (step == "confirm" && stores.isEmpty()) {
+            runAction("Cargando tu tienda…") {
+                val api = ownerApi()
+                stores = withContext(Dispatchers.IO) { api.ownerStores() }
             }
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     if (step == "scanning") {
         ContinuousScannerScreen(
             onResult = { raw ->
-                runCatching { OwnerQrParser.parse(raw) }.onSuccess { challenge ->
-                    scope.launch {
-                        busy = true
-                        runCatching {
-                            val token = resolveOwnerToken(ownerAuth)
-                            val api = OwnerQrApi(apiBaseUrl, token)
-                            val store = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                api.ownerStoreName()
-                            }
-                            pendingCode = challenge.code
-                            pendingStore = store
-                            pendingRaw = raw
-                            step = "confirm"
-                        }.onFailure {
-                            error = it.message ?: "No se pudo leer la tienda"
-                            step = "ready"
-                        }
-                        busy = false
-                    }
-                }.onFailure {
-                    error = it.message ?: "El código no es un reto de Abarpay"
-                    step = "ready"
+                val qr = runCatching { OwnerQrParser.parse(raw) }.getOrNull()
+                if (qr == null || qr.intent != "browser_login") {
+                    step = "scanReady"
+                    error = "Escanea el código de acceso de la consola de Abarpay."
+                } else {
+                    rawQr = raw
+                    selectedId = stores.singleOrNull()?.tenantId.orEmpty()
+                    step = "confirm"
                 }
             },
-            onClose = { step = "ready" },
+            onClose = { step = "scanReady" },
         )
         return
     }
 
+    BackHandler(onBack = ::goBack)
+    val idle = working.isEmpty()
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when (step) {
-            "signup" -> {
-                Text("Configura tu tienda", style = MaterialTheme.typography.titleLarge)
+            "phone" -> {
+                Text("¿Cuál es tu número de celular?", style = MaterialTheme.typography.headlineSmall)
+                Text("Te enviaremos un código por SMS para vincular este celular.")
                 OutlinedTextField(
-                    value = signupName,
-                    onValueChange = { signupName = it },
-                    label = { Text("Tu nombre (dueño)") },
+                    value = phone,
+                    onValueChange = { phone = it.filter { c -> c in '0'..'9' }.take(10) },
+                    label = { Text("Número de celular") },
+                    prefix = { Text("+52 ") },
+                    singleLine = true,
+                    enabled = idle,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth().testTag("owner-phone"),
+                )
+                Button(onClick = ::sendCode, enabled = idle && phone.length == 10,
+                    modifier = Modifier.fillMaxWidth().testTag("owner-send-code")) { Text("Enviar código") }
+            }
+            "code" -> {
+                Text("Escribe el código del SMS", style = MaterialTheme.typography.headlineSmall)
+                Text("Lo enviamos a +52 $phone. Puedes salir a revisar tus mensajes y volver aquí.")
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it.filter { c -> c in '0'..'9' }.take(6) },
+                    label = { Text("Código de 6 dígitos") },
+                    singleLine = true,
+                    enabled = idle,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth().testTag("owner-code"),
+                )
+                Button(
+                    onClick = {
+                        runAction("Verificando tu celular…") {
+                            ownerAuth.verifyEnrollment(challengeId, code)
+                            code = ""
+                            openStore()
+                        }
+                    },
+                    enabled = idle && code.length == 6,
+                    modifier = Modifier.fillMaxWidth().testTag("owner-verify"),
+                ) { Text("Verificar mi celular") }
+                TextButton(onClick = ::sendCode, enabled = idle && resendSeconds == 0) {
+                    Text(if (resendSeconds > 0) "Puedes reenviar en ${resendSeconds} s" else "Reenviar código")
+                }
+            }
+            "signup" -> {
+                Text("Configura tu tienda", style = MaterialTheme.typography.headlineSmall)
+                OutlinedTextField(
+                    value = signupName, onValueChange = { signupName = it },
+                    label = { Text("Tu nombre") }, singleLine = true, enabled = idle,
                     modifier = Modifier.fillMaxWidth().testTag("owner-signup-name"),
                 )
                 OutlinedTextField(
-                    value = signupStore,
-                    onValueChange = { signupStore = it },
-                    label = { Text("Tu negocio") },
+                    value = signupStore, onValueChange = { signupStore = it },
+                    label = { Text("Nombre de tu negocio") }, singleLine = true, enabled = idle,
                     modifier = Modifier.fillMaxWidth().testTag("owner-signup-store"),
                 )
                 Button(
                     onClick = {
-                        scope.launch {
-                            busy = true
-                            runCatching {
-                                val token = resolveOwnerToken(ownerAuth)
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    OwnerQrApi(apiBaseUrl, token).signup(signupName.trim(), signupStore.trim())
-                                }
-                            }.onSuccess {
-                                error = ""
-                                step = "ready"
-                            }.onFailure { error = it.message ?: "No se pudo crear la tienda" }
-                            busy = false
+                        runAction("Creando tu tienda…") {
+                            val api = ownerApi()
+                            withContext(Dispatchers.IO) { api.signup(signupName.trim(), signupStore.trim()) }
+                            openStore()
                         }
                     },
-                    enabled = !busy && signupName.isNotBlank() && signupStore.isNotBlank(),
-                    modifier = Modifier.testTag("owner-signup-submit"),
-                ) {
-                    Text("Empezar")
-                }
+                    enabled = idle && signupName.isNotBlank() && signupStore.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().testTag("owner-signup-submit"),
+                ) { Text("Crear mi tienda") }
             }
-
+            "scanReady" -> {
+                Text("Abre la consola", style = MaterialTheme.typography.headlineSmall)
+                Text("Abre Abarpay en tu computadora y escanea el código que aparece ahí.")
+                Button(onClick = { error = ""; step = "scanning" },
+                    modifier = Modifier.fillMaxWidth().testTag("owner-scan")) { Text("Escanear código QR") }
+            }
             "confirm" -> {
-                Text("Verifica este código", style = MaterialTheme.typography.titleLarge)
-                Text(pendingCode, style = MaterialTheme.typography.displayMedium)
-                if (pendingStore.isNotBlank()) {
-                    Text(pendingStore)
+                val qr = remember(rawQr) { OwnerQrParser.parse(rawQr) }
+                Text("¿Es el mismo código que ves en tu computadora?", style = MaterialTheme.typography.headlineSmall)
+                Text(qr.code, style = MaterialTheme.typography.displayMedium)
+                if (stores.size > 1) {
+                    Text("Elige la tienda que quieres abrir.")
+                    stores.forEach { store ->
+                        OutlinedButton(onClick = { selectedId = store.tenantId }, enabled = idle) {
+                            Text(if (store.tenantId == selectedId) "Elegida: ${store.name}" else store.name)
+                        }
+                    }
                 }
-                Spacer(Modifier.height(16.dp))
+                val selected = stores.singleOrNull() ?: stores.find { it.tenantId == selectedId }
+                if (selected != null) Text("Tienda: ${selected.name}")
                 Button(
                     onClick = {
-                        scope.launch {
-                            busy = true
-                            runCatching {
-                                val prepared = prepareOwnerApproval(context, ownerAuth, apiBaseUrl)
-                                approveOwnerChallenge(prepared, pendingRaw)
-                            }.onSuccess { onApproved(it) }.onFailure {
-                                error = it.message ?: "No se pudo aprobar el reto"
-                                step = "ready"
+                        runAction("Aprobando el acceso…") {
+                            if (selected != null) {
+                                approveOwnerChallenge(context, ownerApi(), qr, selected.tenantId)
+                                rawQr = ""
+                                step = "done"
                             }
-                            busy = false
                         }
                     },
-                    enabled = !busy,
+                    enabled = idle && selected != null,
                     modifier = Modifier.fillMaxWidth().testTag("owner-approve"),
-                ) {
-                    Text("Aprobar acceso")
-                }
-                OutlinedButton(
-                    onClick = { step = "ready" },
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().testTag("owner-cancel"),
-                ) {
-                    Text("Cancelar")
-                }
+                ) { Text("Sí, abrir la consola") }
             }
-
             "done" -> {
-                Text("Acceso aprobado", style = MaterialTheme.typography.titleLarge)
-                Button(onClick = onClose, modifier = Modifier.testTag("owner-done-close")) {
-                    Text("Cerrar")
-                }
+                Text("Acceso aprobado", style = MaterialTheme.typography.headlineSmall)
+                Text("Continúa en tu computadora.")
             }
-
             else -> {
-                Text("Entra a tu tienda", style = MaterialTheme.typography.titleLarge)
-                if (error.isNotBlank()) {
-                    Text(error, color = MaterialTheme.colorScheme.error)
-                }
-                Button(
-                    onClick = {
-                        if (OwnerAuthSeam.tokenProvider != null || ownerAuth.accessToken() != null) {
-                            scope.launch { proceed() }
-                        } else {
-                            busy = true
-                            oidcRevisionAtClick = authRevision
-                            waitingOidc = true
-                            runCatching {
-                                val intent = ownerAuth.beginSignIn().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            }.onFailure {
-                                waitingOidc = false
-                                busy = false
-                                error = it.message ?: "No se pudo abrir el inicio de sesión"
-                            }
-                        }
-                    },
-                    enabled = !busy && apiBaseUrl.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth().testTag("owner-start"),
-                ) {
-                    Text("Entrar a mi tienda")
-                }
-                if (busy) {
-                    LinearProgressIndicator()
-                }
+                Text("Entra a tu tienda", style = MaterialTheme.typography.headlineSmall)
+                Button(onClick = { runAction("Abriendo tu tienda…") { openStore() } }, enabled = idle,
+                    modifier = Modifier.fillMaxWidth().testTag("owner-start")) { Text("Entrar a mi tienda") }
             }
+        }
+
+        if (!idle) {
+            Text(working)
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+        OutlinedButton(onClick = ::goBack, enabled = idle, modifier = Modifier.fillMaxWidth()) {
+            Text(when (step) {
+                "code" -> "Cambiar número"
+                "confirm" -> "Cancelar"
+                "done" -> "Cerrar"
+                else -> "Volver"
+            })
         }
     }
 }

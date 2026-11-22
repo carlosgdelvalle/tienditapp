@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request,
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from .auth import AuthConfig, TokenValidationError, TokenValidator
+from .auth import AuthConfig, TokenValidationError, TokenValidator, ValidatedToken
 from .identity import (
     CHALLENGE_COOKIE_NAME,
     CSRF_HEADER_NAME,
@@ -33,6 +33,7 @@ from .identity import (
     SessionRecord,
     User,
 )
+from .owner_phone import MobileIdentity, TOKEN_PREFIX
 
 INVITE_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://abarpay-api.onrender.com")
 
@@ -45,7 +46,11 @@ INVITE_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://abarpay-api.onrender.com
 @dataclass(frozen=True)
 class IdentityContext:
     user: User
-    token: Any  # ValidatedToken
+    token: ValidatedToken | MobileIdentity
+
+    def require_external_identity(self) -> None:
+        if isinstance(self.token, MobileIdentity):
+            raise HTTPException(403, "Abre la consola con el código QR.")
 
 
 @dataclass(frozen=True)
@@ -126,11 +131,18 @@ def require_identity(
     service: IdentityService = Depends(_service),
     validator: TokenValidator | None = Depends(_validator),
 ) -> IdentityContext:
-    if validator is None:
-        raise HTTPException(status_code=501, detail="Identidad no configurada")
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Token de acceso requerido")
     token = authorization.split(" ", 1)[1].strip()
+    if token.startswith(TOKEN_PREFIX):
+        phone = getattr(request.app.state, "owner_phone", None)
+        identity = phone.identity(token) if phone else None
+        user = service.get_user(identity.user_id) if identity else None
+        if not user or user.idp != "phone":
+            raise HTTPException(401, "Sesión inválida o vencida")
+        return IdentityContext(user=user, token=identity)
+    if validator is None:
+        raise HTTPException(status_code=501, detail="Identidad no configurada")
     try:
         validated = validator.validate_access_token(token)
     except TokenValidationError as exc:
@@ -248,6 +260,7 @@ def device_register(
     ctx: IdentityContext = Depends(require_identity),
     service: IdentityService = Depends(_service),
 ):
+    ctx.require_external_identity()
     try:
         device = service.register_device(
             ctx.user.id, body.deviceId, body.publicKey, body.label or ""
@@ -310,6 +323,8 @@ def approve_challenge(
 ):
     try:
         device_id = body.deviceId
+        if isinstance(ctx.token, MobileIdentity) and device_id != ctx.token.device_id:
+            raise IdentityError("Este dispositivo no está vinculado", status_code=403)
         if device_id is None:
             devices = service.list_devices(ctx.user.id)
             if len(devices) != 1:
@@ -369,6 +384,7 @@ def revoke_device(
     ctx: IdentityContext = Depends(require_identity),
     service: IdentityService = Depends(_service),
 ):
+    ctx.require_external_identity()
     try:
         service.revoke_device(ctx.user.id, device_id)
     except IdentityError as exc:
@@ -393,6 +409,7 @@ def session_store(
     service: IdentityService = Depends(_service),
     config: AuthConfig = Depends(_config),
 ):
+    ctx.require_external_identity()
     try:
         old_token = request.cookies.get(SESSION_COOKIE_NAME)
         session = service.create_session(
@@ -485,6 +502,7 @@ def accept_invite(
     ctx: IdentityContext = Depends(require_identity),
     service: IdentityService = Depends(_service),
 ):
+    ctx.require_external_identity()
     try:
         membership, tenant = service.accept_invite(token, ctx.user.id)
     except IdentityError as exc:

@@ -1,10 +1,9 @@
 package mx.abarpay.mobile
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -22,30 +21,24 @@ class OwnerQrApprovalScreenTest {
     val compose = createComposeRule()
 
     @Test
-    fun firstRunCtaReachesOidc() {
-        var beginSignInCalls = 0
+    fun firstRunShowsPhoneAndThenSmsCode() {
+        var sentTo: String? = null
         val fakeAuth = object : OwnerAuth {
-            override fun beginSignIn(): Intent {
-                beginSignInCalls += 1
-                return Intent(Intent.ACTION_VIEW)
+            override suspend fun accessToken(): String? = null
+            override suspend fun startEnrollment(phone: String): String {
+                sentTo = phone
+                return "synthetic-challenge"
             }
-            override suspend fun completeSignIn(callback: Uri): String = "synthetic-token"
-            override fun accessToken(): String? = null
-            override fun clearAccessToken() {}
+            override suspend fun verifyEnrollment(challengeId: String, code: String) = Unit
         }
-
         compose.setContent {
-            OwnerQrApprovalScreen(
-                ownerAuth = fakeAuth,
-                apiBaseUrl = "https://owner.example.test",
-                authRevision = 0,
-                authError = null,
-                onApproved = {},
-                onClose = {},
-            )
+            OwnerQrApprovalScreen(fakeAuth, "https://owner.example.test", onClose = {})
         }
 
         compose.onNodeWithTag("owner-start").performClick()
-        assertEquals(1, beginSignInCalls)
+        compose.onNodeWithTag("owner-phone").performTextInput("5512345678")
+        compose.onNodeWithTag("owner-send-code").performClick()
+        compose.onNodeWithTag("owner-code").assertExists()
+        assertEquals("5512345678", sentTo)
     }
 }

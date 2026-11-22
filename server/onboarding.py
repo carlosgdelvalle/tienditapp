@@ -439,8 +439,10 @@ class OnboardingService:
         email = (email or "").strip()
         owner_name = (owner_name or "").strip()
         store_name = (store_name or "").strip()
-        if not email:
+        if not email and idp != "phone":
             raise OnboardingError("El correo es obligatorio")
+        if idp == "phone" and not external_sub:
+            raise OnboardingError("Primero vincula tu celular")
         if not owner_name:
             raise OnboardingError("El nombre del dueño es obligatorio")
         if not store_name:
@@ -660,12 +662,18 @@ class PostgresOnboardingStore(OnboardingStore):
     ) -> SignupResult:
         with self._conn() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    "SELECT tenant_id, store_id, user_id "
-                    "FROM public.signup_tenant(%s, %s, %s, %s, %s, %s, %s, %s)",
-                    (idp, external_sub, email, owner_name, slug, tenant_name,
-                     store_name, timezone),
-                )
+                if idp == "phone":
+                    cur.execute(
+                        "SELECT * FROM public.signup_phone_tenant(%s, %s, %s, %s, %s)",
+                        (external_sub, owner_name, slug, store_name, timezone),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT tenant_id, store_id, user_id "
+                        "FROM public.signup_tenant(%s, %s, %s, %s, %s, %s, %s, %s)",
+                        (idp, external_sub, email, owner_name, slug, tenant_name,
+                         store_name, timezone),
+                    )
                 row = cur.fetchone()
             conn.commit()
         if row is None:

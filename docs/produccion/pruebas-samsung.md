@@ -14,24 +14,22 @@ adb -d reverse --no-rebind tcp:8011 tcp:8011
 
 The phone launcher calls the app **Abarpay QA** and its package is `mx.abarpay.mobile.qa`. Use port 8010 for the SQLite cash fixture and port 8011 for the PostgreSQL owner API. Both services listen on Mac loopback. Android reaches them over USB using the same `127.0.0.1` addresses. The QA package has its own app data and Android Keystore.
 
-## Live Auth0 and owner QR
+## Owner phone sign-in and QR
 
-- Use an Auth0 **Native** application with token-endpoint authentication set to **None** and allowed callback `mx.abarpay.mobile.qa://oidc/callback`. The Auth0 **Domain** and Native app **Client ID** identify the sign-in service and app. The Auth0 API **Identifier** is the access-token audience. These are public configuration values.
-- Issue an RS256 API access token with the signed email claim `https://abarpay.app/email`. An Auth0 Post Login Action can add the claim from the test identity. If the Auth0 configuration uses a different namespaced claim, set `AUTH0_EMAIL_CLAIM` on the backend. The corresponding optional name claim is `https://abarpay.app/name`.
-- Apply PostgreSQL migrations 001–003 to the isolated lab database as a separate setup step. Grant `abarpay_app` to a restricted login used by the API. Start the owner service with `ABARPAY_RUNTIME=production`, `MODO_DEMO=false`, `ABARPAY_PG_DSN`, `AUTH0_DOMAIN` and `AUTH0_AUDIENCE`. Use `SECURE_COOKIES=false` for this loopback HTTP browser test. Start it with `python -m uvicorn server.runtime:create_production_app --factory --host 127.0.0.1 --port 8011`.
+1. Apply migrations 001–004 to the isolated PostgreSQL lab as the migrator. Grant `abarpay_app` to a restricted login for the API. Run `server.runtime:create_production_app` on Mac loopback port 8011 with `ABARPAY_RUNTIME=production`, `MODO_DEMO=false`, and `ABARPAY_PG_DSN`. For this HTTP lab only, set `SECURE_COOKIES=false`. Inject a `PhoneSettings` sender that captures generated codes in a private, in-memory test inbox. Use a synthetic Mexican number and enter the code on the Samsung. Keep the inbox out of HTTP routes, logs and source control.
+2. Configure the QA APK with the loopback owner API and install it over the existing QA package.
 
-Rebuild and install the same QA package with the public settings available to Gradle:
+   ```bash
+   cd android
+   ./gradlew -PABARPAY_DEVICE_TEST=true -POWNER_API_BASE_URL=http://127.0.0.1:8011 assembleDebug
+   adb -d install -r app/build/outputs/apk/debug/app-debug.apk
+   ```
 
-```bash
-OWNER_API_BASE_URL=http://127.0.0.1:8011 \
-  ./gradlew -PABARPAY_DEVICE_TEST=true \
-  -PAUTH0_DOMAIN="$AUTH0_DOMAIN" \
-  -PAUTH0_CLIENT_ID="$AUTH0_CLIENT_ID" \
-  -PAUTH0_AUDIENCE="$AUTH0_AUDIENCE" assembleDebug
-adb -d install -r app/build/outputs/apk/debug/app-debug.apk
-```
+3. Open **Consola → Entrar a mi tienda**, enter the number and test SMS code, and create a synthetic store. Close and reopen the app. Confirm it reaches **Escanear código QR** without another message.
+4. On the Mac, open `http://127.0.0.1:8011/console`, select **Mostrar código QR**, and scan it with the Samsung. Compare the code and store before selecting **Sí, abrir la consola**. Check that the same browser opens the correct store. A separate browser and a repeated exchange must be refused.
+5. Add a product priced at MXN 18.00 in the console. Record a cash sale with MXN 20.00 received. Match the receipt reference, MXN 2.00 change and the single sale against PostgreSQL.
 
-On the Samsung open **Consola → Entrar a mi tienda**. Carlos signs in with the authorized test identity in the phone browser and creates a test store. On the Mac, open `http://127.0.0.1:8011/console`, start a QR challenge, and scan it from the QA app. Check that the store and matching code appear before **Aprobar acceso**. Verify the initiating browser opens the correct store and that a second browser cannot consume the approval. Add a product priced at MXN 18.00, record a cash sale with MXN 20.00 received and compare the visible folio and MXN 2.00 change against the ledger. Record approval and receipt results without capturing the QR or login callback.
+Label the SMS and store fixtures **SIMULADO** in the test record. Record physical camera approval and real carrier delivery separately. Repeat the message check with an authorized Mexican SIM and an approved transport before the pilot.
 
 ## Offline cash on the physical phone
 

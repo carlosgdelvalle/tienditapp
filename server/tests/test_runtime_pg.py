@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import getpass
+import secrets
 import shutil
 import socket
 import subprocess
@@ -157,7 +158,7 @@ def _apply_migrations(dsn: str) -> None:
     conn = psycopg.connect(dsn, autocommit=True)
     try:
         with conn.cursor() as cur:
-            for name in ("001_schema.sql", "002_seed.sql", "003_onboarding.sql"):
+            for name in ("001_schema.sql", "002_seed.sql", "003_onboarding.sql", "004_owner_phone.sql"):
                 cur.execute((REPO_ROOT / "migrations" / name).read_text(encoding="utf-8"))
     finally:
         conn.close()
@@ -642,3 +643,104 @@ def test_owner_journey_two_tenants(migrated_dsn):
         assert resp.status_code == 404
     finally:
         app.state.pool.close()
+
+
+def test_owner_phone_enrollment_and_qr_without_oidc(migrated_dsn, pg_cluster):
+    import psycopg
+    from phonenumbers import PhoneNumberType, example_number_for_type
+
+    from server.owner_phone import PhoneSettings
+
+    inbox = []
+    app = create_production_app(
+        env={**_prod_env(migrated_dsn), "SECURE_COOKIES": "false"},
+        phone_settings=PhoneSettings(secrets.token_bytes(32), lambda number, code: inbox.append((number, code))),
+    )
+    prefix = "/api/auth/owner/"
+    phone = str(example_number_for_type("MX", PhoneNumberType.MOBILE).national_number)
+    key, pub = _make_device_key()
+    device = str(uuid.uuid4())
+
+    def send(client, target, public_key):
+        return client.post(
+            prefix + "phone/start",
+            json={"phone": phone, "deviceId": target, "publicKey": public_key},
+        )
+
+    with TestClient(app) as client, TestClient(app) as other:
+        started = send(client, device, pub)
+        assert started.status_code == 200
+        assert inbox[0][0] == "+52" + phone
+        assert set(started.json()) == {"challengeId", "retryAfterSeconds"}
+        challenge = started.json()["challengeId"]
+        otp_body = {
+            "challengeId": challenge,
+            "signature": sign_device(key, f"abarpay-owner-enroll:{challenge}"),
+            "code": inbox[0][1],
+        }
+        assert send(client, device, pub).status_code == 429
+        malformed = client.post(prefix + "phone/verify", json={**otp_body, "code": "entrada inválida"})
+        assert malformed.status_code == 422
+        assert "entrada inválida" not in malformed.text
+        wrong_code = "000000" if otp_body["code"] != "000000" else "000001"
+        assert client.post(prefix + "phone/verify", json={**otp_body, "code": wrong_code}).status_code == 401
+        assert client.post(prefix + "phone/verify", json={**otp_body, "signature": "invalid"}).status_code == 401
+        verified = client.post(prefix + "phone/verify", json=otp_body)
+        assert verified.status_code == 200
+        assert verified.headers["Cache-Control"] == "no-store"
+        assert client.post(prefix + "phone/verify", json=otp_body).status_code == 401
+        auth = {"Authorization": "Bearer " + verified.json()["accessToken"]}
+
+        signup = {"name": "Dueña de prueba", "storeName": "Tienda simulada"}
+        first = client.post("/api/signup", headers=auth, json=signup)
+        assert first.status_code == 200
+        tenant = first.json()["tenant"]
+        assert first.json()["user"]["email"] == ""
+        assert client.post("/api/signup", headers=auth, json=signup).json()["tenant"] == tenant
+        assert client.post("/api/session/store", headers=auth, json={"tenantId": tenant["id"]}).status_code == 403
+        assert client.post(
+            "/api/auth/device/register", headers=auth, json={"deviceId": device, "publicKey": pub}
+        ).status_code == 403
+
+        challenge = client.post(prefix + "device/start", json={"deviceId": device}).json()["challengeId"]
+        proof = {"challengeId": challenge, "signature": sign_device(key, f"abarpay-owner-signin:{challenge}")}
+        reentry = client.post(prefix + "device/verify", json=proof)
+        assert reentry.status_code == 200
+        assert len(inbox) == 1
+        assert client.post(prefix + "device/verify", json=proof).status_code == 401
+        auth = {"Authorization": "Bearer " + reentry.json()["accessToken"]}
+
+        # Simulate the cooldown without sleeping or changing the challenge TTL.
+        with psycopg.connect(pg_cluster["superuser_dsn"]) as conn:
+            conn.execute("UPDATE owner_auth.challenges SET created_at = created_at - interval '31 seconds'")
+        other_key, other_pub = _make_device_key()
+        other_device = str(uuid.uuid4())
+        other_begin = send(other, other_device, other_pub)
+        assert other_begin.status_code == 200
+        other_challenge = other_begin.json()["challengeId"]
+        assert other.post(prefix + "phone/verify", json={
+            "challengeId": other_challenge,
+            "signature": sign_device(other_key, f"abarpay-owner-enroll:{other_challenge}"),
+            "code": inbox[1][1],
+        }).status_code == 409
+
+        created = client.post("/api/auth/challenge", json={"intent": "browser_login"})
+        qr = parse_qr(created.json()["qr"])
+        approved_path = f"/api/auth/challenge/{qr['id']}/approve"
+        exchange_path = f"/api/auth/challenge/{qr['id']}/exchange"
+        payload = NL.join([qr["id"], qr["nonce"], str(qr["exp"]), qr["intent"], tenant["id"]])
+        approval = {
+            "deviceId": device,
+            "tenantId": tenant["id"],
+            "code": qr["code"],
+            "deviceSignature": sign_device(key, payload),
+        }
+        assert client.post(approved_path, headers=auth, json=approval).status_code == 200
+        assert other.post(exchange_path).status_code == 403
+        exchanged = client.post(exchange_path)
+        assert exchanged.status_code == 200
+        assert exchanged.json()["tenant"]["id"] == tenant["id"]
+        assert client.get("/api/tenant").json()["id"] == tenant["id"]
+        cookie = cookie_value(created, CHALLENGE_COOKIE_NAME)
+        client.cookies.set(CHALLENGE_COOKIE_NAME, cookie)
+        assert client.post(exchange_path).status_code == 409

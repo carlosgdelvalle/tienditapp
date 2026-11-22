@@ -1,10 +1,10 @@
-# 04 · Identity, onboarding, and pey (OIDC, devices, and bank account)
+# 04 · Identity, onboarding, and pey
 
 Status: handoff package for the DSH team. Written 21-nov-2026. Implementation instructions for production. It does not modify the current demo code.
 
 ## Purpose
 
-Replace the simulated access (`X-Employee-Id` and console PIN) with real identity via OpenID Connect, link devices with QR approval, and register the business CLABE bank account with pey to route CoDi charges per tenant. Tenancy and isolation are defined in `02-contratos-y-tenencia.md`.
+Replace the simulated access (`X-Employee-Id` and console PIN) with verified Abarpay owner accounts, link devices with QR approval, and register the business CLABE bank account with pey to route CoDi charges per tenant. Tenancy and isolation are defined in `02-contratos-y-tenencia.md`.
 
 ## Inherited context
 
@@ -13,11 +13,12 @@ Replace the simulated access (`X-Employee-Id` and console PIN) with real identit
 
 ## Identity providers
 
-### Auth0 (business owners and employees)
+### Abarpay phone sign-in (merchant owners)
 
-- Auth0 covers the business owners and employees. The Android app uses the Authorization Code Flow with PKCE, the recommended flow for native apps.
-- Discovery at `https://{tenant}.auth0.com/.well-known/openid-configuration`.
-- The access token's `sub` is stored in `users.external_sub` with `idp='auth0'`.
+- The Android owner enters a Mexican phone number and an SMS code to pair a key held in Android Keystore. Abarpay issues and verifies the code and owns the account and sessions. The SMS gateway delivers the message.
+- A paired phone signs a fresh server challenge to sign back in without another SMS. The mobile session is short-lived and bound to the enrolled device. Its opaque token can create the first store, list owner memberships, and approve a browser QR.
+- Store ownership is attached to a stable user UUID. A code received on a different phone cannot replace a paired key. See the [owner phone decision](../decisiones/0006-acceso-dueno-celular.md) for the recovery and carrier checks before enrolling merchants.
+- Employee migration is separate. Phone enrollment in this slice is for owners.
 
 ### Microsoft Entra ID (SaaS staff)
 
@@ -26,34 +27,35 @@ Replace the simulated access (`X-Employee-Id` and console PIN) with real identit
 - Discovery at `/.well-known/openid-configuration` and keys at `/discovery/v2.0/keys`.
 - `oid` plus `tid` form `external_sub` with `idp='entra'`.
 
-Boundary rule: signing in to the Entra staff realm never grants a business membership. SaaS staff operate the SaaS console, not the stores, and any exceptional support operation uses auditable internal permissions with temporary scope. An operator who is also a merchant takes on that role with their independent Auth0 identity.
+Boundary rule: signing in to the Entra staff realm never grants a business membership. SaaS staff operate the SaaS console, not the stores, and any exceptional support operation uses auditable internal permissions with temporary scope. An operator who is also a merchant takes on that role with their independent Abarpay merchant account.
 
-## Access token validation (backend as resource server)
+## Staff access token validation
 
 - The API validates the access token, not the ID token. The access token carries `aud` equal to our API's audience.
 - `iss`, `aud`, `exp`, `nbf` (when present), and the RS256 signature are validated against the JWKS with caching and rotation by `kid`. `alg=none` is rejected and clock drift is bounded.
-- The subject maps to `users.external_sub`: `sub` in Auth0 and `oid` plus `tid` in Entra. For Auth0, the active `membership` and the `tenant_id` consumed by RLS are resolved; Entra checks internal role, MFA, and platform-exclusive audience (`02-contratos-y-tenencia.md`).
+- The Entra subject maps to `users.external_sub` from `oid` plus `tid`. Entra checks internal role, MFA, and platform-exclusive audience (`02-contratos-y-tenencia.md`). Merchant tenant context comes from the active membership selected in the browser QR approval.
 - The ID token is client material. The backend never accepts it as an API credential.
 
 ## Device linking and approval
 
-Each device generates a key pair in Android Keystore on first access and registers the public key. QR approval links the browser and the phone without shared passwords.
+Each owner device generates a key pair in Android Keystore and registers the public key during SMS enrollment. QR approval links the browser and the phone without shared passwords.
 
 ### Browser challenge with an initial cookie and one-time redemption
 
 - The browser requests a challenge and the server sets an initial session cookie (HttpOnly, Secure, SameSite) before showing the QR.
 - The challenge expires in at most 120 seconds and is approved once. The redemption code is consumed exactly once.
 - A short matching code is shown in the browser and on the phone so the user confirms they are approving the right session.
-- If the QR cannot be scanned, a manual fallback exists on the same device or across devices by entering the code.
+- A manual fallback for an inaccessible camera remains a follow-up. Preserve the same browser binding and one-time exchange.
 
 ### Contracts
 
-- `POST /api/auth/device/register` body `{deviceId, publicKey, label}` → registers the device for the current token.
+- `POST /api/auth/owner/phone/start` and `/phone/verify` → issue and verify an enrollment code and the phone key proof.
+- `POST /api/auth/owner/device/start` and `/device/verify` → verify a signed challenge from the linked phone and issue a short-lived mobile token.
 - `POST /api/auth/challenge` body `{intent:'browser_login'|'device_link'}` → creates `{challengeId, code, qr, expiresAt}` and sets the initial session cookie.
 - `GET /api/auth/challenge/{challengeId}` → challenge state for the browser to poll.
 - `POST /api/auth/challenge/{challengeId}/approve` body `{deviceSignature, code}` → the authenticated phone signs the challenge and confirms the code.
 - `POST /api/auth/challenge/{challengeId}/exchange` → the browser with its cookie redeems the challenge once and receives a rotated session cookie that is HttpOnly, Secure, and SameSite. The web app keeps tokens out of JavaScript and browser storage.
-- `DELETE /api/auth/devices/{deviceId}` → revokes a device and its sessions.
+- Device transfer and owner-initiated revocation require the recovery workflow described in decision 0006.
 
 ### Browser approval flow
 
@@ -64,7 +66,7 @@ sequenceDiagram
     participant P as Phone (authenticated)
     B->>S: signs in and receives challengeId + QR + code
     S-->>B: sets initial session cookie
-    P->>P: scans the QR or types the code
+    P->>P: scans the QR and compares the code
     P->>S: POST /challenge/{id}/approve (signature + code)
     S->>S: verifies signature, recent device, and code
     B->>S: GET /challenge/{id} returns approved
@@ -76,12 +78,12 @@ Rules:
 
 - Approval requires a device with recent authentication. A device without recent authentication re-authenticates before approving.
 - The device signature covers challengeId, nonce, expiration, purpose, and chosen store. Show the store and browser before local authentication. The server checks an active owner and a current device when approving and redeeming, binds the redemption to the original cookie, and consumes the challenge in a transaction. Limit manual-code attempts and per-origin requests. Protect web session mutations against CSRF.
-- Access recovery uses the provider's managed OIDC (re-authentication and MFA in Auth0 or Entra). When replacing a phone, revoke the previous device's authorizations and its browser sessions, and notify the owner through the verified channel.
+- Before public merchant enrollment, implement and verify recovery and device transfer. Invalidate the previous device key, its mobile and browser sessions, and pending approvals. Staff recovery follows Entra.
 
 ## Business onboarding
 
-1. Signup in Auth0 (owner) and creation of the tenant and store in `02-contratos-y-tenencia.md`.
-2. Register the device, capture the first item, and complete a cash sale. Save progress between steps.
+1. Verify the owner's phone and create the tenant and store as described in `02-contratos-y-tenencia.md`.
+2. Scan and approve the browser QR, capture the first item, and complete a cash sale. Save progress between steps.
 3. Offer CLABE registration, email invitation, and optional consent as independent tasks. The store can take cash and run fiado before enabling CoDi.
 
 ## Bank account with pey
@@ -171,13 +173,14 @@ To register or replace an account, require recent owner re-authentication, show 
 
 ## Acceptance criteria
 
-- [ ] The Auth0 flow and the Entra flow validate access tokens with the API audience and map to `users`.
+- [ ] Merchant phone enrollment and paired-device sign-in resolve the same local user. Live SMS transport is verified with an authorized SIM.
+- [ ] Entra validates the API audience and maps staff separately.
 - [ ] A token with invalid `aud`, `exp`, or signature is rejected without creating a session.
 - [ ] An Entra staff login creates no business `membership`.
 - [ ] Browser approval uses the initial cookie, the redemption is single-use, and the matching code is verified.
 - [ ] The manual fallback works when the QR cannot be scanned.
 - [ ] A device without recent authentication cannot approve.
-- [ ] Recovery relies on the provider's OIDC and there is no custom backup-code system.
+- [ ] With a replacement phone, the recovery flow safely transfers the account and invalidates the previous credential and sessions.
 - [ ] With `FakePey` marked SIMULADO, registration moves from `PENDING` to `ACTIVE` by polling and by signed webhook, with deduplication.
 - [ ] The account only moves to `ACTIVE` with signed, known evidence.
 - [ ] Registration uses exactly `alias`, `name`, `clabe`, and `entity`.
@@ -187,7 +190,7 @@ To register or replace an account, require recent owner re-authentication, show 
 
 ## Gates
 
-- [ ] Identity suite with test JWKS (no network) for both providers.
+- [ ] Local identity tests with real PostgreSQL and simulated SMS, plus Entra tests with test JWKS.
 - [ ] Bank account suite with `FakePey` covering states, signed webhook, duplicate, unknown, and timeout without `id`.
 - [ ] CI secret scan that fails on CLABE, RFC, or keys.
 - [ ] Device test that verifies revocation, challenge expiration, and single-use redemption.
@@ -202,13 +205,14 @@ To register or replace an account, require recent owner re-authentication, show 
 - pey · Create QR (`bankAccountId` field): <https://docs.pey.mx/docs/api/create-qr>
 - pey · Webhook CoDi QR: <https://docs.pey.mx/docs/webhooks/codi/qr>
 - pey · Webhooks (Standard Webhooks): <https://docs.pey.mx/docs/webhooks/introduction>
-- Auth0 · Authorization Code Flow with OIDC: <https://auth0.com/docs/authenticate/login/oidc-conformant-authentication/oidc-adoption-auth-code-flow>
+- Android · Phone Number Hint: <https://developer.android.com/identity/phone-number-hint>
+- NIST · SMS verification and SIM changes: <https://pages.nist.gov/800-63-4/sp800-63b.html>
 - Microsoft · OpenID Connect on the identity platform: <https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc>
 - CLABE · verification with 3-7-1 weights modulo 10: <https://www.fintoc.com/mx/recursos/guias/como-verificar-la-clabe-antes-de-transferir>
 
 ## Locked decisions
 
-- Auth0 covers the business owners and employees. Entra covers only the SaaS staff and grants no business memberships.
+- Abarpay authenticates merchant owners. Entra covers SaaS staff and grants no merchant memberships.
 - The API validates access tokens with audience, not ID tokens.
 - Bank account registration uses four fields and activation requires signed, known evidence.
-- Access recovery uses the provider's managed OIDC.
+- The previous phone key or an approved recovery procedure is required to transfer a merchant account. A verified SMS by itself cannot replace an enrolled key.
