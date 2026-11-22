@@ -220,7 +220,8 @@ internal fun OwnerCashScreen(auth: OwnerAuth, baseUrl: String, store: OwnerStore
             products.forEach { product ->
                 val count = cart[product.id] ?: 0
                 Text(product.name + " · " + money(product.price) + " / " + product.unit)
-                if (!product.unlimited && product.stockMilli < 1000) Text("Sin unidades disponibles")
+                Text(if (product.unlimited) "Existencia ilimitada" else
+                    "Existencia: " + qtyText(product.stockMilli, product.unit))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { cart[product.id] = count + 1 },

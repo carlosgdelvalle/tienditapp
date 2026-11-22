@@ -116,6 +116,15 @@ def _product_dict(row: dict) -> dict[str, Any]:
     }
 
 
+def read_catalog(cursor) -> list[dict[str, Any]]:
+    cursor.execute(
+        """SELECT id, name, unit, price_cents, stock_milli, low_stock_milli,
+                  quick, unlimited_stock, kind, category, duration_minutes, image_url, aliases
+           FROM products ORDER BY lower(name) ASC, id ASC"""
+    )
+    return [_product_dict(row) for row in cursor.fetchall()]
+
+
 def _sale_summary(sale: dict) -> dict[str, Any]:
     return {
         "saleId": str(sale["id"]),
@@ -221,14 +230,7 @@ class PostgresBusinessStore:
         with self._pool.connection() as conn:
             set_tenant_context(conn, tenant_id=tenant_id, user_id="")
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    """SELECT id, name, unit, price_cents, stock_milli,
-                              low_stock_milli, quick, unlimited_stock, kind,
-                              category, duration_minutes, image_url, aliases
-                       FROM products ORDER BY lower(name) ASC, id ASC"""
-                )
-                rows = cur.fetchall()
-        items = [_product_dict(row) for row in rows]
+                items = read_catalog(cur)
         if q and q.strip():
             needle = q.strip().lower()
             items = [

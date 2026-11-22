@@ -37,7 +37,13 @@ Use the same isolated PostgreSQL backend for the QR console and **Caja** in Abar
 
 Record one cash sale in **Caja → Entrar a mi tienda**. To test loss of a response, wrap the QA server so the first successful mobile checkout response becomes an error after the database commit. Restart the Android app and select **Consultar venta pendiente**. Compare the full folio and total with **Historial de ventas** and verify one sale, payment, and stock movement for that folio in PostgreSQL. Check **Inicio** for the current business day's count and amount. In a separate browser, use a second verified owner with a different store. The sale must be absent from their history and return HTTP 404 when requested directly.
 
-The connected owner checkout and the SQLite offline POS fixture use separate routes. Run the following offline checks against the SQLite fixture.
+The connected owner checkout and the SQLite offline POS fixture use separate routes.
+
+## Inventory between the console and Samsung
+
+In the QR console, open **Inventario**, choose a finite-stock fixture product, and save a physical count with a reason. Verify the new count and one adjustment in **Movimientos recientes**. Open **Caja** on the Samsung or select **Actualizar catálogo** with an empty cart. Confirm the phone shows the same count. Sell one unit and refresh **Inventario** in the console. Verify both show one fewer unit and the console shows the sale movement.
+
+From a different owner's QR session, confirm that the product and movements are absent and that the adjustment endpoint returns HTTP 404 for the first store's product. To check stale counts, open an adjustment and change the same stock from a second authorized request. The stale save must return 409. Refresh inventory and confirm the old editor closes so the owner starts from the latest count.
 
 ## Offline cash on the physical phone
 

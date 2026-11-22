@@ -41,6 +41,7 @@ from .config import Settings
 from .db_pg import SERVICE_ROLE, create_pool
 from .identity_pg import PostgresIdentityStore
 from .owner_phone import PhoneAuth, PhoneSettings, register_phone
+from .owner_operations_pg import router as owner_operations_router
 from .onboarding import (
     DEFAULT_TIMEZONE,
     OnboardingError,
@@ -179,6 +180,11 @@ def owner_console():
     if not page.exists():
         return JSONResponse(status_code=404, content={"detail": "Consola no disponible"})
     return FileResponse(page, media_type="text/html")
+
+
+@console_router.get("/console/operations.js", include_in_schema=False)
+def owner_console_operations():
+    return FileResponse(SERVER_ROOT / "static" / "owner-operations.js", media_type="text/javascript")
 
 
 @signup_router.post("/signup")
@@ -335,6 +341,7 @@ def create_production_app(
         if phone_settings:
             register_phone(app, PhoneAuth(pool, phone_settings))
         register_business_routes(app, pool)
+        app.include_router(owner_operations_router)
         app.add_exception_handler(OnboardingError, _onboarding_error_handler)
         app.include_router(signup_router)
         app.include_router(health_router)

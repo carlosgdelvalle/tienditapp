@@ -43,6 +43,8 @@
   .record-title { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; column-gap: 1rem; }
   .records small, .records code { display: block; color: var(--soft); }
   .catalog-list { max-width: 100%; }
+  .choice { display: flex; gap: .6rem; align-items: center; min-height: 2.65rem; }
+  .choice input { width: 1.2rem; height: 1.2rem; min-height: 0; accent-color: var(--brand); }
   @media (max-width: 32rem) {
     .store-nav a { padding-inline: .65rem; }
     .record-title { row-gap: .2rem; }
@@ -70,6 +72,10 @@
       <a href="#/inicio" data-view="inicio">Inicio</a>
       <a href="#/catalogo" data-view="catalogo">Catálogo</a>
       <a href="#/ventas" data-view="ventas">Historial de ventas</a>
+      <a href="#/inventario" data-view="inventario">Inventario</a>
+      <a href="#/fiado" data-view="fiado">Fiado</a>
+      <a href="#/gastos" data-view="gastos">Gastos</a>
+      <a href="#/equipo" data-view="equipo">Equipo</a>
     </nav>
     <div id="view-inicio" class="stack" hidden>
       <section aria-labelledby="home-title">
@@ -130,8 +136,113 @@
         <button type="button" class="secondary" id="next-sales" hidden>Siguientes</button>
       </div>
     </section>
+    <div id="view-inventario" class="stack" hidden>
+      <div class="columns">
+        <section aria-labelledby="inventory-title" class="stack">
+          <h2 id="inventory-title">Inventario</h2>
+          <button id="refresh-inventory" type="button" class="secondary">Actualizar inventario</button>
+          <p id="inventory-status" class="status" role="status"></p>
+          <ul id="inventory-items" class="records" aria-label="Existencias"></ul>
+        </section>
+        <section id="adjust-panel" aria-labelledby="adjust-title" hidden>
+          <h2 id="adjust-title">Ajustar existencia</h2>
+          <p id="adjust-label"></p>
+          <p id="adjust-status" class="status" role="status"></p>
+          <form id="adjust-form">
+            <label>Existencia contada <input id="adjust-stock" required inputmode="decimal"></label>
+            <label>Motivo <input id="adjust-reason" required maxlength="200"></label>
+            <div class="row">
+              <button>Guardar ajuste</button>
+              <button id="cancel-adjust" type="button" class="secondary">Cancelar</button>
+            </div>
+          </form>
+          <button id="retry-inventory" type="button" hidden>Confirmar ajuste pendiente</button>
+        </section>
+      </div>
+      <section aria-labelledby="movement-title">
+        <h2 id="movement-title">Movimientos recientes</h2>
+        <ul id="inventory-movements" class="records" aria-label="Movimientos"></ul>
+        <p id="inventory-movements-empty" class="muted" hidden>Todavía no hay movimientos.</p>
+      </section>
+    </div>
+    <div id="view-fiado" class="columns" hidden>
+      <section aria-labelledby="fiado-title" class="stack">
+        <h2 id="fiado-title">Fiado</h2>
+        <button id="refresh-fiado" type="button" class="secondary">Actualizar clientes</button>
+        <p id="fiado-status" class="status" role="status"></p>
+        <ul id="fiado-items" class="records" aria-label="Clientes de fiado"></ul>
+        <form id="customer-form">
+          <label>Nombre del cliente <input id="customer-name" required maxlength="120"></label>
+          <button>Agregar cliente</button>
+        </form>
+        <button id="retry-customer" type="button" hidden>Confirmar cliente pendiente</button>
+        <p id="customer-status" class="status" role="status"></p>
+      </section>
+      <section id="fiado-detail" aria-labelledby="fiado-customer" class="stack" hidden>
+        <h2 id="fiado-customer"></h2>
+        <strong id="fiado-balance"></strong>
+        <button id="refresh-fiado-detail" type="button" class="secondary">Actualizar saldo</button>
+        <p id="fiado-detail-status" class="status" role="status"></p>
+        <form id="fiado-entry-form">
+          <label>Movimiento
+            <select id="fiado-kind"><option value="charge">Cargo manual</option><option value="payment">Abono</option></select>
+          </label>
+          <label>Importe en pesos <input id="fiado-amount" inputmode="decimal" required></label>
+          <label>Concepto <input id="fiado-note" maxlength="200" required></label>
+          <button>Registrar movimiento</button>
+        </form>
+        <button id="retry-fiado" type="button" hidden>Confirmar movimiento pendiente</button>
+        <p id="fiado-entry-status" class="status" role="status"></p>
+        <h3>Movimientos recientes</h3>
+        <ul id="fiado-entries" class="records" aria-label="Movimientos del cliente"></ul>
+      </section>
+    </div>
+    <section id="view-gastos" aria-labelledby="expense-title" class="stack" hidden>
+      <h2 id="expense-title">Gastos</h2>
+      <div class="columns">
+        <div class="stack">
+          <button id="refresh-expenses" type="button" class="secondary">Actualizar gastos</button>
+          <strong id="expenses-total"></strong>
+          <p id="expenses-status" class="status" role="status"></p>
+          <ul id="expenses-items" class="records" aria-label="Gastos recientes"></ul>
+        </div>
+        <div>
+          <form id="expense-form">
+            <label>Importe en pesos <input id="expense-amount" inputmode="decimal" required></label>
+            <label>Concepto <input id="expense-note" maxlength="200" required></label>
+            <button>Registrar gasto</button>
+          </form>
+          <button id="retry-expenses" type="button" hidden>Confirmar gasto pendiente</button>
+          <p id="expense-status" class="status" role="status"></p>
+        </div>
+      </div>
+    </section>
+    <div id="view-equipo" class="columns" hidden>
+      <section aria-labelledby="team-title" class="stack">
+        <h2 id="team-title">Equipo</h2>
+        <button id="refresh-team" type="button" class="secondary">Actualizar equipo</button>
+        <p id="team-status" class="status" role="status"></p>
+        <ul id="team-items" class="records" aria-label="Personas vinculadas"></ul>
+      </section>
+      <section id="team-editor" aria-labelledby="team-member" hidden>
+        <h2 id="team-member"></h2>
+        <form id="team-form">
+          <label class="choice"><input id="team-sell" type="checkbox"> Puede cobrar</label>
+          <label class="choice"><input id="team-fiado" type="checkbox"> Puede fiar</label>
+          <label class="choice"><input id="team-inventory" type="checkbox"> Puede ajustar inventario</label>
+          <label class="choice"><input id="team-active" type="checkbox"> Tiene acceso a la tienda</label>
+          <div class="row">
+            <button>Guardar permisos</button>
+            <button id="cancel-team" type="button" class="secondary">Cancelar</button>
+          </div>
+        </form>
+        <button id="retry-team" type="button" hidden>Confirmar permisos pendientes</button>
+        <p id="team-edit-status" class="status" role="status"></p>
+      </section>
+    </div>
   </div>
 </main>
+<script src="/console/operations.js"></script>
 <script>
 (() => {
   'use strict';
@@ -153,6 +264,12 @@
   let historyOffset = 0;
   const historyLimit = 20;
   const views = [...document.querySelectorAll('[data-view]')];
+  const operations = window.ownerOperations({
+    api, status, requestError, money, quantity, scaledInput, session: () => auth,
+    formatDate: seconds => new Intl.DateTimeFormat('es-MX', {
+      dateStyle: 'medium', timeStyle: 'short', timeZone: storeZone,
+    }).format(seconds * 1000),
+  });
 
   function readStorage(key) {
     try { return JSON.parse(sessionStorage.getItem(key)); }
@@ -210,6 +327,7 @@
     $('overview-date').hidden = true;
     $('sale-receipt').hidden = true;
     resetProductForm();
+    operations.reset();
     $('login').hidden = false;
     restartChallenge('Tu sesión terminó. Vuelve a entrar para abrir la tienda.');
     $('start-qr').focus();
@@ -309,7 +427,8 @@
       loadOverview();
       loadCatalog({forSale: true});
     } else if (current === 'catalogo') loadCatalog();
-    else loadHistory(0);
+    else if (current === 'ventas') loadHistory(0);
+    else operations.load(current);
   }
 
   function requestError(id, error, fallback) {

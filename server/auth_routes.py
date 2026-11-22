@@ -33,6 +33,7 @@ from .identity import (
     SessionRecord,
     User,
 )
+from .identity_pg import actor_context
 from .owner_phone import MobileIdentity, TOKEN_PREFIX
 
 INVITE_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://abarpay-api.onrender.com")
@@ -442,7 +443,8 @@ def list_members(
     service: IdentityService = Depends(_service),
 ):
     try:
-        members = service.list_tenant_members(ctx.user_id, ctx.tenant_id)
+        with actor_context(ctx.user_id):
+            members = service.list_tenant_members(ctx.user_id, ctx.tenant_id)
     except IdentityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return {
@@ -529,16 +531,17 @@ def patch_member(
     service: IdentityService = Depends(_service),
 ):
     try:
-        membership = service.patch_member(
-            ctx.user_id,
-            ctx.tenant_id,
-            user_id,
-            role=body.role,
-            can_sell=body.canSell,
-            can_fiado=body.canFiado,
-            can_inventory=body.canInventory,
-            active=body.active,
-        )
+        with actor_context(ctx.user_id):
+            membership = service.patch_member(
+                ctx.user_id,
+                ctx.tenant_id,
+                user_id,
+                role=body.role,
+                can_sell=body.canSell,
+                can_fiado=body.canFiado,
+                can_inventory=body.canInventory,
+                active=body.active,
+            )
     except IdentityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return {
@@ -558,7 +561,8 @@ def delete_member(
     service: IdentityService = Depends(_service),
 ):
     try:
-        membership = service.deactivate_member(ctx.user_id, ctx.tenant_id, user_id)
+        with actor_context(ctx.user_id):
+            membership = service.deactivate_member(ctx.user_id, ctx.tenant_id, user_id)
     except IdentityError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return {"ok": True, "userId": membership.user_id, "active": membership.active}

@@ -829,3 +829,110 @@ def test_owner_phone_enrollment_and_qr_without_oidc(migrated_dsn, pg_cluster):
         assert other.get("/api/sales/" + sale["saleId"]).status_code == 404
         assert other.patch(product_url, headers={"X-CSRF-Token": other_session.json()["csrfToken"]},
                            json=changed).status_code == 404
+
+
+def test_owner_inventory_fiado_expenses_and_team_are_tenant_scoped(migrated_dsn, pg_cluster):
+    import psycopg
+
+    app = create_production_app(
+        env=_prod_env(migrated_dsn), auth_config=prod_config(), validator=build_validator(),
+    )
+
+    def owner_session(client, name):
+        token = make_token(name)
+        response = client.post(
+            "/api/signup", headers={"Authorization": "Bearer " + token},
+            json={"name": name, "storeName": name},
+        )
+        assert response.status_code == 200
+        tenant_id = response.json()["tenant"]["id"]
+        private, public = _make_device_key()
+        _, csrf, _ = _qr_login(client, token, name, private, public, tenant_id)
+        return tenant_id, {"X-CSRF-Token": csrf}
+
+    with TestClient(app) as owner, TestClient(app) as other:
+        tenant_id, csrf = owner_session(owner, "Tienda operaciones A")
+        _, other_csrf = owner_session(other, "Tienda operaciones B")
+
+        def submit(client, path, body, headers, key=None):
+            return client.post(path, json=body, headers={
+                **headers, "Idempotency-Key": key or str(uuid.uuid4()),
+            })
+
+        catalog = owner.post("/api/catalog", headers=csrf, json={
+            "name": "Producto control", "unit": "pieza", "priceCents": 1800, "stockMilli": 2000,
+        })
+        assert catalog.status_code == 200
+        product_id = catalog.json()["id"]
+        stock_path = f"/api/owner/inventory/{product_id}/adjust"
+        stock_body = {"stockMilli": 6000, "expectedStockMilli": 2000, "reason": "Conteo de prueba"}
+        stock_key = str(uuid.uuid4())
+        assert submit(owner, stock_path, stock_body, {}).status_code == 403
+        assert submit(owner, stock_path, stock_body, csrf, stock_key).json()["stockMilli"] == 6000
+        assert submit(owner, stock_path, stock_body, csrf, stock_key).json()["duplicate"]
+        assert submit(owner, stock_path, stock_body, csrf).status_code == 409
+        inventory = owner.get("/api/owner/inventory").json()
+        assert inventory["items"][0]["stockMilli"] == 6000
+        assert [(r["deltaMilli"], r["reason"]) for r in inventory["movements"]] == [(4000, "Ajuste: Conteo de prueba")]
+        assert other.get("/api/owner/inventory").json() == {"items": [], "total": 0, "movements": []}
+        assert submit(other, stock_path, stock_body, other_csrf).status_code == 404
+
+        customers_path = "/api/owner/fiado/customers"
+        customer_key = str(uuid.uuid4())
+        customer = submit(owner, customers_path, {"name": "Cliente QA"}, csrf, customer_key)
+        assert customer.status_code == 200
+        assert submit(owner, customers_path, {"name": "Cliente QA"}, csrf, customer_key).json() == customer.json()
+        customer_path = customers_path + "/" + customer.json()["id"]
+        entries_path = customer_path + "/entries"
+        assert submit(owner, entries_path, {
+            "kind": "charge", "amountCents": 8000, "note": "Anotación QA",
+        }, csrf).status_code == 200
+        payment_key = str(uuid.uuid4())
+        payment = {"kind": "payment", "amountCents": 3000, "note": "Abono QA"}
+        first_payment = submit(owner, entries_path, payment, csrf, payment_key)
+        assert first_payment.status_code == 200
+        assert submit(owner, entries_path, payment, csrf, payment_key).json() == first_payment.json()
+        assert submit(owner, entries_path, {**payment, "amountCents": 5100}, csrf).status_code == 409
+        detail = owner.get(customer_path).json()
+        assert detail["balanceCents"] == 5000
+        assert [row["kind"] for row in detail["items"]] == ["payment", "charge"]
+        assert owner.get(customers_path).json()["items"][0]["balanceCents"] == 5000
+        assert other.get(customers_path).json() == {"items": []}
+        assert other.get(customer_path).status_code == 404
+        assert submit(other, entries_path, payment, other_csrf).status_code == 404
+
+        expense_path = "/api/owner/expenses"
+        expense = {"amountCents": 2550, "note": "Material de prueba"}
+        expense_key = str(uuid.uuid4())
+        recorded = submit(owner, expense_path, expense, csrf, expense_key)
+        assert recorded.status_code == 200
+        assert submit(owner, expense_path, expense, csrf, expense_key).json() == recorded.json()
+        expenses = owner.get(expense_path).json()
+        assert expenses["totalCents"] == 2550
+        assert len(expenses["items"]) == 1
+        assert other.get(expense_path).json() == {"items": [], "totalCents": 0}
+
+        # Equipo manages people who have already been linked. Seed this prior
+        # membership directly and exercise management with normal sessions.
+        employee_sub = "empleado-operaciones-qa"
+        with psycopg.connect(pg_cluster["superuser_dsn"]) as conn:
+            employee_id, = conn.execute(
+                "INSERT INTO users (email, name, idp, external_sub) VALUES (%s, %s, 'auth0', %s) RETURNING id",
+                ("empleada@example.test", "Empleada QA", employee_sub),
+            ).fetchone()
+            conn.execute(
+                "INSERT INTO memberships (user_id, tenant_id, role) VALUES (%s, %s, 'employee')",
+                (employee_id, tenant_id),
+            )
+        employee = {"Authorization": "Bearer " + make_token(employee_sub)}
+        member_path = f"/api/tenant/members/{employee_id}"
+        assert other.patch(member_path, json={"canInventory": True}, headers=other_csrf).status_code == 404
+        permissions = owner.patch(member_path, json={"canInventory": True, "canSell": True}, headers=csrf)
+        assert permissions.status_code == 200 and permissions.json()["canInventory"]
+        assert str(employee_id) in {row["userId"] for row in owner.get("/api/tenant/members").json()["items"]}
+        assert str(employee_id) not in {row["userId"] for row in other.get("/api/tenant/members").json()["items"]}
+        member_session = other.post("/api/session/store", json={"tenantId": tenant_id}, headers=employee)
+        assert member_session.status_code == 200
+        assert other.get("/api/owner/expenses").status_code == 403
+        assert owner.patch(member_path, json={"active": False}, headers=csrf).json()["active"] is False
+        assert other.get("/api/catalog").status_code == 403
