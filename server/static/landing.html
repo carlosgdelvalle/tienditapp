@@ -4,27 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <meta name="description" content="Abarpay reúne la venta, el efectivo, el fiado, el inventario y CoDi en el teléfono de tu tienda. Plan Gratis, Control y piloto de Formalización.">
-  <title>Abarpay · Cobra, controla lo que te deben y sabe qué reponer</title>
+  <meta name="description" content="Registra efectivo, cobra con CoDi sin comisión por transacción y lleva el fiado con sus abonos. Abarpay es la caja de tu negocio en el teléfono.">
+  <title>Abarpay · Que sí cuadre la caja</title>
   <style>
     :root {
-      --ink: #16202b;
-      --ink-soft: #3a4753;
-      --bg: #ffffff;
-      --bg-soft: #f4f6f8;
-      --line: #d7dde3;
-      --brand: #0b6e4f;      /* verde oscuro, contraste AA sobre blanco */
-      --brand-dark: #085239;
+      --ink: #17122f;
+      --ink-soft: #423950;
+      --bg: #faf6ee;
+      --bg-soft: #f1eae0;
+      --line: #d9cdbc;
+      --brand: #5900dc;
+      --brand-dark: #410098;
       --brand-ink: #ffffff;
-      --accent: #0b6e4f;
+      --accent: #a9661b;
       --warn-bg: #fff6e5;
       --warn-line: #e0b25c;
       --warn-ink: #6b4a00;
-      --muted: #57616c;
-      --focus: #1f6fd0;
+      --muted: #62566b;
+      --focus: #5900dc;
       --radius: 10px;
-      --maxw: 1120px;
-      --shadow: 0 1px 3px rgba(22,32,43,.12), 0 8px 24px rgba(22,32,43,.08);
+      --maxw: 1224px;
+      --shadow: 0 1px 3px rgba(32,22,43,.12), 0 8px 24px rgba(32,22,43,.08);
     }
 
     * { box-sizing: border-box; }
@@ -50,7 +50,7 @@
     }
 
     a { color: var(--brand-dark); }
-    a:hover { color: #06432c; }
+    a:hover { color: var(--ink); }
 
     :focus-visible {
       outline: 3px solid var(--focus);
@@ -74,15 +74,15 @@
     .wrap {
       max-width: var(--maxw);
       margin: 0 auto;
-      padding: 0 1rem;
+      padding: 0 clamp(1rem, 4vw, 3rem);
     }
 
     /* ---------- Header / nav ---------- */
     .site-header {
       position: sticky;
       top: 0;
-      background: rgba(255,255,255,.96);
-      border-bottom: 1px solid var(--line);
+      background: #faf6eef5;
+      border-bottom: 1px solid var(--accent);
       z-index: 20;
       backdrop-filter: blur(6px);
     }
@@ -90,30 +90,20 @@
       display: flex;
       align-items: center;
       gap: .75rem;
-      min-height: 3.5rem;
+      min-height: 4.5rem;
     }
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: .5rem;
-      font-weight: 800;
-      font-size: 1.15rem;
+      font-weight: 900;
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-style: italic;
+      letter-spacing: -.07em;
       color: var(--ink);
       text-decoration: none;
       margin-right: auto;
     }
-    .brand .mark {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.7rem;
-      height: 1.7rem;
-      border-radius: 6px;
-      background: var(--brand);
-      color: #fff;
-      font-size: .95rem;
-      font-weight: 800;
-    }
+    .brand-accent { color: var(--brand); }
     .nav-links {
       display: flex;
       align-items: center;
@@ -129,7 +119,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 2.6rem;
+      min-height: 2.75rem;
       padding: .5rem 1rem;
       border: 1.5px solid var(--brand);
       color: var(--brand-dark);
@@ -173,29 +163,32 @@
 
     /* ---------- Hero ---------- */
     .hero {
-      padding: 3rem 0 2.5rem;
-      background: linear-gradient(180deg, #f6fbf8 0%, #ffffff 100%);
-      border-bottom: 1px solid var(--line);
+      padding: clamp(2.75rem, 6vw, 6rem) 0;
+      border-bottom: 1px solid var(--accent);
     }
     .hero-grid {
       display: grid;
-      grid-template-columns: 1.15fr .85fr;
-      gap: 2rem;
+      grid-template-columns: minmax(0, 1fr) minmax(0, .86fr);
+      gap: clamp(2rem, 8vw, 7rem);
       align-items: center;
     }
     .hero h1 {
-      font-size: clamp(1.9rem, 4.5vw, 3rem);
-      line-height: 1.12;
-      letter-spacing: -.01em;
-      margin: 0 0 1rem;
+      font-size: clamp(3rem, 8.6vw, 7.25rem);
+      line-height: .98;
+      font-weight: 900;
+      letter-spacing: -.062em;
+      margin: 0 0 1.5rem;
       color: var(--ink);
     }
     .hero p.lede {
-      font-size: 1.12rem;
+      font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+      line-height: 1.48;
       color: var(--ink-soft);
-      margin: 0 0 1.5rem;
-      max-width: 36rem;
+      margin: 0 0 1.15rem;
+      max-width: 32rem;
     }
+    .hero-pitch { max-width: 29rem; margin: 0 0 .25rem; font-weight: 750; }
+    .hero .microcopy { margin: 0 0 1.45rem; }
     .cta-row {
       display: flex;
       flex-wrap: wrap;
@@ -208,35 +201,48 @@
       max-width: 40rem;
     }
 
-    .proof-frame {
+    .hero .btn-primary { border-radius: 100px; padding-inline: 1.85rem; min-height: 3.35rem; }
+    .receipt {
+      margin: 0;
+      background: #fffdf7;
       border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #fff;
-      box-shadow: var(--shadow);
-      padding: 1rem;
+      border-radius: 3px;
+      padding: clamp(1rem, 3.6vw, 2.5rem);
+      box-shadow: 8px 14px 0 #eadfd0, 18px 23px 38px #2316301c;
+      font-variant-numeric: tabular-nums;
     }
-    .proof-frame .phone {
+    .receipt-heading { margin-bottom: 1rem; }
+    .receipt-heading p { margin: .45rem 0 0; color: var(--muted); font-size: .88rem; }
+    .receipt h2 {
+      margin: .25rem 0 0;
+      font-size: clamp(1.85rem, 3.65vw, 2.85rem);
+      line-height: 1.1;
+      letter-spacing: -.055em;
+    }
+    .receipt details, .receipt-total { border-top: 1px dashed #bfb2a3; }
+    .receipt summary, .receipt-total {
       display: grid;
-      gap: .6rem;
-    }
-    .proof-line {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: .55rem .7rem;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--bg-soft);
-    }
-    .proof-line .k { color: var(--muted); font-size: .875rem; }
-    .proof-line .v { font-weight: 700; text-align: right; }
-    .proof-state {
-      display: inline-flex;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: .25rem .65rem;
       align-items: center;
-      gap: .4rem;
-      font-weight: 700;
-      color: var(--brand-dark);
+      padding: .8rem 0;
     }
+    .receipt summary { list-style: none; cursor: pointer; }
+    .receipt summary::-webkit-details-marker { display: none; }
+    .receipt summary:hover .receipt-label { color: var(--brand-dark); text-decoration: underline; }
+    .receipt-label { font-weight: 700; }
+    .receipt-action { display: block; font-size: .75rem; line-height: 1.3; color: var(--muted); }
+    .receipt-action-close, .receipt details[open] .receipt-action-open { display: none; }
+    .receipt details[open] .receipt-action-close { display: inline; }
+    .receipt-amount {
+      font: 700 clamp(.94rem, 2.1vw, 1.25rem)/1.25 ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: nowrap;
+    }
+    .receipt-detail { font-size: .88rem; margin: 0 0 .85rem; color: var(--ink-soft); }
+    .receipt-total { font-weight: 850; margin: .35rem 0 0; padding-bottom: .2rem; }
+    .receipt-total .receipt-amount { color: var(--brand-dark); font-size: clamp(1rem, 2.5vw, 1.55rem); }
+    .receipt-fiado { color: #79430d; }
+    .receipt-caption { color: var(--muted); font-size: .88rem; margin: .6rem 0 0; }
     .tag-simulado {
       display: inline-block;
       font-size: .72rem;
@@ -249,15 +255,16 @@
       border-radius: 5px;
       padding: .1rem .45rem;
     }
-    .proof-caption { font-size: .8rem; color: var(--muted); margin-top: .6rem; }
-
-    @media (max-width: 860px) {
+    @media (max-width: 760px) {
       .hero-grid { grid-template-columns: 1fr; }
-      .proof-frame { max-width: 30rem; }
+      .hero h1 { max-width: 12ch; text-wrap: balance; }
+      .hero h1 br { display: none; }
+      .receipt { max-width: 34rem; margin-right: .55rem; }
+      .nav-cta { padding-inline: .65rem; }
     }
 
     /* ---------- Sections ---------- */
-    section { padding: 2.75rem 0; }
+    section { padding: 2.75rem 0; scroll-margin-top: 4.5rem; }
     section + section { border-top: 1px solid var(--line); }
     .section-title {
       font-size: clamp(1.5rem, 3vw, 2.1rem);
@@ -269,7 +276,7 @@
     .alt-bg { background: var(--bg-soft); }
     .note {
       border-left: 3px solid var(--brand);
-      background: #eef6f1;
+      background: #f0e9fb;
       padding: .75rem 1rem;
       border-radius: 0 var(--radius) var(--radius) 0;
       color: var(--ink-soft);
@@ -295,6 +302,13 @@
     }
     .card h3 { margin: 0 0 .5rem; font-size: 1.05rem; }
     .card p { margin: 0; color: var(--ink-soft); font-size: .95rem; }
+    #como-funciona .card {
+      background: transparent;
+      border: 0;
+      border-top: 1px solid var(--line);
+      border-radius: 0;
+      padding: 1rem 0;
+    }
     @media (max-width: 720px) {
       .cards { grid-template-columns: 1fr; }
     }
@@ -454,18 +468,18 @@
 
     /* ---------- FAQ ---------- */
     .faq { display: grid; gap: .6rem; margin-top: 1rem; }
-    details {
+    .faq details {
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: #fff;
       padding: .7rem 1rem;
     }
-    details summary {
+    .faq summary {
       cursor: pointer;
       font-weight: 700;
       padding: .2rem 0;
     }
-    details p { margin: .5rem 0 0; color: var(--ink-soft); }
+    .faq details p { margin: .5rem 0 0; color: var(--ink-soft); }
 
     /* ---------- Footer ---------- */
     .site-footer {
@@ -496,8 +510,7 @@
   <header class="site-header">
     <div class="wrap nav">
       <a class="brand" href="/">
-        <span class="mark" aria-hidden="true">A</span>
-        <span>Abarpay</span>
+        <span>Abar<span class="brand-accent">pay</span></span>
       </a>
       <nav class="nav-links" aria-label="Navegación principal">
         <a href="#como-funciona">Cómo funciona</a>
@@ -514,25 +527,62 @@
     <section class="hero" aria-labelledby="h1-hero">
       <div class="wrap hero-grid">
         <div>
-          <h1 id="h1-hero">Cobra, controla lo que te deben y sabe qué reponer.</h1>
-          <p class="lede">Abarpay reúne la venta, el efectivo, el fiado, el inventario y CoDi en el teléfono de tu tienda. El efectivo y sus comprobantes quedan en el teléfono cuando falla la conexión. Al volver la señal, todo se sincroniza para que tu equipo trabaje con el mismo estado.</p>
+          <h1 id="h1-hero">Que sí <br>cuadre <br>la caja.</h1>
+          <p class="lede">Registra ventas en <strong>efectivo</strong>, cobra con <strong>CoDi sin comisión por transacción</strong> y lleva el <strong>fiado</strong> con sus abonos.</p>
+          <p class="hero-pitch">Tu equipo cobra. Los pagos con CoDi llegan a una sola cuenta, la de tu negocio.</p>
+          <p class="microcopy">El cobro en equipo con CoDi está en validación para el piloto.</p>
           <div class="cta-row">
             <a class="btn btn-primary" href="/empezar" data-cta="empezar-gratis">Empezar gratis</a>
-            <a class="btn btn-secondary" href="/entrar" data-cta="entrar-mi-tienda">Entrar a mi tienda</a>
-            <a class="btn btn-ghost" href="/apk-piloto" data-cta="apk-piloto">Instalar APK piloto firmado</a>
           </div>
-          <p class="microcopy">Gratis incluye historial y exportación. Control cuesta MXN 149 por tienda al mes y se cobra manualmente. La web no procesa cargos automáticos.</p>
+          <p class="microcopy">Por ahora puedes registrar tu interés en el piloto.</p>
         </div>
-        <figure class="proof-frame" role="group" aria-labelledby="proof-caption">
-          <div class="phone">
-            <div class="proof-line"><span class="k">Cobro en efectivo</span><span class="v">MXN 124.50</span></div>
-            <div class="proof-line"><span class="k">Cambio</span><span class="v">MXN 75.50</span></div>
-            <div class="proof-line"><span class="k">Estado</span><span class="proof-state">&#10003; Guardado en el teléfono</span></div>
-            <div class="proof-line"><span class="k">Comprobante</span><span class="v">Venta: 2401</span></div>
+        <figure class="receipt" aria-labelledby="cierre-title">
+          <div class="receipt-heading">
+            <span class="tag-simulado">Simulado</span>
+            <h2 id="cierre-title">Cierre del día</h2>
+            <p>Ejemplo de una tienda · Importes en MXN</p>
           </div>
-          <figcaption id="proof-caption" class="proof-caption">
-            <span class="tag-simulado">Simulado</span> Ejemplo de una venta en efectivo con cambio, estado y comprobante.
-          </figcaption>
+          <details>
+            <summary>
+              <span class="receipt-label">
+                Efectivo recibido
+                <small class="receipt-action">
+                  <span class="receipt-action-open">Ver desglose</span>
+                  <span class="receipt-action-close">Ocultar desglose</span>
+                </small>
+              </span>
+              <strong class="receipt-amount">$342.50</strong>
+            </summary>
+            <p class="receipt-detail">$317.50 en ventas y $25.00 de un abono en efectivo.</p>
+          </details>
+          <details>
+            <summary>
+              <span class="receipt-label">
+                CoDi confirmado
+                <small class="receipt-action">
+                  <span class="receipt-action-open">Ver desglose</span>
+                  <span class="receipt-action-close">Ocultar desglose</span>
+                </small>
+              </span>
+              <strong class="receipt-amount">$177.50</strong>
+            </summary>
+            <p class="receipt-detail">Caja 1 cobró $120.00 y Caja 2 cobró $57.50. Ambos pagos se confirmaron en la misma cuenta de la tienda.</p>
+          </details>
+          <details>
+            <summary>
+              <span class="receipt-label receipt-fiado">
+                Fiado por cobrar
+                <small class="receipt-action">
+                  <span class="receipt-action-open">Ver desglose</span>
+                  <span class="receipt-action-close">Ocultar desglose</span>
+                </small>
+              </span>
+              <strong class="receipt-amount receipt-fiado">$75.00</strong>
+            </summary>
+            <p class="receipt-detail">De un fiado de $100.00 ya se abonaron $25.00. Quedan $75.00 pendientes.</p>
+          </details>
+          <p class="receipt-total"><span>Total recibido</span><strong class="receipt-amount">$520.00</strong></p>
+          <figcaption class="receipt-caption">El total recibido suma el efectivo y el CoDi confirmado.</figcaption>
         </figure>
       </div>
     </section>
@@ -540,20 +590,20 @@
     <!-- 1. Today's operation -->
     <section id="como-funciona" aria-labelledby="s1">
       <div class="wrap">
-        <h2 id="s1" class="section-title">Tu tienda, en orden desde el primer cobro.</h2>
-        <p class="section-lede">Abre el catálogo, cobra, registra un gasto y revisa lo que pasó hoy. El dueño ve la tienda completa. Cada empleado ve solo lo que necesita para su turno.</p>
+        <h2 id="s1" class="section-title">Tres formas de vender. Un solo cierre.</h2>
+        <p class="section-lede">Revisa cuánto entró por cada medio, cuánto queda por cobrar y quién atendió cada venta.</p>
         <div class="cards">
           <div class="card">
-            <h3>Cobrar</h3>
-            <p>Productos, total y cambio en una sola pantalla. <span class="tag-simulado">Simulado</span></p>
+            <h3>Efectivo</h3>
+            <p>Registra lo que recibiste, calcula el cambio y guarda el comprobante.</p>
           </div>
           <div class="card">
-            <h3>Inicio</h3>
-            <p>Ventas, lo cobrado, lo que te deben y los productos por agotarse. <span class="tag-simulado">Simulado</span></p>
+            <h3>CoDi</h3>
+            <p>Muestra el QR de la venta y espera la confirmación del pago. Sin comisión por transacción.</p>
           </div>
           <div class="card">
-            <h3>Inventario</h3>
-            <p>Existencia, último movimiento y una alerta de reposición. <span class="tag-simulado">Simulado</span></p>
+            <h3>Fiado</h3>
+            <p>Anota lo que te deben y registra cada abono para ver el saldo pendiente.</p>
           </div>
         </div>
       </div>
@@ -588,6 +638,13 @@
         <h2 id="s4" class="section-title">Lo que te deben, con nombre y con historial.</h2>
         <p class="section-lede">Registra una venta fiada con el cliente correcto. Consulta el saldo, registra un abono parcial o liquida la deuda. Cada movimiento conserva fecha, responsable y nota. El fiado se confirma con conexión para no duplicar una deuda desde dos teléfonos.</p>
         <p class="note">La demostración usa nombres ficticios con una etiqueta visible <span class="tag-simulado">Simulado</span>. Esta página no muestra deudas de personas reales.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="s-equipo">
+      <div class="wrap">
+        <h2 id="s-equipo" class="section-title">Cada quien cobra con su acceso.</h2>
+        <p class="section-lede">Tú decides quién puede cobrar. Cada venta queda a nombre de quien la atendió. En el flujo de equipo que se valida para el piloto, los pagos con CoDi van a la cuenta bancaria activa de tu tienda.</p>
       </div>
     </section>
 
@@ -819,7 +876,7 @@
     <div class="wrap">
       <div class="cols">
         <div>
-          <p><strong>Abarpay</strong> · Cobros CoDi, ventas e inventario para la tiendita.</p>
+          <p><strong>Abarpay</strong> · Efectivo, CoDi y fiado para tu negocio.</p>
         </div>
         <div>
           <p><a href="/empezar" data-cta="footer-empezar">Empezar gratis</a> · <a href="/entrar" data-cta="footer-entrar">Entrar a mi tienda</a> · <a href="/apk-piloto" data-cta="footer-apk">APK piloto</a></p>
