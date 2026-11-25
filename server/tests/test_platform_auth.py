@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import secrets
+
 import pytest
 from fastapi.testclient import TestClient
 
 from server.main import create_app
 
 OWNER_EMAIL = "carlos@abarpay.app"
-OWNER_PASSWORD = "ClaveSegura123"
+OWNER_PASSWORD = secrets.token_urlsafe(24)
 
 
 @pytest.fixture
@@ -116,17 +118,18 @@ def test_deactivating_staff_revokes_the_session(platform):
 
 def test_password_change_clears_the_temporary_password(platform):
     _, owner = platform
+    new_password = secrets.token_urlsafe(24)
     assert login(owner).status_code == 200
     changed = owner.post(
         "/api/platform/auth/password",
-        json={"currentPassword": OWNER_PASSWORD, "newPassword": "ClaveDefinitiva789"},
+        json={"currentPassword": OWNER_PASSWORD, "newPassword": new_password},
     )
     assert changed.status_code == 200, changed.text
     assert changed.json()["staff"]["mustChangePassword"] is False
 
     assert owner.post("/api/platform/auth/logout").status_code == 204
     assert login(owner).status_code == 401
-    assert login(owner, password="ClaveDefinitiva789").status_code == 200
+    assert login(owner, password=new_password).status_code == 200
 
 
 def test_only_the_owner_can_grant_admin(platform):

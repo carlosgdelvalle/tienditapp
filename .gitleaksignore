@@ -1,0 +1,3 @@
+# Contraseñas ficticias de la prueba de inicio y cambio de contraseña en SQLite temporal.
+ea6ccd40939574cbcc4d7dc3ca978499d19b973c:server/tests/test_platform_auth.py:generic-api-key:11
+ea6ccd40939574cbcc4d7dc3ca978499d19b973c:server/tests/test_platform_auth.py:generic-api-key:129

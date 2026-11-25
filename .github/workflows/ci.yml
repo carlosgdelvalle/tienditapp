@@ -18,7 +18,7 @@ jobs:
       - name: Escaneo de secretos (gitleaks)
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
-            detect --source=/repo --redact --verbose --exit-code 1
+            detect --source=/repo --gitleaks-ignore-path=/repo/.gitleaksignore --redact --verbose --exit-code 1
 
   servidor:
     runs-on: ubuntu-latest
@@ -63,6 +63,8 @@ jobs:
           java-version: "21"
       - name: Configurar Android SDK 35
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35'
       - name: Pruebas unitarias y ensamblado release
         working-directory: android
         run: ./gradlew testDebugUnitTest assembleRelease
